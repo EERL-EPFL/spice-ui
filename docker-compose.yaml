@@ -1,0 +1,67 @@
+services:
+  traefik:
+    image: traefik:v2.9.6
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+    ports:
+      - "88:80"
+      - "8088:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  spice-api:
+    build:
+      context: ../spice-api
+      dockerfile: Dockerfile.dev  # Uses the dockerfile containing cargo-watch
+    environment:
+      - DB_HOST=spice-db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=psql
+      - DB_NAME=postgres
+      - DB_PREFIX=postgresql
+      - KEYCLOAK_UI_ID=${KEYCLOAK_CLIENT_ID}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM}
+      - KEYCLOAK_URL=${KEYCLOAK_URL}
+      - DEPLOYMENT=local
+      - APP_NAME=spice-api
+    ports:
+      - 3005:3000
+    depends_on:
+        - spice-db
+    volumes:
+      - ../spice-api/src:/app/src
+      - spice-api-data:/app/target  # Store builds in docker volume
+      - ../spice-api/Cargo.toml:/app/Cargo.toml
+      - ../spice-api/Cargo.lock:/app/Cargo.lock
+      - ../crudcrate:/crudcrate
+      - ../crudcrate-derive:/crudcrate-derive
+    labels:
+      - "traefik.http.routers.spice-api.rule=Host(`spice`) && PathPrefix(`/api`)"
+      - "traefik.http.services.spice-api.loadbalancer.server.port=3000"
+
+  spice-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev  # Uses the dockerfile containing yarn dev
+    labels:
+      - "traefik.http.routers.spice-ui.rule=Host(`spice`)"
+      - "traefik.http.services.spice-ui.loadbalancer.server.port=5173"
+    volumes:
+      - ../spice-ui:/app
+
+  spice-db:
+    image: postgis/postgis:17-master
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=psql
+      - POSTGRES_DB=postgres
+    ports:
+      - 5433:5432
+    volumes:
+      - spice-db-data:/var/lib/postgresql/data
+
+volumes:
+  spice-db-data:
+  spice-api-data:
