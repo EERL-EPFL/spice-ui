@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import {
     useAuthProvider,
     useNotify,
+    useRecordContext,
     useRefresh,
 } from 'react-admin';
 
@@ -14,6 +15,11 @@ import '@uppy/status-bar/dist/style.min.css';
 import './UppyUploader.css'; // Import custom CSS
 
 export const UppyUploader = () => {
+    const record = useRecordContext();
+    if (!record) {
+        return null;
+    }
+    const { id } = record;
     const auth = useAuthProvider();
     const token = auth.getToken();
     const refresh = useRefresh();
@@ -29,7 +35,7 @@ export const UppyUploader = () => {
     const [uppy] = useState(() => new Uppy({
         // restrictions: { allowedFileTypes: ['.tif'] }
     }).use(XHR, {
-        endpoint: '/api/experiments/uploads',
+        endpoint: `/api/experiments/${id}/uploads`,
         headers: headers,
         limit: 25,
         onAfterResponse: (response) => {

@@ -10,6 +10,10 @@ import {
     NumberField,
     BooleanField,
     ReferenceField,
+    ArrayField,
+    Datagrid,
+    FunctionField,
+    TabbedShowLayout,
 } from "react-admin";
 import { UppyUploader } from "../uploader/Uppy";
 
@@ -45,6 +49,22 @@ export const ShowComponent = () => {
                 <NumberField source="temperature_start" />
                 <NumberField source="temperature_end" />
                 <UppyUploader />
+                <TabbedShowLayout>
+                    <TabbedShowLayout.Tab label="Assets">
+                <ArrayField source="assets">
+                    <Datagrid
+                        bulkActionButtons={false}
+                        rowClick={false}
+                    >
+                        <TextField source="original_filename" />
+                        <TextField source="type" />
+                        <FunctionField source="size_bytes" render={record => record.size_bytes ? `${(record.size_bytes / 1024 / 1024).toFixed(2)} MB` : ''} />
+                        <DateField source="created_at" showTime />
+                        <NumberField source="size" />
+                    </Datagrid>
+                    </ArrayField>
+                    </TabbedShowLayout.Tab>
+                    </TabbedShowLayout>
 
             </SimpleShowLayout>
         </Show>
