@@ -10,6 +10,6 @@ export default {
     edit: EditComponent,
     list: ListComponent,
     show: ShowComponent,
-    recordRepresentation: 'name.en',
+    // recordRepresentation: (record: { name: string }) => record.name,
     icon: BiotechIcon,
 };

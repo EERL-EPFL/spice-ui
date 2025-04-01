@@ -11,6 +11,8 @@ import {
     BooleanField,
     ReferenceField,
 } from "react-admin";
+import { UppyUploader } from "../uploader/Uppy";
+
 
 const ShowComponentActions = () => {
     const { permissions } = usePermissions();
@@ -29,7 +31,7 @@ const ShowComponentActions = () => {
 export const ShowComponent = () => {
     return (
         <Show actions={<ShowComponentActions />}>
-            <SimpleShowLayout>
+            <SimpleShowLayout title="Experiment">
                 <TextField source="id" />
                 <TextField source="name" />
                 <DateField source="performed_at" showTime label="Date"/>
@@ -42,6 +44,8 @@ export const ShowComponent = () => {
                 <NumberField source="temperature_ramp" />
                 <NumberField source="temperature_start" />
                 <NumberField source="temperature_end" />
+                <UppyUploader />
+
             </SimpleShowLayout>
         </Show>
     );

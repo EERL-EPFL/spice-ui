@@ -5,6 +5,7 @@ import {
     Resource,
     AuthProvider,
     DataProvider,
+    RecordContext,
 } from 'react-admin';
 import { Route } from 'react-router-dom';
 import simpleRestProvider from './dataProvider/index'
@@ -103,7 +104,7 @@ const App = () => {
                             {/* <Resource name="projects" {...projects} /> */}
                             <Resource name="campaigns" {...campaigns} />
                             <Resource name="samples" {...samples} />
-                            <Resource name="experiments" {...experiments} />
+                            <Resource name="experiments" {...experiments} recordRepresentation="Hello"/>
                             {/* <Resource name="plots" {...plots.plot} />
                             <Resource name="plot_samples" {...plots.sample} />
                             <Resource name="sensors" {...sensors.sensor} />

@@ -1,0 +1,37 @@
+#progressbar,
+#statusbar,
+#dragdrop {
+    margin: 20px 0;
+}
+
+#progressbar .uppy-ProgressBar-inner {
+    background-color: #4caf50;
+    /* Custom color for progress bar */
+}
+
+#dragdrop {
+    border: 2px dashed #4caf50;
+    padding: 20px;
+    background-color: #f9f9f9;
+    text-align: center;
+}
+
+#statusbar {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.uppy-DragDrop-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.uppy-DragDrop-inner {
+    max-width: 100%;
+    padding: 20px;
+}
+
+.uppy-StatusBar-actions .uppy-StatusBar-action {
+    margin: 0 10px;
+}
