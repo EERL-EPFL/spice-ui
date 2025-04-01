@@ -39,6 +39,7 @@ export const keycloakAuthProvider = (
     },
     async checkAuth() {
         try {
+            console.log('Checking authentication...');
             if (!client.authenticated || !client.token) {
                 throw new Error('Authentication failed.');
             }
@@ -57,6 +58,7 @@ export const keycloakAuthProvider = (
                 return Promise.resolve();
             }
         } catch (error) {
+            console.error('Error during authentication check:', error);
             return Promise.reject(error);
         }
     },

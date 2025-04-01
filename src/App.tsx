@@ -15,7 +15,7 @@ import Keycloak, {
 import { httpClient } from 'ra-keycloak';
 import { keycloakAuthProvider } from './authProvider';
 import MyLayout from './layout/Layout';
-// import users from './users';
+import samples from './samples';
 import sensors from './sensors';
 import campaigns from "./campaigns";
 import plots from './plots';
@@ -102,6 +102,7 @@ const App = () => {
                         <>
                             {/* <Resource name="projects" {...projects} /> */}
                             <Resource name="campaigns" {...campaigns} />
+                            <Resource name="samples" {...samples} />
                             <Resource name="experiments" {...experiments} />
                             {/* <Resource name="plots" {...plots.plot} />
                             <Resource name="plot_samples" {...plots.sample} />

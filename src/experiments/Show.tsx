@@ -8,6 +8,8 @@ import {
     usePermissions,
     DateField,
     NumberField,
+    BooleanField,
+    ReferenceField,
 } from "react-admin";
 
 const ShowComponentActions = () => {
@@ -29,19 +31,17 @@ export const ShowComponent = () => {
         <Show actions={<ShowComponentActions />}>
             <SimpleShowLayout>
                 <TextField source="id" />
-                <TextField source="experiment_code" />
-                <TextField source="campaign_id" />
-                <TextField source="user_identifier" />
-                <DateField source="experiment_date" showTime />
+                <TextField source="name" />
+                <DateField source="performed_at" showTime label="Date"/>
+                <BooleanField source="is_calibration" />
+                <ReferenceField source="sample_id" reference="samples" link="show">
+                    <TextField source="name"/>
+                </ReferenceField>
+                <TextField source="username" />
                 <DateField source="created_at" showTime />
-                <DateField source="image_capture_started_at" showTime />
-                <DateField source="image_capture_ended_at" showTime />
                 <NumberField source="temperature_ramp" />
                 <NumberField source="temperature_start" />
                 <NumberField source="temperature_end" />
-                <NumberField source="cooling_rate" />
-                <NumberField source="temperature_calibration_slope" />
-                <NumberField source="temperature_calibration_intercept" />
             </SimpleShowLayout>
         </Show>
     );

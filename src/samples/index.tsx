@@ -2,8 +2,7 @@ import CreateComponent from './Create';
 import EditComponent from './Edit';
 import ListComponent from './List';
 import ShowComponent from './Show';
-import BiotechIcon from '@mui/icons-material/Biotech';
-
+import ScienceIcon from '@mui/icons-material/Science';
 
 export default {
     create: CreateComponent,
@@ -11,5 +10,5 @@ export default {
     list: ListComponent,
     show: ShowComponent,
     recordRepresentation: 'name.en',
-    icon: BiotechIcon,
+    icon: ScienceIcon,
 };

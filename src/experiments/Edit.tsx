@@ -1,7 +1,11 @@
 import {
+    BooleanField,
+    BooleanInput,
     DateTimeInput,
     Edit,
     NumberInput,
+    ReferenceInput,
+    SelectInput,
     SimpleForm,
     TextInput,
     required
@@ -12,19 +16,20 @@ const EditComponent = () => {
         <Edit>
             <SimpleForm>
                 <TextInput disabled label="Id" source="id" />
-                <TextInput source="experiment_code" validate={[required()]} />
-                <TextInput source="campaign_id" />
-                <TextInput source="user_identifier" />
-                <DateTimeInput source="experiment_date" />
-                <DateTimeInput source="created_at" disabled />
-                <DateTimeInput source="image_capture_started_at" />
-                <DateTimeInput source="image_capture_ended_at" />
+                <TextInput source="name" validate={[required()]} />
+                <ReferenceInput source="sample_id" reference="samples">
+                    <SelectInput optionText="name" />
+                </ReferenceInput>
+                <TextInput source="username" />
+                <DateTimeInput source="performed_at" label="Date" parse={(date: string | Date) => {
+                    const parsedDate = typeof date === 'string' ? new Date(date) : date;
+                    return parsedDate ? parsedDate.toISOString() : null;
+                }}/>
                 <NumberInput source="temperature_ramp" />
                 <NumberInput source="temperature_start" />
                 <NumberInput source="temperature_end" />
-                <NumberInput source="cooling_rate" />
-                <NumberInput source="temperature_calibration_slope" />
-                <NumberInput source="temperature_calibration_intercept" />
+                <BooleanInput source="is_calibration" />
+                <TextInput source="remarks" />
             </SimpleForm>
         </Edit>
     );
