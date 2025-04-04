@@ -20,6 +20,7 @@ import {
     useRecordContext,
     useAuthProvider,
 } from "react-admin";
+import React from "react";
 import { Button } from "@mui/material";
 import { UppyUploader } from "../uploader/Uppy";
 import { AuthProvider } from 'react-admin';
@@ -37,10 +38,10 @@ const ShowComponentActions = () => {
         </TopToolbar>
     );
 };
-
 const DownloadAllButton = () => {
     const record = useRecordContext();
     const authProvider = useAuthProvider();
+    const [isDownloading, setIsDownloading] = React.useState(false);
 
     if (!record || !authProvider) return null;
     if (!record.assets || record.assets.length === 0) return null;
@@ -48,31 +49,44 @@ const DownloadAllButton = () => {
     const handleDownload = async () => {
         if (!record) return;
 
-        const token = await authProvider.getToken(); // Assuming getToken is available and retrieves the auth token
+        setIsDownloading(true);
 
-        const response = await fetch(`/api/experiments/${record.id}/download`, {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        });
+        try {
+            const token = await authProvider.getToken(); // Assuming getToken is available and retrieves the auth token
 
-        if (response.ok) {
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `experiment_${record.id}_assets.zip`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-        } else {
-            console.error("Failed to download assets");
+            const response = await fetch(`/api/experiments/${record.id}/download`, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `experiment_${record.id}_assets.zip`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            } else {
+                console.error("Failed to download assets");
+            }
+        } catch (error) {
+            console.error("Error during download:", error);
+        } finally {
+            setIsDownloading(false);
         }
     };
 
     return (
-        <Button variant="contained" color="primary" onClick={handleDownload}>
-            Download all
+        <Button
+            variant="contained"
+            color="primary"
+            onClick={handleDownload}
+            disabled={isDownloading}
+        >
+            {isDownloading ? "Downloading..." : "Download all"}
         </Button>
     );
 };
