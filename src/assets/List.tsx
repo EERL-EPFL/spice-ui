@@ -9,7 +9,7 @@ import {
     DateField,
     NumberField,
     ReferenceField,
-    ReferenceManyCount,
+    FunctionField,
 } from "react-admin";
 import { postFilters } from "../filters/list";
 
@@ -27,13 +27,13 @@ export const ListComponent = () => {
     return (
         <List actions={<ListComponentActions />} storeKey={false} filters={postFilters}>
             <Datagrid rowClick="show">
-                <DateField source="performed_at" label="Date" showTime />
-                <TextField source="name" label="Experiment Code" />
-                <ReferenceField source="sample_id" reference="samples" link="show">
+                <DateField source="uploaded_at" label="Uploaded at" showTime />
+                <TextField source="original_filename" />
+                <ReferenceField source="experiment_id" reference="experiments" link="show">
                     <TextField source="name" />
                 </ReferenceField>
-                <TextField source="username" label="Username" />
-                <ReferenceManyCount label="Data Assets #" reference="assets" target="experiment_id" link />
+                <TextField source="type" />
+                <FunctionField source="size_bytes" label="Size (MB)" render={record => (record.size_bytes / 1024 / 1024).toFixed(2)} />
             </Datagrid>
         </List>
     );

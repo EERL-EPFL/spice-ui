@@ -1,13 +1,10 @@
-/* eslint react/jsx-key: off */
 import { useState, useRef, useEffect } from 'react';
 import {
     Admin,
     Resource,
     AuthProvider,
     DataProvider,
-    RecordContext,
 } from 'react-admin';
-import { Route } from 'react-router-dom';
 import simpleRestProvider from './dataProvider/index'
 import Keycloak, {
     KeycloakTokenParsed,
@@ -17,15 +14,10 @@ import { httpClient } from 'ra-keycloak';
 import { keycloakAuthProvider } from './authProvider';
 import MyLayout from './layout/Layout';
 import samples from './samples';
-import sensors from './sensors';
+import assets from './assets';
 import campaigns from "./campaigns";
-import plots from './plots';
 import experiments from './experiments';
-import projects from './projects';
-// import transects from './transects';
-// import gnss from './gnss';
 import axios from 'axios';
-// import instruments from './instruments';
 import Dashboard from './Dashboard';
 import './App.css';
 
@@ -98,20 +90,12 @@ const App = () => {
         >
             {permissions => (
                 <>
-
                     {permissions ? (
                         <>
-                            {/* <Resource name="projects" {...projects} /> */}
                             <Resource name="campaigns" {...campaigns} />
                             <Resource name="samples" {...samples} />
-                            <Resource name="experiments" {...experiments} recordRepresentation="Hello"/>
-                            {/* <Resource name="plots" {...plots.plot} />
-                            <Resource name="plot_samples" {...plots.sample} />
-                            <Resource name="sensors" {...sensors.sensor} />
-                            <Resource name="sensor_profiles" {...sensors.profile} />
-                            <Resource name="sensor_profile_assignments" {...sensors.assignments} />
-                            <Resource name="sensordata" {...sensors.sensordata} /> */}
-
+                            <Resource name="experiments" {...experiments} />
+                            <Resource name="assets" {...assets} />
                         </>
                     ) : null}
                 </>

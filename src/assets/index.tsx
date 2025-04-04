@@ -2,7 +2,7 @@ import CreateComponent from './Create';
 import EditComponent from './Edit';
 import ListComponent from './List';
 import ShowComponent from './Show';
-import BiotechIcon from '@mui/icons-material/Biotech';
+import SaveIcon from '@mui/icons-material/Save';
 
 
 export default {
@@ -10,5 +10,8 @@ export default {
     edit: EditComponent,
     list: ListComponent,
     show: ShowComponent,
-    icon: BiotechIcon,
+    icon: SaveIcon,
+    options: {
+        label: 'Data Assets',
+    },
 };
