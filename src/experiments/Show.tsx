@@ -10,20 +10,19 @@ import {
     NumberField,
     BooleanField,
     ReferenceField,
-    ArrayField,
     Datagrid,
     FunctionField,
     TabbedShowLayout,
-    ReferenceArrayField,
     ReferenceManyField,
     Pagination,
     useRecordContext,
     useAuthProvider,
+    Labeled,
 } from "react-admin";
 import React from "react";
-import { Button } from "@mui/material";
+import { Button, Grid } from "@mui/material";
 import { UppyUploader } from "../uploader/Uppy";
-import { AuthProvider } from 'react-admin';
+
 
 const ShowComponentActions = () => {
     const { permissions } = usePermissions();
@@ -95,27 +94,89 @@ export const ShowComponent = () => {
     return (
         <Show actions={<ShowComponentActions />}>
             <SimpleShowLayout title="Experiment">
-                <TextField source="id" />
-                <TextField source="name" />
-                <DateField source="performed_at" showTime label="Date" />
-                <BooleanField source="is_calibration" />
-                <ReferenceField source="sample_id" reference="samples" link="show">
-                    <TextField source="name" />
-                </ReferenceField>
-                <TextField source="username" />
-                <DateField source="created_at" showTime />
-                <NumberField source="temperature_ramp" />
-                <NumberField source="temperature_start" />
-                <NumberField source="temperature_end" />
-                <UppyUploader />
+                <Grid container spacing={2}>
+                    {/* Left column with fields */}
+                    <Grid item xs={8}>
+                        <Grid container spacing={2}>
+                            <Grid item xs={6}>
+                                <Labeled>
+                                    <TextField source="id" />
+                                </Labeled>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Labeled>
+                                    <TextField source="name" />
+                                </Labeled>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Labeled>
+                                    <DateField source="performed_at" showTime label="Date" />
+                                </Labeled>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Labeled>
+                                    <BooleanField source="is_calibration" />
+                                </Labeled>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Labeled>
+                                    <ReferenceField source="sample_id" reference="samples" link="show">
+                                        <TextField source="name" />
+                                    </ReferenceField>
+                                </Labeled>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Labeled>
+                                    <TextField source="username" />
+                                </Labeled>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Labeled>
+                                    <DateField source="created_at" showTime />
+                                </Labeled>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Labeled>
+                                    <NumberField source="temperature_ramp" />
+                                </Labeled>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Labeled>
+                                    <NumberField source="temperature_start" />
+                                </Labeled>
+                            </Grid>
+                            <Grid item xs={6}>
+                                <Labeled>
+                                    <NumberField source="temperature_end" />
+                                </Labeled>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                    {/* Right column with uploader */}
+                    <Grid item xs={4}>
+                        <UppyUploader />
+                    </Grid>
+                </Grid>
                 <TabbedShowLayout>
                     <TabbedShowLayout.Tab label="Asset list">
                         <DownloadAllButton />
-                        <ReferenceManyField reference="assets" target="experiment_id" label="Tags" pagination={<Pagination />}>
+                        <ReferenceManyField
+                            reference="assets"
+                            target="experiment_id"
+                            label="Tags"
+                            pagination={<Pagination />}
+                        >
                             <Datagrid rowClick={false}>
                                 <TextField source="original_filename" />
                                 <TextField source="type" />
-                                <FunctionField source="size_bytes" render={record => record.size_bytes ? `${(record.size_bytes / 1024 / 1024).toFixed(2)} MB` : ''} />
+                                <FunctionField
+                                    source="size_bytes"
+                                    render={(record) =>
+                                        record.size_bytes
+                                            ? `${(record.size_bytes / 1024 / 1024).toFixed(2)} MB`
+                                            : ""
+                                    }
+                                />
                                 <DateField source="created_at" showTime />
                             </Datagrid>
                         </ReferenceManyField>
@@ -125,5 +186,6 @@ export const ShowComponent = () => {
         </Show>
     );
 };
+
 
 export default ShowComponent;
