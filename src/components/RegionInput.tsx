@@ -346,6 +346,10 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
                                 onChange={(e) => handleNameChange(idx, e.target.value)}
                                 variant="outlined"
                                 margin="dense"
+                                sx={{ 
+                                    width: 140, // Fixed width for consistent sizing
+                                    minWidth: 140 
+                                }}
                                 InputProps={{
                                     style: {
                                         backgroundColor: r.color,
