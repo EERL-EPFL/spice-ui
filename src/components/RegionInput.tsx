@@ -11,16 +11,29 @@ const letterToRowIndex = (letter: string): number =>
     ROW_LETTERS.indexOf(letter.toUpperCase());
 const numberToColIndex = (num: number): number => num - 1;
 
-// Parse “A1” or “H12” → { row: 0..7, col: 0..11 }
-const parseCell = (s: string): Cell => {
+// Parse "A1" or "H12" → { row: 0..7, col: 0..11 }, accounting for tray orientation
+const parseCell = (s: string, tray?: number): Cell => {
     const match = s.match(/^([A-Ha-h])(\d{1,2})$/);
     if (match) {
-        return {
-            row: letterToRowIndex(match[1]),
-            col: numberToColIndex(parseInt(match[2], 10)),
-        };
+        const row = letterToRowIndex(match[1]);
+        const colNumber = parseInt(match[2], 10);
+        let col = numberToColIndex(colNumber);
+
+        // For P2, the visual display shows 12→1 but we need to map to logical coords
+        // No inversion needed in parsing - the visual mapping handles this
+
+        return { row, col };
     }
     return { row: 0, col: 0 };
+};
+
+// Convert Cell back to string, accounting for tray orientation
+const cellToString = (cell: Cell, tray: number): string => {
+    const letter = rowIndexToLetter(cell.row);
+    // Both trays use normal 1-12 numbering in the coordinate system
+    const colNumber = cell.col + 1;
+    
+    return `${letter}${colNumber}`;
 };
 
 interface SingleRegion {
@@ -55,14 +68,14 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
     const handleNewRegion = useCallback(
         (regionObj: { tray: number; upperLeft: Cell; lowerRight: Cell }) => {
             const { tray, upperLeft, lowerRight } = regionObj;
-            const ulStr = `${rowIndexToLetter(upperLeft.row)}${colIndexToNumber(upperLeft.col)}`;
-            const lrStr = `${rowIndexToLetter(lowerRight.row)}${colIndexToNumber(lowerRight.col)}`;
+            const ulStr = cellToString(upperLeft, tray);
+            const lrStr = cellToString(lowerRight, tray);
 
             // 1) Check overlap on same tray
             const existingOnTray = regions.filter((r) => r.tray === tray);
             for (const r of existingOnTray) {
-                const rUL = parseCell(r.upper_left);
-                const rLR = parseCell(r.lower_right);
+                const rUL = parseCell(r.upper_left, r.tray);
+                const rLR = parseCell(r.lower_right, r.tray);
                 const overlapInRows =
                     upperLeft.row <= rLR.row && lowerRight.row >= rUL.row;
                 const overlapInCols =
@@ -102,8 +115,8 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
         .map((r, idx) => ({ ...r, idx }))
         .filter((r) => r.tray === 1)
         .map((r) => ({
-            upperLeft: parseCell(r.upper_left),
-            lowerRight: parseCell(r.lower_right),
+            upperLeft: parseCell(r.upper_left, r.tray),
+            lowerRight: parseCell(r.lower_right, r.tray),
             name: r.name || 'Unnamed',
             color: r.color,
             onRemove: () => handleRemove(r.idx),
@@ -113,8 +126,8 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
         .map((r, idx) => ({ ...r, idx }))
         .filter((r) => r.tray === 2)
         .map((r) => ({
-            upperLeft: parseCell(r.upper_left),
-            lowerRight: parseCell(r.lower_right),
+            upperLeft: parseCell(r.upper_left, r.tray),
+            lowerRight: parseCell(r.lower_right, r.tray),
             name: r.name || 'Unnamed',
             color: r.color,
             onRemove: () => handleRemove(r.idx),

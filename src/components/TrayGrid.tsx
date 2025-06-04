@@ -71,10 +71,12 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     // Convert a logical (row,col) → displayed (xIndex,yIndex) depending on orientation:
     const getDisplayIndices = (row: number, col: number) => {
         if (orientation === 90) {
-            // 90° CW: x = row, y = (12−1 − col)
+            // P2 (Tray 2): A→H (left to right), 12→1 (top to bottom)
+            // Keep rows normal, invert columns for display
             return { xIndex: row, yIndex: NUM_COLS - 1 - col };
         } else {
-            // 270° CCW: x = (8−1 − row), y = col
+            // P1 (Tray 1): H→A (left to right), 1→12 (top to bottom) 
+            // Invert rows for display, keep columns normal
             return { xIndex: NUM_ROWS - 1 - row, yIndex: col };
         }
     };
@@ -209,7 +211,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             {Array.from({ length: NUM_ROWS }).map((_, rowIdx) => {
                 const { xIndex } = getDisplayIndices(rowIdx, 0);
                 const cx = SPACING + xIndex * SPACING;
-                const label = orientation === 90 ? ROW_LETTERS[rowIdx] : ROW_LETTERS[NUM_ROWS - 1 - rowIdx];
+                // For P1 (270°): H→A, For P2 (90°): A→H
+                const label = orientation === 90 ? ROW_LETTERS[rowIdx] : ROW_LETTERS[rowIdx];
                 return (
                     <text
                         key={`row-label-${rowIdx}`}
@@ -228,7 +231,18 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             {Array.from({ length: NUM_COLS }).map((_, colIdx) => {
                 const { yIndex } = getDisplayIndices(0, colIdx);
                 const cy = SPACING + yIndex * SPACING;
-                const label = orientation === 90 ? NUM_COLS - colIdx : colIdx + 1;
+                
+                let label: number;
+                if (orientation === 90) {
+                    // P2: 12→1 (top to bottom)
+                    // colIdx=0 appears at bottom and should show "1"
+                    // colIdx=11 appears at top and should show "12"
+                    label = colIdx + 1;
+                } else {
+                    // P1: 1→12 (top to bottom)
+                    label = colIdx + 1;
+                }
+                
                 return (
                     <text
                         key={`col-label-${colIdx}`}
