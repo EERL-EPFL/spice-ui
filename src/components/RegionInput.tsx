@@ -1,8 +1,10 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { useInput, FieldTitle } from 'react-admin';
 import TrayGrid, { Cell, ExistingRegion, Orientation } from './TrayGrid';
-import { Box, Typography, TextField, IconButton } from '@mui/material';
+import { Box, Typography, TextField, IconButton, Button } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
+import DownloadIcon from '@mui/icons-material/Download';
 
 const ROW_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 const rowIndexToLetter = (idx: number): string => ROW_LETTERS[idx] || 'A';
@@ -56,6 +58,51 @@ const COLOR_PALETTE = [
     '#666666',
 ];
 
+// Simple YAML parser for our specific format
+const parseYAML = (yamlText: string): any => {
+    const lines = yamlText.split('\n');
+    const result: any = {};
+    let currentKey = '';
+    let currentArray: any[] = [];
+    
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        
+        if (!line.startsWith(' ') && trimmed.endsWith(':')) {
+            // New top-level key
+            if (currentKey && currentArray.length > 0) {
+                result[currentKey] = currentArray;
+                currentArray = [];
+            }
+            currentKey = trimmed.slice(0, -1);
+        } else if (trimmed.startsWith('- tray:')) {
+            // Start of new array item
+            const trayValue = trimmed.split('tray:')[1].trim();
+            currentArray.push({ tray: trayValue });
+        } else if (trimmed.startsWith('upper_left:')) {
+            // Add upper_left to current item
+            const value = trimmed.split('upper_left:')[1].trim();
+            if (currentArray.length > 0) {
+                currentArray[currentArray.length - 1].upper_left = value;
+            }
+        } else if (trimmed.startsWith('lower_right:')) {
+            // Add lower_right to current item
+            const value = trimmed.split('lower_right:')[1].trim();
+            if (currentArray.length > 0) {
+                currentArray[currentArray.length - 1].lower_right = value;
+            }
+        }
+    }
+    
+    // Don't forget the last key
+    if (currentKey && currentArray.length > 0) {
+        result[currentKey] = currentArray;
+    }
+    
+    return result;
+};
+
 export const RegionInput: React.FC<{ source: string; label?: string }> = (props) => {
     const {
         field: { value, onChange },
@@ -64,6 +111,7 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
     } = useInput(props);
 
     const regions: SingleRegion[] = Array.isArray(value) ? value : [];
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleNewRegion = useCallback(
         (regionObj: { tray: number; upperLeft: Cell; lowerRight: Cell }) => {
@@ -110,6 +158,109 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
         );
         onChange(updated);
     };
+
+    const handleYAMLImport = useCallback(() => {
+        fileInputRef.current?.click();
+    }, []);
+
+    const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const yamlText = e.target?.result as string;
+                const parsedYAML = parseYAML(yamlText);
+                
+                const importedRegions: SingleRegion[] = [];
+                let colorIndex = regions.length; // Continue from existing color index
+                
+                Object.entries(parsedYAML).forEach(([regionName, regionData]: [string, any]) => {
+                    if (Array.isArray(regionData)) {
+                        regionData.forEach((region) => {
+                            const trayNum = region.tray === 'P1' ? 1 : 2;
+                            const color = COLOR_PALETTE[colorIndex % COLOR_PALETTE.length];
+                            
+                            importedRegions.push({
+                                name: regionName,
+                                tray: trayNum,
+                                upper_left: region.upper_left,
+                                lower_right: region.lower_right,
+                                color: color
+                            });
+                            colorIndex++;
+                        });
+                    }
+                });
+                
+                // Merge with existing regions
+                const updatedRegions = [...regions, ...importedRegions];
+                onChange(updatedRegions);
+                
+            } catch (err) {
+                console.error('Error parsing YAML:', err);
+                window.alert('Error parsing YAML file. Please check the format.');
+            }
+        };
+        
+        reader.readAsText(file);
+        
+        // Reset file input
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    }, [regions, onChange]);
+
+    const handleYAMLExport = useCallback(() => {
+        if (regions.length === 0) {
+            window.alert('No regions to export.');
+            return;
+        }
+
+        // Group regions by name for YAML structure
+        const groupedRegions: { [key: string]: any[] } = {};
+        
+        regions.forEach(region => {
+            const regionName = region.name || 'Unnamed';
+            const trayLabel = region.tray === 1 ? 'P1' : 'P2';
+            
+            if (!groupedRegions[regionName]) {
+                groupedRegions[regionName] = [];
+            }
+            
+            groupedRegions[regionName].push({
+                tray: trayLabel,
+                upper_left: region.upper_left,
+                lower_right: region.lower_right
+            });
+        });
+
+        // Generate YAML content
+        let yamlContent = '';
+        Object.entries(groupedRegions).forEach(([regionName, regionData], index) => {
+            if (index > 0) yamlContent += '\n';
+            yamlContent += `${regionName}:\n`;
+            
+            regionData.forEach(region => {
+                yamlContent += `  - tray: ${region.tray}\n`;
+                yamlContent += `    upper_left: ${region.upper_left}\n`;
+                yamlContent += `    lower_right: ${region.lower_right}\n`;
+                yamlContent += '\n';
+            });
+        });
+
+        // Create and download file
+        const blob = new Blob([yamlContent.trim()], { type: 'text/yaml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'regions.yaml';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, [regions]);
 
     const tray1Existing: ExistingRegion[] = regions
         .map((r, idx) => ({ ...r, idx }))
@@ -225,6 +376,32 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
                             {error}
                         </Typography>
                     )}
+
+                    <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleYAMLImport}
+                        startIcon={<UploadFileIcon />}
+                        style={{ marginTop: '1rem' }}
+                    >
+                        Import YAML
+                    </Button>
+                    <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handleYAMLExport}
+                        startIcon={<DownloadIcon />}
+                        style={{ marginTop: '1rem', marginLeft: '0.5rem' }}
+                    >
+                        Export YAML
+                    </Button>
+                    <input
+                        type="file"
+                        accept=".yaml,.yml"
+                        onChange={handleFileChange}
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                    />
                 </Box>
             </Box>
         </Box>
