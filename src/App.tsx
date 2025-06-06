@@ -20,6 +20,7 @@ import experiments from './experiments';
 import axios from 'axios';
 import Dashboard from './Dashboard';
 import './App.css';
+import trays from './trays';
 
 
 const initOptions: KeycloakInitOptions = { onLoad: 'login-required', checkLoginIframe: false };
@@ -96,6 +97,7 @@ const App = () => {
                             <Resource name="samples" {...samples} />
                             <Resource name="experiments" {...experiments} />
                             <Resource name="assets" {...assets} />
+                            <Resource name="trays" {...trays} />
                         </>
                     ) : null}
                 </>
