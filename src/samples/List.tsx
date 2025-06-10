@@ -33,7 +33,7 @@ export const ListComponent = () => {
                 <ReferenceField source="campaign_id" reference="campaigns" link="show">
                     <TextField source="name" />
                 </ReferenceField>
-                <TextField source="treatment" label="Treatment" />=
+                {/* <TextField source="treatment" label="Treatment" />= */}
                 <DateField source="last_updated" label="Last Updated" showTime />
             </Datagrid>
         </List>

@@ -31,7 +31,7 @@ const CreateComponent = () => {
                     ]}
                     validate={[required()]}
                 />
-                <TextInput source="treatment" />
+                {/* <TextInput source="treatment" /> */}
                 <TextInput source="material_description" />
                 <TextInput source="extraction_procedure" />
                 <TextInput source="filter_substrate" />

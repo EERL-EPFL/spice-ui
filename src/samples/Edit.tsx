@@ -1,12 +1,16 @@
 import {
+    ArrayField,
+    ArrayInput,
     BooleanField,
     BooleanInput,
+    Datagrid,
     DateTimeInput,
     Edit,
     NumberInput,
     ReferenceInput,
     SelectInput,
     SimpleForm,
+    SimpleFormIterator,
     TextInput,
     required
 } from 'react-admin';
@@ -30,7 +34,7 @@ const EditComponent = () => {
                     ]}
                     validate={[required()]}
                 />
-                <TextInput source="treatment" />
+                {/* <TextInput source="treatment" /> */}
                 <TextInput source="material_description" />
                 <TextInput source="extraction_procedure" />
                 <TextInput source="filter_substrate" />
@@ -41,6 +45,14 @@ const EditComponent = () => {
                 <NumberInput source="well_volume_liters" />
                 <TextInput source="background_region_key" />
                 <TextInput source="remarks" />
+                Add treatments as input fields, here is the datagrid for the show component
+                <ArrayInput source="treatments" label="Sample Treatments">
+                    <SimpleFormIterator inline>
+                        <TextInput source="name" />
+                        <TextInput source="notes" />
+                        <NumberInput source="enzyme_volume_microlitres" />
+                    </SimpleFormIterator>
+                </ArrayInput>
             </SimpleForm>
         </Edit>
     );
