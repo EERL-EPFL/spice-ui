@@ -93,11 +93,11 @@ const App = () => {
                 <>
                     {permissions ? (
                         <>
+                            <Resource name="trays" {...trays} />
                             <Resource name="campaigns" {...campaigns} />
                             <Resource name="samples" {...samples} />
                             <Resource name="experiments" {...experiments} />
                             <Resource name="assets" {...assets} />
-                            <Resource name="trays" {...trays} />
                         </>
                     ) : null}
                 </>

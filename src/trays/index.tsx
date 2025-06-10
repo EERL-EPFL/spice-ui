@@ -11,4 +11,7 @@ export default {
     list: ListComponent,
     show: ShowComponent,
     icon: AppRegistrationIcon,
+    options: {
+        label: 'Tray Configuration',
+    }
 };
