@@ -66,6 +66,49 @@ services:
     volumes:
       - spice-db-data:/var/lib/postgresql/data
 
+
+  spice-test-db:
+    image: postgis/postgis:17-master
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=psql
+      - POSTGRES_DB=spice_test
+    tmpfs:
+      - /var/lib/postgresql/data:noexec,nosuid,size=500m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  spice-test-runner:
+    build:
+      context: ../spice-api
+      dockerfile: Dockerfile.test
+    environment:
+      - DB_HOST=spice-test-db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=psql
+      - DB_NAME=spice_test
+      - DB_PREFIX=postgresql
+      - RUST_LOG=info
+      - DEPLOYMENT=test
+    depends_on:
+      spice-test-db:
+        condition: service_healthy
+    volumes:
+      - ../spice-api/src:/app/src
+      - ../spice-api/entity:/app/entity
+      - ../spice-api/migration:/app/migration
+      - ../spice-api/Cargo.toml:/app/Cargo.toml
+      - ../spice-api/Cargo.lock:/app/Cargo.lock
+      - ../spice-api/dummy_data.sql:/app/dummy_data.sql
+      - spice-test-target:/app/target
+    working_dir: /app
+
+
 volumes:
   spice-db-data:
   spice-api-data:
+  spice-test-target:
