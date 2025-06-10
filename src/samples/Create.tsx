@@ -21,7 +21,16 @@ const CreateComponent = () => {
                     <SelectInput optionText="name" />
                 </ReferenceInput>
                 <TextInput source="name" validate={[required()]} />
-                <TextInput source="type" validate={[required()]} />
+                <SelectInput
+                    source="type"
+                    choices={[
+                        { id: 'Bulk', name: 'Bulk' },
+                        { id: 'Filter', name: 'Filter' },
+                        { id: 'ProceduralBlank', name: 'ProceduralBlank' },
+                        { id: 'PureWater', name: 'PureWater' },
+                    ]}
+                    validate={[required()]}
+                />
                 <TextInput source="treatment" />
                 <TextInput source="material_description" />
                 <TextInput source="extraction_procedure" />

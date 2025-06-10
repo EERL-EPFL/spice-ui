@@ -37,7 +37,7 @@ export const ShowComponent = () => {
                 <TextField source="id" />
                 <TextField source="name" />
                 <ReferenceField source="campaign_id" reference="campaigns" link="show">
-                    <TextField source="name"/>
+                    <TextField source="name" />
                 </ReferenceField>
                 <TextField source="type" />
                 <TextField source="treatment" />
@@ -53,12 +53,12 @@ export const ShowComponent = () => {
                 <TextField source="remarks" />
                 <DateField source="created_at" showTime />
                 <DateField source="last_updated" showTime />
-                <ReferenceManyField reference="experiments" target="sample_id" label="Experiments">
+                {/* <ReferenceManyField reference="experiments" target="sample_id" label="Experiments">
                     <Datagrid>
                         <TextField source="name" />
                         <DateField source="performed_at" />
                     </Datagrid>
-                </ReferenceManyField>
+                </ReferenceManyField> */}
 
             </SimpleShowLayout>
         </Show>

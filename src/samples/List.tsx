@@ -29,9 +29,9 @@ export const ListComponent = () => {
             <Datagrid rowClick="show">
                 <TextField source="name" label="Name" />
                 <TextField source="type" label="Type" />
-                <ReferenceManyCount target="sample_id" reference="experiments" label="Experiments" link/>
+                {/* <ReferenceManyCount target="sample_id" reference="experiments" label="Experiments" link/> */}
                 <ReferenceField source="campaign_id" reference="campaigns" link="show">
-                    <TextField source="name"/>
+                    <TextField source="name" />
                 </ReferenceField>
                 <TextField source="treatment" label="Treatment" />=
                 <DateField source="last_updated" label="Last Updated" showTime />
