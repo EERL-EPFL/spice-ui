@@ -28,10 +28,10 @@ export const ListComponent = () => {
         <List actions={<ListComponentActions />} storeKey={false} filters={postFilters}>
             <Datagrid rowClick="show">
                 <TextField source="name" label="Name" />
-                <TextField source="type" label="Type" />
-                <ReferenceField source="campaign_id" reference="campaigns" link="show">
+                <ReferenceField source="sample_id" reference="samples" link="show">
                     <TextField source="name" />
                 </ReferenceField>
+                <NumberField source="enzyme_volume_microlitres" label="Enzyme Volume (μL)" />
                 <DateField source="last_updated" label="Last Updated" showTime />
             </Datagrid>
         </List>

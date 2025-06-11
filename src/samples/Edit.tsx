@@ -34,7 +34,8 @@ const EditComponent = () => {
                     ]}
                     validate={[required()]}
                 />
-                {/* <TextInput source="treatment" /> */}
+                <NumberInput source="latitude" />
+                <NumberInput source="longitude" />
                 <TextInput source="material_description" />
                 <TextInput source="extraction_procedure" />
                 <TextInput source="filter_substrate" />

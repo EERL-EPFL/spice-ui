@@ -39,8 +39,6 @@ export const ShowComponent = () => {
                 <TextField source="id" />
                 <TextField source="name" />
                 <TextField source="description" />
-                <NumberField source="latitude" label="Latitude (°)" />
-                <NumberField source="longitude" label="Longitude (°)" />
                 <DateField source="start_date" showTime />
                 <DateField source="end_date" showTime />
                 <DateField source="last_updated" showTime />
