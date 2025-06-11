@@ -6,47 +6,72 @@ import CloseIcon from '@mui/icons-material/Close';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
 
-const ROW_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-const rowIndexToLetter = (idx: number): string => ROW_LETTERS[idx] || 'A';
+// Generate dynamic row letters based on tray dimensions
+const generateRowLetters = (maxRows: number): string[] => {
+    const letters = [];
+    for (let i = 0; i < maxRows; i++) {
+        letters.push(String.fromCharCode(65 + i)); // A, B, C, etc.
+    }
+    return letters;
+};
+
+const rowIndexToLetter = (idx: number, maxRows: number): string => {
+    const letters = generateRowLetters(maxRows);
+    return letters[idx] || 'A';
+};
+
 const colIndexToNumber = (idx: number): number => idx + 1;
-const letterToRowIndex = (letter: string): number =>
-    ROW_LETTERS.indexOf(letter.toUpperCase());
+
+const letterToRowIndex = (letter: string, maxRows: number): number => {
+    const letters = generateRowLetters(maxRows);
+    return letters.indexOf(letter.toUpperCase());
+};
+
 const numberToColIndex = (num: number): number => num - 1;
 
-// Parse "A1" or "H12" → { row: 0..7, col: 0..11 }, accounting for tray orientation
-const parseCell = (s: string, tray?: number): Cell => {
-    const match = s.match(/^([A-Ha-h])(\d{1,2})$/);
+// Parse cell string with dynamic tray dimensions
+const parseCell = (s: string, trayConfig?: any): Cell => {
+    if (!trayConfig) return { row: 0, col: 0 };
+    
+    const match = s.match(/^([A-Za-z])(\d{1,2})$/);
     if (match) {
-        const row = letterToRowIndex(match[1]);
+        const row = letterToRowIndex(match[1], trayConfig.qty_y_axis);
         const colNumber = parseInt(match[2], 10);
         let col = numberToColIndex(colNumber);
-
-        // For P2, the visual display shows 12→1 but we need to map to logical coords
-        // No inversion needed in parsing - the visual mapping handles this
-
         return { row, col };
     }
     return { row: 0, col: 0 };
 };
 
-// Convert Cell back to string, accounting for tray orientation
-const cellToString = (cell: Cell, tray: number): string => {
-    const letter = rowIndexToLetter(cell.row);
-    // Both trays use normal 1-12 numbering in the coordinate system
+// Convert Cell back to string with dynamic tray dimensions
+const cellToString = (cell: Cell, trayConfig: any): string => {
+    const letter = rowIndexToLetter(cell.row, trayConfig.qty_y_axis);
     const colNumber = cell.col + 1;
-    
     return `${letter}${colNumber}`;
 };
 
 interface SingleRegion {
-    name: string;         // user‐entered label
-    tray: number;         // 1 or 2
-    upper_left: string;   // e.g. "A1"
-    lower_right: string;  // e.g. "H4"
-    color: string;        // e.g. "#1b9e77"
+    name: string;
+    tray_name: string;     // Now use tray name instead of number
+    upper_left: string;
+    lower_right: string;
+    color: string;
+    sample?: string;       // Add sample field
+    dilution?: string;     // Add dilution field
 }
 
-// Colorblind‐safe palette (ColorBrewer “Dark2”)
+interface TrayConfig {
+    order_sequence: number;
+    rotation_degrees: number;
+    trays: Array<{
+        name: string;
+        qty_x_axis: number;
+        qty_y_axis: number;
+        well_relative_diameter?: string;
+    }>;
+}
+
+// Colorblind‐safe palette (ColorBrewer "Dark2")
 const COLOR_PALETTE = [
     '#1b9e77',
     '#d95f02',
@@ -59,7 +84,7 @@ const COLOR_PALETTE = [
 ];
 
 // Simple YAML parser for our specific format
-const parseYAML = (yamlText: string): any => {
+const parseYAML = (yamlText: string, trayConfigs: TrayConfig[]): any => {
     const lines = yamlText.split('\n');
     const result: any = {};
     let currentKey = '';
@@ -103,7 +128,12 @@ const parseYAML = (yamlText: string): any => {
     return result;
 };
 
-export const RegionInput: React.FC<{ source: string; label?: string }> = (props) => {
+export const RegionInput: React.FC<{ 
+    source: string; 
+    label?: string; 
+    trayConfiguration?: { trays: TrayConfig[] };
+    readOnly?: boolean;
+}> = (props) => {
     const {
         field: { value, onChange },
         fieldState: { error, isTouched },
@@ -112,18 +142,36 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
 
     const regions: SingleRegion[] = Array.isArray(value) ? value : [];
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { trayConfiguration, readOnly = false } = props;
+
+    // If no tray configuration is provided, show a message
+    if (!trayConfiguration || !trayConfiguration.trays || trayConfiguration.trays.length === 0) {
+        return (
+            <Box marginTop={2} marginBottom={2}>
+                <FieldTitle
+                    label={props.label || 'Regions'}
+                    source={props.source}
+                    resource={undefined}
+                    isRequired={isRequired}
+                />
+                <Typography variant="body2" color="textSecondary">
+                    No tray configuration available. Please select a tray configuration first.
+                </Typography>
+            </Box>
+        );
+    }
 
     const handleNewRegion = useCallback(
-        (regionObj: { tray: number; upperLeft: Cell; lowerRight: Cell }) => {
-            const { tray, upperLeft, lowerRight } = regionObj;
-            const ulStr = cellToString(upperLeft, tray);
-            const lrStr = cellToString(lowerRight, tray);
+        (regionObj: { trayName: string; upperLeft: Cell; lowerRight: Cell; trayConfig: any }) => {
+            const { trayName, upperLeft, lowerRight, trayConfig } = regionObj;
+            const ulStr = cellToString(upperLeft, trayConfig);
+            const lrStr = cellToString(lowerRight, trayConfig);
 
-            // 1) Check overlap on same tray
-            const existingOnTray = regions.filter((r) => r.tray === tray);
+            // Check overlap on same tray
+            const existingOnTray = regions.filter((r) => r.tray_name === trayName);
             for (const r of existingOnTray) {
-                const rUL = parseCell(r.upper_left, r.tray);
-                const rLR = parseCell(r.lower_right, r.tray);
+                const rUL = parseCell(r.upper_left, trayConfig);
+                const rLR = parseCell(r.lower_right, trayConfig);
                 const overlapInRows =
                     upperLeft.row <= rLR.row && lowerRight.row >= rUL.row;
                 const overlapInCols =
@@ -134,13 +182,21 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
                 }
             }
 
-            // 2) Pick a color
+            // Pick a color
             const color = COLOR_PALETTE[regions.length % COLOR_PALETTE.length];
 
-            // 3) Append new region (name initially empty)
+            // Append new region
             const updated: SingleRegion[] = [
                 ...regions,
-                { name: '', tray, upper_left: ulStr, lower_right: lrStr, color },
+                { 
+                    name: '', 
+                    tray_name: trayName, 
+                    upper_left: ulStr, 
+                    lower_right: lrStr, 
+                    color,
+                    sample: '',
+                    dilution: ''
+                },
             ];
             onChange(updated);
         },
@@ -152,9 +208,9 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
         onChange(updated);
     };
 
-    const handleNameChange = (idx: number, newName: string) => {
+    const handleRegionChange = (idx: number, field: string, newValue: string) => {
         const updated = regions.map((r, i) =>
-            i === idx ? { ...r, name: newName } : r
+            i === idx ? { ...r, [field]: newValue } : r
         );
         onChange(updated);
     };
@@ -171,30 +227,30 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
         reader.onload = (e) => {
             try {
                 const yamlText = e.target?.result as string;
-                const parsedYAML = parseYAML(yamlText);
+                const parsedYAML = parseYAML(yamlText, trayConfiguration?.trays || []);
                 
                 const importedRegions: SingleRegion[] = [];
-                let colorIndex = regions.length; // Continue from existing color index
+                let colorIndex = regions.length;
                 
                 Object.entries(parsedYAML).forEach(([regionName, regionData]: [string, any]) => {
                     if (Array.isArray(regionData)) {
                         regionData.forEach((region) => {
-                            const trayNum = region.tray === 'P1' ? 1 : 2;
                             const color = COLOR_PALETTE[colorIndex % COLOR_PALETTE.length];
                             
                             importedRegions.push({
                                 name: regionName,
-                                tray: trayNum,
+                                tray_name: region.tray,
                                 upper_left: region.upper_left,
                                 lower_right: region.lower_right,
-                                color: color
+                                color: color,
+                                sample: '',
+                                dilution: ''
                             });
                             colorIndex++;
                         });
                     }
                 });
                 
-                // Merge with existing regions
                 const updatedRegions = [...regions, ...importedRegions];
                 onChange(updatedRegions);
                 
@@ -206,11 +262,10 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
         
         reader.readAsText(file);
         
-        // Reset file input
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
-    }, [regions, onChange]);
+    }, [regions, onChange, trayConfiguration]);
 
     const handleYAMLExport = useCallback(() => {
         if (regions.length === 0) {
@@ -218,25 +273,22 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
             return;
         }
 
-        // Group regions by name for YAML structure
         const groupedRegions: { [key: string]: any[] } = {};
         
         regions.forEach(region => {
             const regionName = region.name || 'Unnamed';
-            const trayLabel = region.tray === 1 ? 'P1' : 'P2';
             
             if (!groupedRegions[regionName]) {
                 groupedRegions[regionName] = [];
             }
             
             groupedRegions[regionName].push({
-                tray: trayLabel,
+                tray: region.tray_name,
                 upper_left: region.upper_left,
                 lower_right: region.lower_right
             });
         });
 
-        // Generate YAML content
         let yamlContent = '';
         Object.entries(groupedRegions).forEach(([regionName, regionData], index) => {
             if (index > 0) yamlContent += '\n';
@@ -262,28 +314,6 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
         URL.revokeObjectURL(url);
     }, [regions]);
 
-    const tray1Existing: ExistingRegion[] = regions
-        .map((r, idx) => ({ ...r, idx }))
-        .filter((r) => r.tray === 1)
-        .map((r) => ({
-            upperLeft: parseCell(r.upper_left, r.tray),
-            lowerRight: parseCell(r.lower_right, r.tray),
-            name: r.name || 'Unnamed',
-            color: r.color,
-            onRemove: () => handleRemove(r.idx),
-        }));
-
-    const tray2Existing: ExistingRegion[] = regions
-        .map((r, idx) => ({ ...r, idx }))
-        .filter((r) => r.tray === 2)
-        .map((r) => ({
-            upperLeft: parseCell(r.upper_left, r.tray),
-            lowerRight: parseCell(r.lower_right, r.tray),
-            name: r.name || 'Unnamed',
-            color: r.color,
-            onRemove: () => handleRemove(r.idx),
-        }));
-
     return (
         <Box marginTop={2} marginBottom={2}>
             <FieldTitle
@@ -293,35 +323,47 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
                 isRequired={isRequired}
             />
 
-            <Box display="flex" gap={2}>
-                {/* Tray 1 */}
-                <Box flex={1}>
-                    <Typography variant="subtitle1" marginBottom={1}>
-                        Tray 1 (P1)
-                    </Typography>
-                    <TrayGrid
-                        tray={1}
-                        orientation={270 as Orientation}
-                        onRegionSelect={handleNewRegion}
-                        existingRegions={tray1Existing}
-                    />
-                </Box>
+            <Box display="flex" gap={2} flexWrap="wrap">
+                {/* Render dynamic trays */}
+                {trayConfiguration.trays.map((trayConfig, configIndex) => {
+                    return trayConfig.trays.map((tray, trayIndex) => {
+                        const trayName = tray.name;
+                        const existingRegions: ExistingRegion[] = regions
+                            .map((r, idx) => ({ ...r, idx }))
+                            .filter((r) => r.tray_name === trayName)
+                            .map((r) => ({
+                                upperLeft: parseCell(r.upper_left, tray),
+                                lowerRight: parseCell(r.lower_right, tray),
+                                name: r.name || 'Unnamed',
+                                color: r.color,
+                                onRemove: readOnly ? () => {} : () => handleRemove(r.idx),
+                            }));
 
-                {/* Tray 2 */}
-                <Box flex={1}>
-                    <Typography variant="subtitle1" marginBottom={1}>
-                        Tray 2 (P2)
-                    </Typography>
-                    <TrayGrid
-                        tray={2}
-                        orientation={90 as Orientation}
-                        onRegionSelect={handleNewRegion}
-                        existingRegions={tray2Existing}
-                    />
-                </Box>
+                        return (
+                            <Box key={`${configIndex}-${trayIndex}`} flex={1} minWidth="400px">
+                                <Typography variant="subtitle1" marginBottom={1}>
+                                    {trayName} ({trayConfig.rotation_degrees}°)
+                                </Typography>
+                                <TrayGrid
+                                    tray={trayName}
+                                    qtyXAxis={tray.qty_x_axis}
+                                    qtyYAxis={tray.qty_y_axis}
+                                    orientation={trayConfig.rotation_degrees as Orientation}
+                                    onRegionSelect={readOnly ? () => {} : (regionObj) => handleNewRegion({
+                                        trayName,
+                                        upperLeft: regionObj.upperLeft,
+                                        lowerRight: regionObj.lowerRight,
+                                        trayConfig: tray
+                                    })}
+                                    existingRegions={existingRegions}
+                                />
+                            </Box>
+                        );
+                    });
+                })}
 
                 {/* Selected Regions List */}
-                <Box flex={1}>
+                <Box flex={1} minWidth="300px">
                     <Typography variant="subtitle2" marginBottom={1}>
                         Selected Regions
                     </Typography>
@@ -336,76 +378,95 @@ export const RegionInput: React.FC<{ source: string; label?: string }> = (props)
                         <Box
                             key={`region-list-${idx}`}
                             display="flex"
-                            alignItems="center"
-                            marginBottom={1}
+                            flexDirection="column"
+                            marginBottom={2}
+                            padding={2}
+                            border={`2px solid ${r.color}`}
+                            borderRadius={1}
+                            sx={{ backgroundColor: `${r.color}10` }}
                         >
-                            <TextField
-                                label="Name"
-                                size="small"
-                                value={r.name}
-                                onChange={(e) => handleNameChange(idx, e.target.value)}
-                                variant="outlined"
-                                margin="dense"
-                                sx={{ 
-                                    width: 140, // Fixed width for consistent sizing
-                                    minWidth: 140 
-                                }}
-                                InputProps={{
-                                    style: {
-                                        backgroundColor: r.color,
-                                        color: '#fff',
-                                        whiteSpace: 'nowrap', // prevent wrapping
-                                    },
-                                }}
-                            />
-                            <Typography
-                                variant="body2"
-                                style={{ marginLeft: '0.5rem', whiteSpace: 'nowrap' }}
-                            >
-                                (P{r.tray}: {r.upper_left}–{r.lower_right})
-                            </Typography>
-                            <IconButton
-                                size="small"
-                                color="error"
-                                onClick={() => handleRemove(idx)}
-                                style={{ marginLeft: '0.5rem' }}
-                            >
-                                <CloseIcon fontSize="small" />
-                            </IconButton>
+                            <Box display="flex" alignItems="center" marginBottom={1}>
+                                <TextField
+                                    label="Region Name"
+                                    size="small"
+                                    value={r.name}
+                                    onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'name', e.target.value)}
+                                    variant="outlined"
+                                    disabled={readOnly}
+                                    sx={{ width: 140, marginRight: 1 }}
+                                />
+                                <Typography variant="body2" color="textSecondary">
+                                    {r.tray_name}: {r.upper_left}–{r.lower_right}
+                                </Typography>
+                                {!readOnly && (
+                                    <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() => handleRemove(idx)}
+                                        style={{ marginLeft: 'auto' }}
+                                    >
+                                        <CloseIcon fontSize="small" />
+                                    </IconButton>
+                                )}
+                            </Box>
+                            <Box display="flex" gap={1}>
+                                <TextField
+                                    label="Sample"
+                                    size="small"
+                                    value={r.sample || ''}
+                                    onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'sample', e.target.value)}
+                                    variant="outlined"
+                                    disabled={readOnly}
+                                    sx={{ flex: 1 }}
+                                />
+                                <TextField
+                                    label="Dilution"
+                                    size="small"
+                                    value={r.dilution || ''}
+                                    onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'dilution', e.target.value)}
+                                    variant="outlined"
+                                    disabled={readOnly}
+                                    sx={{ flex: 1 }}
+                                />
+                            </Box>
                         </Box>
                     ))}
 
                     {isTouched && error && (
                         <Typography color="error" variant="body2">
-                            {error}
+                            {error.message || String(error)}
                         </Typography>
                     )}
 
-                    <Button
-                        variant="contained"
-                        size="small"
-                        onClick={handleYAMLImport}
-                        startIcon={<UploadFileIcon />}
-                        style={{ marginTop: '1rem' }}
-                    >
-                        Import YAML
-                    </Button>
-                    <Button
-                        variant="contained"
-                        size="small"
-                        onClick={handleYAMLExport}
-                        startIcon={<DownloadIcon />}
-                        style={{ marginTop: '1rem', marginLeft: '0.5rem' }}
-                    >
-                        Export YAML
-                    </Button>
-                    <input
-                        type="file"
-                        accept=".yaml,.yml"
-                        onChange={handleFileChange}
-                        ref={fileInputRef}
-                        style={{ display: 'none' }}
-                    />
+                    {!readOnly && (
+                        <>
+                            <Button
+                                variant="contained"
+                                size="small"
+                                onClick={handleYAMLImport}
+                                startIcon={<UploadFileIcon />}
+                                style={{ marginTop: '1rem' }}
+                            >
+                                Import YAML
+                            </Button>
+                            <Button
+                                variant="contained"
+                                size="small"
+                                onClick={handleYAMLExport}
+                                startIcon={<DownloadIcon />}
+                                style={{ marginTop: '1rem', marginLeft: '0.5rem' }}
+                            >
+                                Export YAML
+                            </Button>
+                            <input
+                                type="file"
+                                accept=".yaml,.yml"
+                                onChange={handleFileChange}
+                                ref={fileInputRef}
+                                style={{ display: 'none' }}
+                            />
+                        </>
+                    )}
                 </Box>
             </Box>
         </Box>

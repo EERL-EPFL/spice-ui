@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import {
     BooleanField,
     BooleanInput,
@@ -8,9 +9,12 @@ import {
     SelectInput,
     SimpleForm,
     TextInput,
-    required
+    required,
+    useRecordContext,
+    useGetOne,
+    FormDataConsumer
 } from 'react-admin';
-import RegionInput from '../components/RegionInput'; // <— our custom input from above
+import RegionInput from '../components/RegionInput';
 
 const EditComponent = () => {
     return (
@@ -30,9 +34,45 @@ const EditComponent = () => {
                 <NumberInput source="temperature_start" />
                 <NumberInput source="temperature_end" />
                 <BooleanInput source="is_calibration" />
+                <ReferenceInput
+                    source="tray_configuration_id"
+                    reference="trays"
+                    sort={{ field: 'experiment_default', order: 'ASC' }}
+                >
+                    <SelectInput
+                        optionText={record =>
+                            `${record.name}${record.experiment_default ? ' (Default)' : ''}`
+                        }
+                        optionValue="id"
+                        validate={[required()]}
+                    />
+                </ReferenceInput>
                 <TextInput source="remarks" />
+                <FormDataConsumer>
+                    {({ formData }) => {
+                        const TrayConfigurationRegionInput = () => {
+                            const { data: trayConfiguration, isLoading } = useGetOne(
+                                'trays',
+                                { id: formData?.tray_configuration_id },
+                                { enabled: !!formData?.tray_configuration_id }
+                            );
 
-                <RegionInput source="regions" label="Define Well Regions" validate={[required()]} />
+                            if (isLoading) {
+                                return <div>Loading tray configuration...</div>;
+                            }
+
+                            return (
+                                <RegionInput 
+                                    source="regions" 
+                                    label="Define Well Regions" 
+                                    trayConfiguration={trayConfiguration}
+                                />
+                            );
+                        };
+
+                        return <TrayConfigurationRegionInput />;
+                    }}
+                </FormDataConsumer>
             </SimpleForm>
         </Edit>
     );

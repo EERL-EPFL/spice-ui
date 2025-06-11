@@ -1,33 +1,32 @@
 import React, { useState } from 'react';
 
 //
-// Renders an 8×12 tray of wells with deep, colorblind-safe overlays.
-// Two orientations are used: 270° (Tray 1) and 90° (Tray 2).
+// Renders a dynamic tray of wells with deep, colorblind-safe overlays.
+// Supports any dimensions and orientation based on tray configuration.
 // Labels (letters and numbers) remain in fixed positions: letters on top, numbers on left.
 //
-// For Tray 1 (orientation=270):
-//   • top labels: H → A (left to right)
-//   • left labels: 1 → 12 (bottom to top)
-//
-// For Tray 2 (orientation=90):
-//   • top labels: A → H (left to right)
-//   • left labels: 12 → 1 (top to bottom)
-//
 // Props:
-//   - tray: number
-//   - orientation: 90 | 270
+//   - tray: string (tray name)
+//   - qtyXAxis: number (columns)
+//   - qtyYAxis: number (rows)
+//   - orientation: 0 | 90 | 180 | 270
 //   - onRegionSelect: ({ tray, upperLeft: Cell, lowerRight: Cell }) => void
 //   - existingRegions?: Array<{ upperLeft: Cell; lowerRight: Cell; name: string; color: string; onRemove: () => void; }>
 //
-// A "Cell" is { row: 0..7, col: 0..11 } in logical coordinates.
+// A "Cell" is { row: 0..qtyYAxis-1, col: 0..qtyXAxis-1 } in logical coordinates.
 //
 
-export const ROW_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-export const NUM_ROWS = ROW_LETTERS.length; // 8
-export const NUM_COLS = 12;                  // 1..12
+// Generate dynamic row letters based on tray dimensions
+const generateRowLetters = (maxRows: number): string[] => {
+    const letters = [];
+    for (let i = 0; i < maxRows; i++) {
+        letters.push(String.fromCharCode(65 + i)); // A, B, C, etc.
+    }
+    return letters;
+};
 
-const CIRCLE_RADIUS = 15;
-const SPACING = 40;
+const CIRCLE_RADIUS = 12;
+const SPACING = 30;
 
 // Logical well coordinate
 export interface Cell {
@@ -44,17 +43,21 @@ export interface ExistingRegion {
     onRemove: () => void;
 }
 
-export type Orientation = 90 | 270;
+export type Orientation = 0 | 90 | 180 | 270;
 
 export interface TrayGridProps {
-    tray: number;
+    tray: string;
+    qtyXAxis: number;
+    qtyYAxis: number;
     orientation: Orientation;
-    onRegionSelect: (region: { tray: number; upperLeft: Cell; lowerRight: Cell }) => void;
+    onRegionSelect: (region: { tray: string; upperLeft: Cell; lowerRight: Cell }) => void;
     existingRegions?: ExistingRegion[];
 }
 
 const TrayGrid: React.FC<TrayGridProps> = ({
     tray,
+    qtyXAxis,
+    qtyYAxis,
     orientation,
     onRegionSelect,
     existingRegions = [],
@@ -64,20 +67,24 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     const [endCell, setEndCell] = useState<Cell | null>(null);
     const [hoveredCell, setHoveredCell] = useState<Cell | null>(null);
 
-    // After rotation, we still have 8 rows & 12 columns, but "width" becomes 8 and "height" becomes 12.
-    const widthCells = NUM_ROWS;  // 8 display columns
-    const heightCells = NUM_COLS; // 12 display rows
+    const rowLetters = generateRowLetters(qtyYAxis);
+
+    // Calculate display dimensions based on orientation
+    const isRotated90or270 = orientation === 90 || orientation === 270;
+    const displayCols = isRotated90or270 ? qtyYAxis : qtyXAxis;
+    const displayRows = isRotated90or270 ? qtyXAxis : qtyYAxis;
 
     // Convert a logical (row,col) → displayed (xIndex,yIndex) depending on orientation:
     const getDisplayIndices = (row: number, col: number) => {
-        if (orientation === 90) {
-            // P2 (Tray 2): A→H (left to right), 12→1 (top to bottom)
-            // Keep rows normal, invert columns for display
-            return { xIndex: row, yIndex: NUM_COLS - 1 - col };
-        } else {
-            // P1 (Tray 1): H→A (left to right), 1→12 (top to bottom) 
-            // Invert rows for display, keep columns normal
-            return { xIndex: NUM_ROWS - 1 - row, yIndex: col };
+        switch (orientation) {
+            case 90:
+                return { xIndex: row, yIndex: qtyXAxis - 1 - col };
+            case 180:
+                return { xIndex: qtyXAxis - 1 - col, yIndex: qtyYAxis - 1 - row };
+            case 270:
+                return { xIndex: qtyYAxis - 1 - row, yIndex: col };
+            default: // 0 degrees
+                return { xIndex: col, yIndex: row };
         }
     };
 
@@ -159,8 +166,51 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     };
 
     // SVG size: width = (num displayed columns × SPACING + margin), height = (num displayed rows × SPACING + margin + 20 for labels)
-    const svgWidth = widthCells * SPACING + SPACING;
-    const svgHeight = heightCells * SPACING + SPACING + 20;
+    const svgWidth = displayCols * SPACING + SPACING;
+    const svgHeight = displayRows * SPACING + SPACING + 20;
+
+    // Generate all label positions based on orientation
+    const getLabels = () => {
+        const topLabels = [];
+        const leftLabels = [];
+
+        if (orientation === 0 || orientation === 180) {
+            // X-axis (columns): letters A, B, C...
+            for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
+                const letter = rowLetters[colIdx] || String.fromCharCode(65 + colIdx);
+                const { xIndex } = getDisplayIndices(0, colIdx);
+                const cx = SPACING + xIndex * SPACING;
+                topLabels.push({ x: cx, y: 15, label: letter });
+            }
+            // Y-axis (rows): numbers 1, 2, 3...
+            for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
+                const number = rowIdx + 1;
+                const { yIndex } = getDisplayIndices(rowIdx, 0);
+                const cy = SPACING + yIndex * SPACING;
+                leftLabels.push({ x: 15, y: cy + 5, label: number });
+            }
+        } else if (orientation === 90 || orientation === 270) {
+            // For 90°/270° rotation, columns become rows and vice versa
+            // X-axis (what were originally rows): numbers 1, 2, 3...
+            for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
+                const number = rowIdx + 1;
+                const { xIndex } = getDisplayIndices(rowIdx, 0);
+                const cx = SPACING + xIndex * SPACING;
+                topLabels.push({ x: cx, y: 15, label: number });
+            }
+            // Y-axis (what were originally columns): letters A, B, C...
+            for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
+                const letter = rowLetters[colIdx] || String.fromCharCode(65 + colIdx);
+                const { yIndex } = getDisplayIndices(0, colIdx);
+                const cy = SPACING + yIndex * SPACING;
+                leftLabels.push({ x: 15, y: cy + 5, label: letter });
+            }
+        }
+
+        return { topLabels, leftLabels };
+    };
+
+    const { topLabels, leftLabels } = getLabels();
 
     return (
         <svg
@@ -170,9 +220,9 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
         >
-            {/* 1) Draw all 8×12 wells (circles) */}
-            {Array.from({ length: NUM_ROWS }).map((_, rowIdx) =>
-                Array.from({ length: NUM_COLS }).map((_, colIdx) => {
+            {/* 1) Draw all wells (circles) */}
+            {Array.from({ length: qtyYAxis }).map((_, rowIdx) =>
+                Array.from({ length: qtyXAxis }).map((_, colIdx) => {
                     const { xIndex, yIndex } = getDisplayIndices(rowIdx, colIdx);
                     const cx = SPACING + xIndex * SPACING;
                     const cy = SPACING + yIndex * SPACING;
@@ -207,55 +257,33 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 })
             )}
 
-            {/* 2) Row Labels (Letters) */}
-            {Array.from({ length: NUM_ROWS }).map((_, rowIdx) => {
-                const { xIndex } = getDisplayIndices(rowIdx, 0);
-                const cx = SPACING + xIndex * SPACING;
-                // For P1 (270°): H→A, For P2 (90°): A→H
-                const label = orientation === 90 ? ROW_LETTERS[rowIdx] : ROW_LETTERS[rowIdx];
-                return (
-                    <text
-                        key={`row-label-${rowIdx}`}
-                        x={cx}
-                        y={15}
-                        textAnchor="middle"
-                        fontSize="12"
-                        fill="#333"
-                    >
-                        {label}
-                    </text>
-                );
-            })}
+            {/* 2) Top Labels */}
+            {topLabels.map((label, idx) => (
+                <text
+                    key={`top-label-${idx}`}
+                    x={label.x}
+                    y={label.y}
+                    textAnchor="middle"
+                    fontSize="12"
+                    fill="#333"
+                >
+                    {label.label}
+                </text>
+            ))}
 
-            {/* 3) Column Labels (Numbers) */}
-            {Array.from({ length: NUM_COLS }).map((_, colIdx) => {
-                const { yIndex } = getDisplayIndices(0, colIdx);
-                const cy = SPACING + yIndex * SPACING;
-                
-                let label: number;
-                if (orientation === 90) {
-                    // P2: 12→1 (top to bottom)
-                    // colIdx=0 appears at bottom and should show "1"
-                    // colIdx=11 appears at top and should show "12"
-                    label = colIdx + 1;
-                } else {
-                    // P1: 1→12 (top to bottom)
-                    label = colIdx + 1;
-                }
-                
-                return (
-                    <text
-                        key={`col-label-${colIdx}`}
-                        x={15}
-                        y={cy + 5}
-                        textAnchor="middle"
-                        fontSize="12"
-                        fill="#333"
-                    >
-                        {label}
-                    </text>
-                );
-            })}
+            {/* 3) Left Labels */}
+            {leftLabels.map((label, idx) => (
+                <text
+                    key={`left-label-${idx}`}
+                    x={label.x}
+                    y={label.y}
+                    textAnchor="middle"
+                    fontSize="12"
+                    fill="#333"
+                >
+                    {label.label}
+                </text>
+            ))}
 
             {/* 4) Existing Region Overlays */}
             {existingRegions.map((region, idx) => {

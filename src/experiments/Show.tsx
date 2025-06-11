@@ -18,10 +18,12 @@ import {
     useRecordContext,
     useAuthProvider,
     Labeled,
+    useGetOne,
 } from "react-admin";
 import React from "react";
-import { Button, Grid } from "@mui/material";
+import { Button, Box } from "@mui/material";
 import { UppyUploader } from "../uploader/Uppy";
+import RegionInput from '../components/RegionInput';
 
 
 const ShowComponentActions = () => {
@@ -90,74 +92,88 @@ const DownloadAllButton = () => {
     );
 };
 
+const RegionsDisplay = () => {
+    const record = useRecordContext();
+    const { data: trayConfiguration, isLoading } = useGetOne(
+        'trays',
+        { id: record?.tray_configuration_id },
+        { enabled: !!record?.tray_configuration_id }
+    );
+
+    if (isLoading) {
+        return <div>Loading tray configuration...</div>;
+    }
+
+    if (!record?.regions || !Array.isArray(record.regions)) {
+        return <div>No regions defined for this experiment.</div>;
+    }
+
+    return (
+        <RegionInput 
+            source="regions" 
+            label="Experiment Well Regions" 
+            trayConfiguration={trayConfiguration}
+            readOnly={true}
+        />
+    );
+};
+
 export const ShowComponent = () => {
     return (
         <Show actions={<ShowComponentActions />}>
             <SimpleShowLayout title="Experiment">
-                <Grid container spacing={2}>
+                <Box display="flex" gap={2}>
                     {/* Left column with fields */}
-                    <Grid item xs={8}>
-                        <Grid container spacing={2}>
-                            <Grid item xs={6}>
-                                <Labeled>
-                                    <TextField source="id" />
-                                </Labeled>
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Labeled>
+                    <Box flex={2}>
+                        <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
+                            <Labeled>
+                                <TextField source="id" />
+                            </Labeled>
+                            <Labeled>
+                                <TextField source="name" />
+                            </Labeled>
+                            <Labeled>
+                                <DateField source="performed_at" showTime label="Date" />
+                            </Labeled>
+                            <Labeled>
+                                <BooleanField source="is_calibration" />
+                            </Labeled>
+                            <Labeled>
+                                <ReferenceField source="sample_id" reference="samples" link="show">
                                     <TextField source="name" />
-                                </Labeled>
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Labeled>
-                                    <DateField source="performed_at" showTime label="Date" />
-                                </Labeled>
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Labeled>
-                                    <BooleanField source="is_calibration" />
-                                </Labeled>
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Labeled>
-                                    <ReferenceField source="sample_id" reference="samples" link="show">
-                                        <TextField source="name" />
-                                    </ReferenceField>
-                                </Labeled>
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Labeled>
-                                    <TextField source="username" />
-                                </Labeled>
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Labeled>
-                                    <DateField source="created_at" showTime />
-                                </Labeled>
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Labeled>
-                                    <NumberField source="temperature_ramp" />
-                                </Labeled>
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Labeled>
-                                    <NumberField source="temperature_start" />
-                                </Labeled>
-                            </Grid>
-                            <Grid item xs={6}>
-                                <Labeled>
-                                    <NumberField source="temperature_end" />
-                                </Labeled>
-                            </Grid>
-                        </Grid>
-                    </Grid>
+                                </ReferenceField>
+                            </Labeled>
+                            <Labeled>
+                                <ReferenceField source="tray_configuration_id" reference="trays" link="show">
+                                    <TextField source="name" />
+                                </ReferenceField>
+                            </Labeled>
+                            <Labeled>
+                                <TextField source="username" />
+                            </Labeled>
+                            <Labeled>
+                                <DateField source="created_at" showTime />
+                            </Labeled>
+                            <Labeled>
+                                <NumberField source="temperature_ramp" />
+                            </Labeled>
+                            <Labeled>
+                                <NumberField source="temperature_start" />
+                            </Labeled>
+                            <Labeled>
+                                <NumberField source="temperature_end" />
+                            </Labeled>
+                        </Box>
+                    </Box>
                     {/* Right column with uploader */}
-                    <Grid item xs={4}>
+                    <Box flex={1}>
                         <UppyUploader />
-                    </Grid>
-                </Grid>
+                    </Box>
+                </Box>
                 <TabbedShowLayout>
+                    <TabbedShowLayout.Tab label="Regions">
+                        <RegionsDisplay />
+                    </TabbedShowLayout.Tab>
                     <TabbedShowLayout.Tab label="Asset list">
                         <DownloadAllButton />
                         <ReferenceManyField

@@ -11,8 +11,11 @@ import {
     SelectInput,
     BooleanInput,
     useGetList,
+    FormDataConsumer,
+    useGetOne,
 } from 'react-admin';
-import { useFormContext } from 'react-hook-form'; // ← react-admin uses this already :contentReference[oaicite:0]{index=0}
+import { useFormContext } from 'react-hook-form';
+import RegionInput from '../components/RegionInput';
 
 /**
  * Once we know the default tray ID, shove it into the form.
@@ -74,6 +77,32 @@ const CreateComponent: React.FC = () => {
                         validate={[required()]}
                     />
                 </ReferenceInput>
+
+                <FormDataConsumer>
+                    {({ formData }) => {
+                        const TrayConfigurationRegionInput = () => {
+                            const { data: trayConfiguration, isLoading } = useGetOne(
+                                'trays',
+                                { id: formData?.tray_configuration_id },
+                                { enabled: !!formData?.tray_configuration_id }
+                            );
+
+                            if (isLoading) {
+                                return <div>Loading tray configuration...</div>;
+                            }
+
+                            return (
+                                <RegionInput 
+                                    source="regions" 
+                                    label="Define Well Regions" 
+                                    trayConfiguration={trayConfiguration}
+                                />
+                            );
+                        };
+
+                        return <TrayConfigurationRegionInput />;
+                    }}
+                </FormDataConsumer>
             </SimpleForm>
         </Create>
     );
