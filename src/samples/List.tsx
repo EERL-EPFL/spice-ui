@@ -10,6 +10,7 @@ import {
     NumberField,
     ReferenceManyCount,
     ReferenceField,
+    FunctionField,
 } from "react-admin";
 import { postFilters } from "../filters/list";
 
@@ -32,6 +33,7 @@ export const ListComponent = () => {
                 <ReferenceField source="campaign_id" reference="campaigns" link="show">
                     <TextField source="name" />
                 </ReferenceField>
+                <FunctionField label="Treatments" render={record => (record.treatments ? record.treatments.length : 0)} />
                 <DateField source="last_updated" label="Last Updated" showTime />
             </Datagrid>
         </List>

@@ -1,6 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { useInput, FieldTitle } from 'react-admin';
 import TrayGrid, { Cell, ExistingRegion, Orientation } from './TrayGrid';
+import { SimpleTreatmentSelector } from './TreatmentSelector';
 import { Box, Typography, TextField, IconButton, Button } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -463,17 +464,18 @@ export const RegionInput: React.FC<{
                                 )}
                             </Box>
                             <Box display="flex" gap={1}>
-                                <TextField
-                                    id={`region-${idx}-sample`}
-                                    label="Sample"
-                                    size="small"
-                                    value={r.sample || ''}
-                                    onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'sample', e.target.value)}
-                                    variant="outlined"
-                                    disabled={readOnly}
-                                    sx={{ flex: 1 }}
-                                    inputRef={inputRefs.current[`region-${idx}-sample`]}
-                                />
+                                <Box sx={{ flex: 1 }}>
+                                    <SimpleTreatmentSelector
+                                        value={r.sample || ''}
+                                        label="Treatment"
+                                        disabled={readOnly}
+                                        onChange={(treatmentId) => {
+                                            if (!readOnly) {
+                                                handleRegionChange(idx, 'sample', treatmentId);
+                                            }
+                                        }}
+                                    />
+                                </Box>
                                 <TextField
                                     id={`region-${idx}-dilution`}
                                     label="Dilution"
