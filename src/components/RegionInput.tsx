@@ -142,7 +142,21 @@ export const RegionInput: React.FC<{
 
     const regions: SingleRegion[] = Array.isArray(value) ? value : [];
     const fileInputRef = useRef<HTMLInputElement>(null);
+    // Add refs for inputs to maintain focus
+    const inputRefs = useRef<{ [key: string]: React.RefObject<HTMLInputElement> }>({});
     const { trayConfiguration, readOnly = false } = props;
+
+    // Initialize or update input refs when regions change
+    React.useEffect(() => {
+        regions.forEach((region, idx) => {
+            ['name', 'sample', 'dilution'].forEach(field => {
+                const key = `region-${idx}-${field}`;
+                if (!inputRefs.current[key]) {
+                    inputRefs.current[key] = React.createRef();
+                }
+            });
+        });
+    }, [regions.length]);
 
     // Create memoized values for all hooks to ensure consistent hook call order
     const [noTraysMessage, flatTrays] = React.useMemo(() => {
@@ -233,12 +247,26 @@ export const RegionInput: React.FC<{
         onChange(updated);
     };
 
-    const handleRegionChange = (idx: number, field: string, newValue: string) => {
+    const handleRegionChange = useCallback((idx: number, field: string, newValue: string) => {
+        // Get current focused element to restore focus after state update
+        const activeElement = document.activeElement as HTMLElement;
+        const activeId = activeElement?.id;
+
         const updated = regions.map((r, i) =>
             i === idx ? { ...r, [field]: newValue } : r
         );
         onChange(updated);
-    };
+
+        // Restore focus on next render
+        setTimeout(() => {
+            if (activeId) {
+                const elementToFocus = document.getElementById(activeId);
+                if (elementToFocus) {
+                    elementToFocus.focus();
+                }
+            }
+        }, 0);
+    }, [onChange, regions]);
 
     const handleYAMLImport = useCallback(() => {
         fileInputRef.current?.click();
@@ -410,6 +438,7 @@ export const RegionInput: React.FC<{
                         >
                             <Box display="flex" alignItems="center" marginBottom={1}>
                                 <TextField
+                                    id={`region-${idx}-name`}
                                     label="Region Name"
                                     size="small"
                                     value={r.name}
@@ -417,6 +446,7 @@ export const RegionInput: React.FC<{
                                     variant="outlined"
                                     disabled={readOnly}
                                     sx={{ width: 140, marginRight: 1 }}
+                                    inputRef={inputRefs.current[`region-${idx}-name`]}
                                 />
                                 <Typography variant="body2" color="textSecondary">
                                     {r.tray_name}: {r.upper_left}–{r.lower_right}
@@ -434,6 +464,7 @@ export const RegionInput: React.FC<{
                             </Box>
                             <Box display="flex" gap={1}>
                                 <TextField
+                                    id={`region-${idx}-sample`}
                                     label="Sample"
                                     size="small"
                                     value={r.sample || ''}
@@ -441,8 +472,10 @@ export const RegionInput: React.FC<{
                                     variant="outlined"
                                     disabled={readOnly}
                                     sx={{ flex: 1 }}
+                                    inputRef={inputRefs.current[`region-${idx}-sample`]}
                                 />
                                 <TextField
+                                    id={`region-${idx}-dilution`}
                                     label="Dilution"
                                     size="small"
                                     value={r.dilution || ''}
@@ -450,6 +483,7 @@ export const RegionInput: React.FC<{
                                     variant="outlined"
                                     disabled={readOnly}
                                     sx={{ flex: 1 }}
+                                    inputRef={inputRefs.current[`region-${idx}-dilution`]}
                                 />
                             </Box>
                         </Box>
