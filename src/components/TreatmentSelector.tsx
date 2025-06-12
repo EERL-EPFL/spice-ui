@@ -21,6 +21,7 @@ export const TreatmentSelector = (props: {
     onChange: (value: string) => void;
     label?: string;
     disabled?: boolean;
+    compact?: boolean;
 }) => {
     const dataProvider = useDataProvider();
     const [open, setOpen] = useState(false);
@@ -172,32 +173,65 @@ export const TreatmentSelector = (props: {
 
     return (
         <div>
-            <Box display="flex" alignItems="center" gap={1}>
-                <Paper
-                    variant="outlined"
+            {props.compact ? (
+                // Compact mode - just show treatment name as clickable text
+                <Box
+                    onClick={props.disabled ? undefined : openDialog}
                     sx={{
-                        padding: '8px 12px',
-                        minHeight: '40px',
-                        flexGrow: 1,
+                        cursor: props.disabled ? 'default' : 'pointer',
+                        padding: '4px 8px',
+                        borderRadius: 1,
+                        backgroundColor: props.disabled ? 'action.disabledBackground' : 'transparent',
+                        '&:hover': props.disabled ? {} : {
+                            backgroundColor: 'action.hover'
+                        },
+                        minHeight: '32px',
                         display: 'flex',
                         alignItems: 'center',
-                        backgroundColor: props.disabled ? 'action.disabledBackground' : 'background.paper',
-                        color: props.disabled ? 'text.disabled' : 'text.primary'
+                        border: '1px solid',
+                        borderColor: 'divider'
                     }}
                 >
-                    <Typography variant="body1" color="inherit">
-                        {displayValue || 'No treatment selected'}
+                    <Typography
+                        variant="body2"
+                        sx={{
+                            fontSize: '0.8rem',
+                            color: props.disabled ? 'text.disabled' : (displayValue ? 'text.primary' : 'text.secondary'),
+                            fontStyle: displayValue ? 'normal' : 'italic'
+                        }}
+                    >
+                        {displayValue || 'Select treatment...'}
                     </Typography>
-                </Paper>
-                <Button
-                    variant="contained"
-                    onClick={openDialog}
-                    size="small"
-                    disabled={props.disabled}
-                >
-                    Select Treatment
-                </Button>
-            </Box>
+                </Box>
+            ) : (
+                // Original full mode
+                <Box display="flex" alignItems="center" gap={1}>
+                    <Paper
+                        variant="outlined"
+                        sx={{
+                            padding: '8px 12px',
+                            minHeight: '40px',
+                            flexGrow: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            backgroundColor: props.disabled ? 'action.disabledBackground' : 'background.paper',
+                            color: props.disabled ? 'text.disabled' : 'text.primary'
+                        }}
+                    >
+                        <Typography variant="body1" color="inherit">
+                            {displayValue || 'No treatment selected'}
+                        </Typography>
+                    </Paper>
+                    <Button
+                        variant="contained"
+                        onClick={openDialog}
+                        size="small"
+                        disabled={props.disabled}
+                    >
+                        Select Treatment
+                    </Button>
+                </Box>
+            )}
 
             <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth>
                 <DialogTitle>Select a Treatment</DialogTitle>

@@ -377,51 +377,53 @@ export const RegionInput: React.FC<{
                 isRequired={isRequired}
             />
 
-            <Box display="flex" gap={2} flexWrap="wrap">
-                {/* Render dynamic trays */}
-                {flatTrays.map((flatTray, index) => {
-                    const { trayConfig, tray, trayName, rotation } = flatTray;
-                    const existingRegions: ExistingRegion[] = regions
-                        .map((r, idx) => ({ ...r, idx }))
-                        .filter((r) => r.tray_name === trayName)
-                        .map((r) => ({
-                            upperLeft: parseCell(r.upper_left, tray),
-                            lowerRight: parseCell(r.lower_right, tray),
-                            name: r.name || 'Unnamed',
-                            color: r.color,
-                            onRemove: readOnly ? () => { } : () => handleRemove(r.idx),
-                        }));
+            <Box display="flex" gap={2} alignItems="flex-start">
+                {/* Render dynamic trays with minimal spacing */}
+                <Box display="flex" gap={0.5} flexWrap="wrap" flex={1}>
+                    {flatTrays.map((flatTray, index) => {
+                        const { trayConfig, tray, trayName, rotation } = flatTray;
+                        const existingRegions: ExistingRegion[] = regions
+                            .map((r, idx) => ({ ...r, idx }))
+                            .filter((r) => r.tray_name === trayName)
+                            .map((r) => ({
+                                upperLeft: parseCell(r.upper_left, tray),
+                                lowerRight: parseCell(r.lower_right, tray),
+                                name: r.name || 'Unnamed',
+                                color: r.color,
+                                onRemove: readOnly ? () => { } : () => handleRemove(r.idx),
+                            }));
 
-                    return (
-                        <Box key={index} flex={1} minWidth="400px">
-                            <Typography variant="subtitle1" marginBottom={1}>
-                                {trayName} ({rotation}°)
-                            </Typography>
-                            <TrayGrid
-                                tray={trayName}
-                                qtyXAxis={tray.qty_x_axis}
-                                qtyYAxis={tray.qty_y_axis}
-                                orientation={rotation as Orientation}
-                                onRegionSelect={readOnly ? () => { } : (regionObj) => handleNewRegion({
-                                    trayName,
-                                    upperLeft: regionObj.upperLeft,
-                                    lowerRight: regionObj.lowerRight,
-                                    trayConfig: tray
-                                })}
-                                existingRegions={existingRegions}
-                            />
-                        </Box>
-                    );
-                })}
+                        return (
+                            <Box key={index} minWidth="280px">
+                                <Typography variant="caption" fontWeight="medium" marginBottom={0.25}>
+                                    {trayName} ({rotation}°)
+                                </Typography>
+                                <TrayGrid
+                                    tray={trayName}
+                                    qtyXAxis={tray.qty_x_axis}
+                                    qtyYAxis={tray.qty_y_axis}
+                                    orientation={rotation as Orientation}
+                                    onRegionSelect={readOnly ? () => { } : (regionObj) => handleNewRegion({
+                                        trayName,
+                                        upperLeft: regionObj.upperLeft,
+                                        lowerRight: regionObj.lowerRight,
+                                        trayConfig: tray
+                                    })}
+                                    existingRegions={existingRegions}
+                                />
+                            </Box>
+                        );
+                    })}
+                </Box>
 
-                {/* Selected Regions List */}
-                <Box flex={1} minWidth="300px">
-                    <Typography variant="subtitle2" marginBottom={1}>
+                {/* Selected Regions List on the right side */}
+                <Box minWidth="400px" maxWidth="500px">
+                    <Typography variant="caption" fontWeight="medium" marginBottom={0.5}>
                         Selected Regions
                     </Typography>
 
                     {regions.length === 0 && (
-                        <Typography variant="body2" color="textSecondary">
+                        <Typography variant="caption" color="textSecondary" fontStyle="italic">
                             No regions defined yet.
                         </Typography>
                     )}
@@ -430,92 +432,121 @@ export const RegionInput: React.FC<{
                         <Box
                             key={`region-list-${idx}`}
                             display="flex"
-                            flexDirection="column"
-                            marginBottom={2}
-                            padding={2}
-                            border={`2px solid ${r.color}`}
+                            alignItems="center"
+                            gap={1}
+                            marginBottom={0.5}
+                            padding={1}
+                            border={`1px solid ${r.color}`}
                             borderRadius={1}
-                            sx={{ backgroundColor: `${r.color}10` }}
+                            sx={{
+                                backgroundColor: `${r.color}08`,
+                                position: 'relative'
+                            }}
                         >
-                            <Box display="flex" alignItems="center" marginBottom={1}>
-                                <TextField
-                                    id={`region-${idx}-name`}
-                                    label="Region Name"
-                                    size="small"
-                                    value={r.name}
-                                    onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'name', e.target.value)}
-                                    variant="outlined"
-                                    disabled={readOnly}
-                                    sx={{ width: 140, marginRight: 1 }}
-                                    inputRef={inputRefs.current[`region-${idx}-name`]}
-                                />
-                                <Typography variant="body2" color="textSecondary">
-                                    {r.tray_name}: {r.upper_left}–{r.lower_right}
-                                </Typography>
-                                {!readOnly && (
-                                    <IconButton
-                                        size="small"
-                                        color="error"
-                                        onClick={() => handleRemove(idx)}
-                                        style={{ marginLeft: 'auto' }}
-                                    >
-                                        <CloseIcon fontSize="small" />
-                                    </IconButton>
-                                )}
+                            {/* Color indicator and region label */}
+                            <Box
+                                sx={{
+                                    position: 'absolute',
+                                    top: -8,
+                                    left: 8,
+                                    backgroundColor: 'background.paper',
+                                    paddingX: 0.5,
+                                    fontSize: '0.75rem',
+                                    fontWeight: 'medium',
+                                    color: r.color,
+                                }}
+                            >
+                                Region {idx + 1}
                             </Box>
-                            <Box display="flex" gap={1}>
-                                <Box sx={{ flex: 1 }}>
-                                    <TreatmentSelector
-                                        value={r.sample || ''}
-                                        label="Treatment"
-                                        disabled={readOnly}
-                                        onChange={(treatmentId) => {
-                                            if (!readOnly) {
-                                                handleRegionChange(idx, 'sample', treatmentId);
-                                            }
-                                        }}
-                                    />
-                                </Box>
-                                <TextField
-                                    id={`region-${idx}-dilution`}
-                                    label="Dilution"
-                                    size="small"
-                                    value={r.dilution || ''}
-                                    onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'dilution', e.target.value)}
-                                    variant="outlined"
+
+                            <TextField
+                                id={`region-${idx}-name`}
+                                placeholder="Name"
+                                size="small"
+                                value={r.name}
+                                onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'name', e.target.value)}
+                                variant="standard"
+                                disabled={readOnly}
+                                sx={{ width: 90 }}
+                                inputRef={inputRefs.current[`region-${idx}-name`]}
+                                InputProps={{
+                                    disableUnderline: true,
+                                    sx: { fontSize: '0.8rem' }
+                                }}
+                            />
+
+                            <Box sx={{ width: 120 }}>
+                                <TreatmentSelector
+                                    value={r.sample || ''}
+                                    label=""
                                     disabled={readOnly}
-                                    sx={{ flex: 1 }}
-                                    inputRef={inputRefs.current[`region-${idx}-dilution`]}
+                                    onChange={(treatmentId) => {
+                                        if (!readOnly) {
+                                            handleRegionChange(idx, 'sample', treatmentId);
+                                        }
+                                    }}
+                                    compact={true}
                                 />
                             </Box>
+
+                            <TextField
+                                id={`region-${idx}-dilution`}
+                                placeholder="Dilution"
+                                size="small"
+                                value={r.dilution || ''}
+                                onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'dilution', e.target.value)}
+                                variant="standard"
+                                disabled={readOnly}
+                                sx={{ width: 70 }}
+                                inputRef={inputRefs.current[`region-${idx}-dilution`]}
+                                InputProps={{
+                                    disableUnderline: true,
+                                    sx: { fontSize: '0.8rem' }
+                                }}
+                            />
+
+                            <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.65rem', minWidth: 45 }}>
+                                {r.upper_left}–{r.lower_right}
+                            </Typography>
+
+                            {!readOnly && (
+                                <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleRemove(idx)}
+                                    sx={{ padding: 0.25 }}
+                                >
+                                    <CloseIcon sx={{ fontSize: '1rem' }} />
+                                </IconButton>
+                            )}
                         </Box>
                     ))}
 
                     {isTouched && error && (
-                        <Typography color="error" variant="body2">
+                        <Typography color="error" variant="caption">
                             {error.message || String(error)}
                         </Typography>
                     )}
 
                     {!readOnly && (
-                        <>
+                        <Box display="flex" gap={1} marginTop={1}>
                             <Button
                                 variant="contained"
                                 size="small"
                                 onClick={handleYAMLImport}
                                 startIcon={<UploadFileIcon />}
-                                style={{ marginTop: '1rem' }}
+                                sx={{ fontSize: '0.7rem', padding: '4px 8px' }}
                             >
-                                Import YAML
+                                Import
                             </Button>
                             <Button
                                 variant="contained"
                                 size="small"
                                 onClick={handleYAMLExport}
                                 startIcon={<DownloadIcon />}
-                                style={{ marginTop: '1rem', marginLeft: '0.5rem' }}
+                                sx={{ fontSize: '0.7rem', padding: '4px 8px' }}
                             >
-                                Export YAML
+                                Export
                             </Button>
                             <input
                                 type="file"
@@ -524,7 +555,7 @@ export const RegionInput: React.FC<{
                                 ref={fileInputRef}
                                 style={{ display: 'none' }}
                             />
-                        </>
+                        </Box>
                     )}
                 </Box>
             </Box>

@@ -30,10 +30,14 @@ const EditComponent = () => {
                     const parsedDate = typeof date === 'string' ? new Date(date) : date;
                     return parsedDate ? parsedDate.toISOString() : null;
                 }} />
-                <NumberInput source="temperature_ramp" />
-                <NumberInput source="temperature_start" />
-                <NumberInput source="temperature_end" />
+
+                <NumberInput source="temperature_ramp" fullWidth />
+                <NumberInput source="temperature_start" fullWidth />
+                <NumberInput source="temperature_end" fullWidth />
+                <TextInput source="remarks" fullWidth />
                 <BooleanInput source="is_calibration" />
+                <hr style={{ margin: '20px 0', border: '1px solid #ccc', width: '100%' }} />
+
                 <ReferenceInput
                     source="tray_configuration_id"
                     reference="trays"
@@ -47,7 +51,6 @@ const EditComponent = () => {
                         validate={[required()]}
                     />
                 </ReferenceInput>
-                <TextInput source="remarks" />
                 <FormDataConsumer>
                     {({ formData }) => {
                         const TrayConfigurationRegionInput = () => {
@@ -62,9 +65,9 @@ const EditComponent = () => {
                             }
 
                             return (
-                                <RegionInput 
-                                    source="regions" 
-                                    label="Define Well Regions" 
+                                <RegionInput
+                                    source="regions"
+                                    label="Define Well Regions"
                                     trayConfiguration={trayConfiguration}
                                 />
                             );
