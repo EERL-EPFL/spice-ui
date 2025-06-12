@@ -32,7 +32,7 @@ const numberToColIndex = (num: number): number => num - 1;
 // Parse cell string with dynamic tray dimensions
 const parseCell = (s: string, trayConfig?: any): Cell => {
     if (!trayConfig) return { row: 0, col: 0 };
-    
+
     const match = s.match(/^([A-Za-z])(\d{1,2})$/);
     if (match) {
         const row = letterToRowIndex(match[1], trayConfig.qty_y_axis);
@@ -89,11 +89,11 @@ const parseYAML = (yamlText: string, trayConfigs: TrayConfig[]): any => {
     const result: any = {};
     let currentKey = '';
     let currentArray: any[] = [];
-    
+
     for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('#')) continue;
-        
+
         if (!line.startsWith(' ') && trimmed.endsWith(':')) {
             // New top-level key
             if (currentKey && currentArray.length > 0) {
@@ -119,18 +119,18 @@ const parseYAML = (yamlText: string, trayConfigs: TrayConfig[]): any => {
             }
         }
     }
-    
+
     // Don't forget the last key
     if (currentKey && currentArray.length > 0) {
         result[currentKey] = currentArray;
     }
-    
+
     return result;
 };
 
-export const RegionInput: React.FC<{ 
-    source: string; 
-    label?: string; 
+export const RegionInput: React.FC<{
+    source: string;
+    label?: string;
     trayConfiguration?: { trays: TrayConfig[] };
     readOnly?: boolean;
 }> = (props) => {
@@ -144,22 +144,47 @@ export const RegionInput: React.FC<{
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { trayConfiguration, readOnly = false } = props;
 
-    // If no tray configuration is provided, show a message
-    if (!trayConfiguration || !trayConfiguration.trays || trayConfiguration.trays.length === 0) {
-        return (
-            <Box marginTop={2} marginBottom={2}>
-                <FieldTitle
-                    label={props.label || 'Regions'}
-                    source={props.source}
-                    resource={undefined}
-                    isRequired={isRequired}
-                />
-                <Typography variant="body2" color="textSecondary">
-                    No tray configuration available. Please select a tray configuration first.
-                </Typography>
-            </Box>
-        );
+    // Create memoized values for all hooks to ensure consistent hook call order
+    const [noTraysMessage, flatTrays] = React.useMemo(() => {
+        // If no tray configuration is provided, return early with message component
+        if (!trayConfiguration || !trayConfiguration.trays || trayConfiguration.trays.length === 0) {
+            const message = (
+                <Box marginTop={2} marginBottom={2}>
+                    <FieldTitle
+                        label={props.label || 'Regions'}
+                        source={props.source}
+                        resource={undefined}
+                        isRequired={isRequired}
+                    />
+                    <Typography variant="body2" color="textSecondary">
+                        No tray configuration available. Please select a tray configuration first.
+                    </Typography>
+                </Box>
+            );
+            return [message, []];
+        }
+
+        // Otherwise, process the tray configuration
+        const flattened = [];
+        for (const trayConfig of trayConfiguration.trays) {
+            for (const tray of trayConfig.trays) {
+                flattened.push({
+                    trayConfig,
+                    tray,
+                    trayName: tray.name,
+                    rotation: trayConfig.rotation_degrees
+                });
+            }
+        }
+        return [null, flattened];
+    }, [trayConfiguration, props.label, props.source, isRequired]);
+
+    // If no trays are available, show the message
+    if (noTraysMessage) {
+        return noTraysMessage;
     }
+
+    // All hooks below this point will always run, maintaining consistent hook order
 
     const handleNewRegion = useCallback(
         (regionObj: { trayName: string; upperLeft: Cell; lowerRight: Cell; trayConfig: any }) => {
@@ -188,11 +213,11 @@ export const RegionInput: React.FC<{
             // Append new region
             const updated: SingleRegion[] = [
                 ...regions,
-                { 
-                    name: '', 
-                    tray_name: trayName, 
-                    upper_left: ulStr, 
-                    lower_right: lrStr, 
+                {
+                    name: '',
+                    tray_name: trayName,
+                    upper_left: ulStr,
+                    lower_right: lrStr,
                     color,
                     sample: '',
                     dilution: ''
@@ -228,15 +253,15 @@ export const RegionInput: React.FC<{
             try {
                 const yamlText = e.target?.result as string;
                 const parsedYAML = parseYAML(yamlText, trayConfiguration?.trays || []);
-                
+
                 const importedRegions: SingleRegion[] = [];
                 let colorIndex = regions.length;
-                
+
                 Object.entries(parsedYAML).forEach(([regionName, regionData]: [string, any]) => {
                     if (Array.isArray(regionData)) {
                         regionData.forEach((region) => {
                             const color = COLOR_PALETTE[colorIndex % COLOR_PALETTE.length];
-                            
+
                             importedRegions.push({
                                 name: regionName,
                                 tray_name: region.tray,
@@ -250,18 +275,18 @@ export const RegionInput: React.FC<{
                         });
                     }
                 });
-                
+
                 const updatedRegions = [...regions, ...importedRegions];
                 onChange(updatedRegions);
-                
+
             } catch (err) {
                 console.error('Error parsing YAML:', err);
                 window.alert('Error parsing YAML file. Please check the format.');
             }
         };
-        
+
         reader.readAsText(file);
-        
+
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -274,14 +299,14 @@ export const RegionInput: React.FC<{
         }
 
         const groupedRegions: { [key: string]: any[] } = {};
-        
+
         regions.forEach(region => {
             const regionName = region.name || 'Unnamed';
-            
+
             if (!groupedRegions[regionName]) {
                 groupedRegions[regionName] = [];
             }
-            
+
             groupedRegions[regionName].push({
                 tray: region.tray_name,
                 upper_left: region.upper_left,
@@ -293,7 +318,7 @@ export const RegionInput: React.FC<{
         Object.entries(groupedRegions).forEach(([regionName, regionData], index) => {
             if (index > 0) yamlContent += '\n';
             yamlContent += `${regionName}:\n`;
-            
+
             regionData.forEach(region => {
                 yamlContent += `  - tray: ${region.tray}\n`;
                 yamlContent += `    upper_left: ${region.upper_left}\n`;
@@ -325,41 +350,39 @@ export const RegionInput: React.FC<{
 
             <Box display="flex" gap={2} flexWrap="wrap">
                 {/* Render dynamic trays */}
-                {trayConfiguration.trays.map((trayConfig, configIndex) => {
-                    return trayConfig.trays.map((tray, trayIndex) => {
-                        const trayName = tray.name;
-                        const existingRegions: ExistingRegion[] = regions
-                            .map((r, idx) => ({ ...r, idx }))
-                            .filter((r) => r.tray_name === trayName)
-                            .map((r) => ({
-                                upperLeft: parseCell(r.upper_left, tray),
-                                lowerRight: parseCell(r.lower_right, tray),
-                                name: r.name || 'Unnamed',
-                                color: r.color,
-                                onRemove: readOnly ? () => {} : () => handleRemove(r.idx),
-                            }));
+                {flatTrays.map((flatTray, index) => {
+                    const { trayConfig, tray, trayName, rotation } = flatTray;
+                    const existingRegions: ExistingRegion[] = regions
+                        .map((r, idx) => ({ ...r, idx }))
+                        .filter((r) => r.tray_name === trayName)
+                        .map((r) => ({
+                            upperLeft: parseCell(r.upper_left, tray),
+                            lowerRight: parseCell(r.lower_right, tray),
+                            name: r.name || 'Unnamed',
+                            color: r.color,
+                            onRemove: readOnly ? () => { } : () => handleRemove(r.idx),
+                        }));
 
-                        return (
-                            <Box key={`${configIndex}-${trayIndex}`} flex={1} minWidth="400px">
-                                <Typography variant="subtitle1" marginBottom={1}>
-                                    {trayName} ({trayConfig.rotation_degrees}°)
-                                </Typography>
-                                <TrayGrid
-                                    tray={trayName}
-                                    qtyXAxis={tray.qty_x_axis}
-                                    qtyYAxis={tray.qty_y_axis}
-                                    orientation={trayConfig.rotation_degrees as Orientation}
-                                    onRegionSelect={readOnly ? () => {} : (regionObj) => handleNewRegion({
-                                        trayName,
-                                        upperLeft: regionObj.upperLeft,
-                                        lowerRight: regionObj.lowerRight,
-                                        trayConfig: tray
-                                    })}
-                                    existingRegions={existingRegions}
-                                />
-                            </Box>
-                        );
-                    });
+                    return (
+                        <Box key={index} flex={1} minWidth="400px">
+                            <Typography variant="subtitle1" marginBottom={1}>
+                                {trayName} ({rotation}°)
+                            </Typography>
+                            <TrayGrid
+                                tray={trayName}
+                                qtyXAxis={tray.qty_x_axis}
+                                qtyYAxis={tray.qty_y_axis}
+                                orientation={rotation as Orientation}
+                                onRegionSelect={readOnly ? () => { } : (regionObj) => handleNewRegion({
+                                    trayName,
+                                    upperLeft: regionObj.upperLeft,
+                                    lowerRight: regionObj.lowerRight,
+                                    trayConfig: tray
+                                })}
+                                existingRegions={existingRegions}
+                            />
+                        </Box>
+                    );
                 })}
 
                 {/* Selected Regions List */}
