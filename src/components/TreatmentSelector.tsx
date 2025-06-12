@@ -1,14 +1,5 @@
-// filepath: /home/ejthomas/projects/EERL/SPICE/spice-ui/src/components/TreatmentSelector.tsx
 import React, { useState, useCallback } from 'react';
-import {
-    AutocompleteInput,
-    ReferenceInput,
-    useDataProvider,
-    useRecordContext,
-    useInput,
-    SelectInput
-} from 'react-admin';
-import { debounce } from 'lodash';
+import { useDataProvider } from 'react-admin';
 import {
     Dialog,
     DialogTitle,
@@ -23,10 +14,9 @@ import {
     MenuItem,
     SelectChangeEvent,
     Paper,
-    useTheme
 } from '@mui/material';
 
-export const SimpleTreatmentSelector = (props: {
+export const TreatmentSelector = (props: {
     value?: string;
     onChange: (value: string) => void;
     label?: string;

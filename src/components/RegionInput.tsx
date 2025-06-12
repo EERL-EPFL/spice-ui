@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { useInput, FieldTitle } from 'react-admin';
 import TrayGrid, { Cell, ExistingRegion, Orientation } from './TrayGrid';
-import { SimpleTreatmentSelector } from './TreatmentSelector';
+import { TreatmentSelector } from './TreatmentSelector';
 import { Box, Typography, TextField, IconButton, Button } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -465,7 +465,7 @@ export const RegionInput: React.FC<{
                             </Box>
                             <Box display="flex" gap={1}>
                                 <Box sx={{ flex: 1 }}>
-                                    <SimpleTreatmentSelector
+                                    <TreatmentSelector
                                         value={r.sample || ''}
                                         label="Treatment"
                                         disabled={readOnly}
