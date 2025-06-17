@@ -138,25 +138,38 @@ export const TreatmentSelector = (props: {
 
     // Get treatment name from ID
     const getTreatmentName = useCallback(async () => {
-        if (!props.value) return '';
+        if (!props.value) return { campaign: '', sample: '', treatment: '' };
 
         try {
-            const { data } = await dataProvider.getOne('treatments', { id: props.value });
-            return data ? `${data.name} (${data.id})` : '';
+            const { data: treatment } = await dataProvider.getOne('treatments', { id: props.value });
+            if (!treatment) return { campaign: '', sample: '', treatment: '' };
+
+            // Get the sample for this treatment
+            const { data: sample } = await dataProvider.getOne('samples', { id: treatment.sample_id });
+            if (!sample) return { campaign: '', sample: '', treatment: treatment.name };
+
+            // Get the campaign for this sample
+            const { data: campaign } = await dataProvider.getOne('campaigns', { id: sample.campaign_id });
+
+            return {
+                campaign: campaign?.name || '',
+                sample: sample.name,
+                treatment: treatment.name
+            };
         } catch (error) {
-            console.error('Error fetching treatment:', error);
-            return '';
+            console.error('Error fetching treatment hierarchy:', error);
+            return { campaign: '', sample: '', treatment: '' };
         }
     }, [props.value, dataProvider]);
 
     // Display the selected treatment name
-    const [displayValue, setDisplayValue] = useState('');
+    const [displayValue, setDisplayValue] = useState<{ campaign: string; sample: string; treatment: string }>({ campaign: '', sample: '', treatment: '' });
 
     React.useEffect(() => {
         if (props.value) {
             getTreatmentName().then(setDisplayValue);
         } else {
-            setDisplayValue('');
+            setDisplayValue({ campaign: '', sample: '', treatment: '' });
         }
     }, [props.value, getTreatmentName]);
 
@@ -174,53 +187,108 @@ export const TreatmentSelector = (props: {
     return (
         <div>
             {props.compact ? (
-                // Compact mode - just show treatment name as clickable text
+                // Compact mode - show hierarchical display
                 <Box
                     onClick={props.disabled ? undefined : openDialog}
                     sx={{
                         cursor: props.disabled ? 'default' : 'pointer',
-                        padding: '4px 8px',
+                        padding: '6px 12px',
                         borderRadius: 1,
                         backgroundColor: props.disabled ? 'action.disabledBackground' : 'transparent',
                         '&:hover': props.disabled ? {} : {
                             backgroundColor: 'action.hover'
                         },
-                        minHeight: '32px',
+                        minHeight: '48px',
                         display: 'flex',
-                        alignItems: 'center',
+                        flexDirection: 'column',
+                        justifyContent: 'center',
                         border: '1px solid',
                         borderColor: 'divider'
                     }}
                 >
-                    <Typography
-                        variant="body2"
-                        sx={{
-                            fontSize: '0.8rem',
-                            color: props.disabled ? 'text.disabled' : (displayValue ? 'text.primary' : 'text.secondary'),
-                            fontStyle: displayValue ? 'normal' : 'italic'
-                        }}
-                    >
-                        {displayValue || 'Select treatment...'}
-                    </Typography>
+                    {displayValue.treatment ? (
+                        <>
+                            <Typography
+                                variant="caption"
+                                sx={{
+                                    fontSize: '0.65rem',
+                                    color: 'text.secondary',
+                                    lineHeight: 1.2,
+                                    marginBottom: '2px'
+                                }}
+                            >
+                                {displayValue.campaign}
+                            </Typography>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    fontSize: '0.8rem',
+                                    color: props.disabled ? 'text.disabled' : 'text.primary',
+                                    lineHeight: 1.2,
+                                    fontWeight: 500
+                                }}
+                            >
+                                {displayValue.sample} ({displayValue.treatment})
+                            </Typography>
+                        </>
+                    ) : (
+                        <Typography
+                            variant="body2"
+                            sx={{
+                                fontSize: '0.8rem',
+                                color: props.disabled ? 'text.disabled' : 'text.secondary',
+                                fontStyle: 'italic'
+                            }}
+                        >
+                            Select treatment...
+                        </Typography>
+                    )}
                 </Box>
             ) : (
-                // Original full mode
+                // Original full mode - also use hierarchical display
                 <Box display="flex" alignItems="center" gap={1}>
                     <Paper
                         variant="outlined"
                         sx={{
-                            padding: '8px 12px',
-                            minHeight: '40px',
+                            padding: '12px 16px',
+                            minHeight: '56px',
                             flexGrow: 1,
                             display: 'flex',
-                            alignItems: 'center',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
                             backgroundColor: props.disabled ? 'action.disabledBackground' : 'background.paper',
                             color: props.disabled ? 'text.disabled' : 'text.primary'
                         }}
                     >
-                        <Typography variant="body1" color="inherit">
-                            {displayValue || 'No treatment selected'}
-                        </Typography>
+                        {displayValue.treatment ? (
+                            <>
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        fontSize: '0.7rem',
+                                        color: 'text.secondary',
+                                        lineHeight: 1.2,
+                                        marginBottom: '4px'
+                                    }}
+                                >
+                                    {displayValue.campaign}
+                                </Typography>
+                                <Typography
+                                    variant="body1"
+                                    sx={{
+                                        lineHeight: 1.2,
+                                        fontWeight: 500
+                                    }}
+                                    color="inherit"
+                                >
+                                    {displayValue.sample} ({displayValue.treatment})
+                                </Typography>
+                            </>
+                        ) : (
+                            <Typography variant="body1" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                No treatment selected
+                            </Typography>
+                        )}
                     </Paper>
                     <Button
                         variant="contained"
