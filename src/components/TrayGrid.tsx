@@ -93,19 +93,19 @@ const TrayGrid: React.FC<TrayGridProps> = ({
         return existingRegions.some(region => {
             const { upperLeft, lowerRight } = region;
             return row >= upperLeft.row && row <= lowerRight.row &&
-                   col >= upperLeft.col && col <= lowerRight.col;
+                col >= upperLeft.col && col <= lowerRight.col;
         });
     };
 
     const handleMouseDown = (row: number, col: number) => {
         // Don't allow selection on covered cells
         if (isCellCovered(row, col)) return;
-        
+
         setStartCell({ row, col });
         setEndCell({ row, col });
         setIsDragging(true);
     };
-    
+
     const handleMouseEnter = (row: number, col: number) => {
         if (!isDragging) {
             setHoveredCell({ row, col });
@@ -113,16 +113,16 @@ const TrayGrid: React.FC<TrayGridProps> = ({
         }
         // Don't extend selection over covered cells
         if (isCellCovered(row, col)) return;
-        
+
         setEndCell({ row, col });
     };
-    
+
     const handleMouseLeaveCell = () => {
         if (!isDragging) {
             setHoveredCell(null);
         }
     };
-    
+
     const handleMouseUp = () => {
         if (startCell && endCell) {
             const upperLeft: Cell = {
@@ -139,7 +139,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
         setStartCell(null);
         setEndCell(null);
     };
-    
+
     const handleMouseLeave = () => {
         if (isDragging) {
             setIsDragging(false);
@@ -161,8 +161,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
 
     // True if this cell should show hover effect
     const isCellHovered = (row: number, col: number) => {
-        return hoveredCell?.row === row && hoveredCell?.col === col && 
-               !isCellCovered(row, col) && !isDragging;
+        return hoveredCell?.row === row && hoveredCell?.col === col &&
+            !isCellCovered(row, col) && !isDragging;
     };
 
     // SVG size: width = (num displayed columns × SPACING + margin), height = (num displayed rows × SPACING + margin + 20 for labels)
@@ -174,39 +174,19 @@ const TrayGrid: React.FC<TrayGridProps> = ({
         const topLabels = [];
         const leftLabels = [];
 
-        if (orientation === 0 || orientation === 180) {
-            // X-axis (columns): letters A, B, C...
-            for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
-                const letter = rowLetters[colIdx] || String.fromCharCode(65 + colIdx);
-                const { xIndex } = getDisplayIndices(0, colIdx);
-                const cx = SPACING + xIndex * SPACING;
-                topLabels.push({ x: cx, y: 15, label: letter });
-            }
-            // Y-axis (rows): numbers 1, 2, 3...
-            for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
-                const number = rowIdx + 1;
-                const { yIndex } = getDisplayIndices(rowIdx, 0);
-                const cy = SPACING + yIndex * SPACING;
-                leftLabels.push({ x: 15, y: cy + 5, label: number });
-            }
-        } else if (orientation === 90 || orientation === 270) {
-            // For 90°/270° rotation, columns become rows and vice versa
-            // X-axis (what were originally rows): numbers 1, 2, 3...
-            for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
-                const number = rowIdx + 1;
-                const { xIndex } = getDisplayIndices(rowIdx, 0);
-                const cx = SPACING + xIndex * SPACING;
-                topLabels.push({ x: cx, y: 15, label: number });
-            }
-            // Y-axis (what were originally columns): letters A, B, C...
-            for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
-                const letter = rowLetters[colIdx] || String.fromCharCode(65 + colIdx);
-                const { yIndex } = getDisplayIndices(0, colIdx);
-                const cy = SPACING + yIndex * SPACING;
-                leftLabels.push({ x: 15, y: cy + 5, label: letter });
-            }
+        // Always: top = numbers (columns), left = letters (rows)
+        for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
+            const number = colIdx + 1;
+            const { xIndex } = getDisplayIndices(0, colIdx);
+            const cx = SPACING + xIndex * SPACING;
+            topLabels.push({ x: cx, y: 15, label: number });
         }
-
+        for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
+            const letter = rowLetters[rowIdx] || String.fromCharCode(65 + rowIdx);
+            const { yIndex } = getDisplayIndices(rowIdx, 0);
+            const cy = SPACING + yIndex * SPACING;
+            leftLabels.push({ x: 15, y: cy + 5, label: letter });
+        }
         return { topLabels, leftLabels };
     };
 
@@ -229,7 +209,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     const selected = isCellInSelection(rowIdx, colIdx);
                     const hovered = isCellHovered(rowIdx, colIdx);
                     const covered = isCellCovered(rowIdx, colIdx);
-                    
+
                     let fillColor = '#fff';
                     if (selected) {
                         fillColor = 'rgba(0,128,255,0.5)';
@@ -238,7 +218,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     } else if (covered) {
                         fillColor = '#f5f5f5';
                     }
-                    
+
                     return (
                         <circle
                             key={`circle-${rowIdx}-${colIdx}`}
@@ -296,7 +276,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 const maxX = Math.max(x1, x2);
                 const minY = Math.min(y1, y2);
                 const maxY = Math.max(y1, y2);
-                
+
                 // Position rectangle to hug the wells more tightly
                 const rectX = SPACING + minX * SPACING - CIRCLE_RADIUS;
                 const rectY = SPACING + minY * SPACING - CIRCLE_RADIUS;

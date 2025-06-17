@@ -31,24 +31,55 @@ const letterToRowIndex = (letter: string, maxRows: number): number => {
 const numberToColIndex = (num: number): number => num - 1;
 
 // Parse cell string with dynamic tray dimensions
+// Format: Letter (row) + Number (column), e.g., "A1", "D5"
 const parseCell = (s: string, trayConfig?: any): Cell => {
     if (!trayConfig) return { row: 0, col: 0 };
 
     const match = s.match(/^([A-Za-z])(\d{1,2})$/);
     if (match) {
-        const row = letterToRowIndex(match[1], trayConfig.qty_y_axis);
+        const row = letterToRowIndex(match[1], trayConfig.qty_y_axis); // Letter = row (Y-axis)
         const colNumber = parseInt(match[2], 10);
-        let col = numberToColIndex(colNumber);
+        let col = numberToColIndex(colNumber); // Number = column (X-axis)
+
+        // Validate bounds to prevent invalid coordinates
+        if (row < 0 || row >= trayConfig.qty_y_axis || col < 0 || col >= trayConfig.qty_x_axis) {
+            console.warn(`Invalid cell coordinates: ${s} for tray with ${trayConfig.qty_y_axis} rows and ${trayConfig.qty_x_axis} cols`);
+            return { row: 0, col: 0 };
+        }
+
         return { row, col };
     }
     return { row: 0, col: 0 };
 };
 
 // Convert Cell back to string with dynamic tray dimensions
+// Format: Letter (row) + Number (column), e.g., "A1", "D5"
 const cellToString = (cell: Cell, trayConfig: any): string => {
+    // Validate bounds before converting
+    if (cell.row < 0 || cell.row >= trayConfig.qty_y_axis ||
+        cell.col < 0 || cell.col >= trayConfig.qty_x_axis) {
+        console.warn(`Invalid cell coordinates: row ${cell.row}, col ${cell.col} for tray with ${trayConfig.qty_y_axis} rows and ${trayConfig.qty_x_axis} cols`);
+        return 'A1'; // Return safe default
+    }
+
+    const letter = rowIndexToLetter(cell.row, trayConfig.qty_y_axis); // Row = letter (Y-axis)
+    const colNumber = cell.col + 1; // Column = number (X-axis)
+    return `${letter}${colNumber}`;
+};
+
+// Helper to convert a cell to string, considering tray rotation
+const cellToStringWithRotation = (cell: Cell, trayConfig: any, rotation: number): string => {
+    // For debugging, let's see what we're getting
+    console.log(`Original cell: row=${cell.row}, col=${cell.col}, rotation=${rotation}`);
+
+    // Don't apply any rotation transformation - the cell coordinates should already be correct
+    // The TrayGrid handles the visual rotation, so we just need to convert the logical coordinates
     const letter = rowIndexToLetter(cell.row, trayConfig.qty_y_axis);
     const colNumber = cell.col + 1;
-    return `${letter}${colNumber}`;
+    const result = `${letter}${colNumber}`;
+
+    console.log(`Converted to: ${result}`);
+    return result;
 };
 
 interface SingleRegion {
@@ -428,99 +459,113 @@ export const RegionInput: React.FC<{
                         </Typography>
                     )}
 
-                    {regions.map((r, idx) => (
-                        <Box
-                            key={`region-list-${idx}`}
-                            display="flex"
-                            alignItems="center"
-                            gap={1}
-                            marginBottom={0.5}
-                            padding={1}
-                            border={`1px solid ${r.color}`}
-                            borderRadius={1}
-                            sx={{
-                                backgroundColor: `${r.color}08`,
-                                position: 'relative'
-                            }}
-                        >
-                            {/* Color indicator and region label */}
+                    {regions.map((r, idx) => {
+                        // Find the tray config and rotation for this region
+                        const trayInfo = flatTrays.find(t => t.trayName === r.tray_name);
+                        const trayConfig = trayInfo?.tray;
+                        const rotation = trayInfo?.rotation || 0;
+                        let ulStr = r.upper_left;
+                        let lrStr = r.lower_right;
+                        if (trayConfig) {
+                            const ulCell = parseCell(r.upper_left, trayConfig);
+                            const lrCell = parseCell(r.lower_right, trayConfig);
+                            ulStr = cellToStringWithRotation(ulCell, trayConfig, rotation);
+                            lrStr = cellToStringWithRotation(lrCell, trayConfig, rotation);
+                        }
+                        return (
                             <Box
+                                key={`region-list-${idx}`}
+                                display="flex"
+                                alignItems="center"
+                                gap={1}
+                                marginBottom={0.5}
+                                padding={1}
+                                border={`1px solid ${r.color}`}
+                                borderRadius={1}
                                 sx={{
-                                    position: 'absolute',
-                                    top: -8,
-                                    left: 8,
-                                    backgroundColor: 'background.paper',
-                                    paddingX: 0.5,
-                                    fontSize: '0.75rem',
-                                    fontWeight: 'medium',
-                                    color: r.color,
+                                    backgroundColor: `${r.color}08`,
+                                    position: 'relative'
                                 }}
                             >
-                                Region {idx + 1}
-                            </Box>
-
-                            <TextField
-                                id={`region-${idx}-name`}
-                                placeholder="Name"
-                                size="small"
-                                value={r.name}
-                                onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'name', e.target.value)}
-                                variant="standard"
-                                disabled={readOnly}
-                                sx={{ width: 90 }}
-                                inputRef={inputRefs.current[`region-${idx}-name`]}
-                                InputProps={{
-                                    disableUnderline: true,
-                                    sx: { fontSize: '0.8rem' }
-                                }}
-                            />
-
-                            <Box sx={{ width: 120 }}>
-                                <TreatmentSelector
-                                    value={r.sample || ''}
-                                    label=""
-                                    disabled={readOnly}
-                                    onChange={(treatmentId) => {
-                                        if (!readOnly) {
-                                            handleRegionChange(idx, 'sample', treatmentId);
-                                        }
+                                {/* Color indicator and region label */}
+                                <Box
+                                    sx={{
+                                        position: 'absolute',
+                                        top: -8,
+                                        left: 8,
+                                        backgroundColor: 'background.paper',
+                                        paddingX: 0.5,
+                                        fontSize: '0.75rem',
+                                        fontWeight: 'medium',
+                                        color: r.color,
                                     }}
-                                    compact={true}
-                                />
-                            </Box>
-
-                            <TextField
-                                id={`region-${idx}-dilution`}
-                                placeholder="Dilution"
-                                size="small"
-                                value={r.dilution || ''}
-                                onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'dilution', e.target.value)}
-                                variant="standard"
-                                disabled={readOnly}
-                                sx={{ width: 70 }}
-                                inputRef={inputRefs.current[`region-${idx}-dilution`]}
-                                InputProps={{
-                                    disableUnderline: true,
-                                    sx: { fontSize: '0.8rem' }
-                                }}
-                            />
-
-                            <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.65rem', minWidth: 45 }}>
-                                {r.upper_left}–{r.lower_right}
-                            </Typography>
-
-                            {!readOnly && (
-                                <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleRemove(idx)}
-                                    sx={{ padding: 0.25 }}
                                 >
-                                    <CloseIcon sx={{ fontSize: '1rem' }} />
-                                </IconButton>
-                            )}
-                        </Box>
-                    ))}
+                                    {r.tray_name}: {ulStr}–{lrStr}
+                                </Box>
+
+                                <TextField
+                                    id={`region-${idx}-name`}
+                                    placeholder="Name"
+                                    size="small"
+                                    value={r.name}
+                                    onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'name', e.target.value)}
+                                    variant="standard"
+                                    disabled={readOnly}
+                                    sx={{ width: 90 }}
+                                    inputRef={inputRefs.current[`region-${idx}-name`]}
+                                    InputProps={{
+                                        disableUnderline: true,
+                                        sx: { fontSize: '0.8rem' }
+                                    }}
+                                />
+
+                                <Box sx={{ width: 120 }}>
+                                    <TreatmentSelector
+                                        value={r.sample || ''}
+                                        label=""
+                                        disabled={readOnly}
+                                        onChange={(treatmentId) => {
+                                            if (!readOnly) {
+                                                handleRegionChange(idx, 'sample', treatmentId);
+                                            }
+                                        }}
+                                        compact={true}
+                                    />
+                                </Box>
+
+                                <TextField
+                                    id={`region-${idx}-dilution`}
+                                    placeholder="Dilution"
+                                    size="small"
+                                    value={r.dilution || ''}
+                                    onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'dilution', e.target.value)}
+                                    variant="standard"
+                                    disabled={readOnly}
+                                    sx={{ width: 70 }}
+                                    inputRef={inputRefs.current[`region-${idx}-dilution`]}
+                                    InputProps={{
+                                        disableUnderline: true,
+                                        sx: { fontSize: '0.8rem' }
+                                    }}
+                                />
+
+                                <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.65rem', minWidth: 45 }}>
+                                    {ulStr}–{lrStr}
+                                </Typography>
+
+                                {!readOnly && (
+                                    <IconButton
+                                        size="small"
+                                        color="error"
+                                        onClick={() => handleRemove(idx)}
+                                        sx={{ padding: 0.25 }}
+                                    >
+                                        <CloseIcon sx={{ fontSize: '1rem' }} />
+                                    </IconButton>
+                                )}
+                            </Box>
+                        );
+                    })}
 
                     {isTouched && error && (
                         <Typography color="error" variant="caption">
