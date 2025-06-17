@@ -167,15 +167,25 @@ export const RegionInput: React.FC<{
     readOnly?: boolean;
     value?: any; // Allow direct value prop for display mode
 }> = (props) => {
-    // Conditionally use useInput only when not in readOnly mode or when we don't have a direct value
-    const inputResult = props.readOnly && props.value ? null : useInput(props);
+    // Always call useInput to maintain consistent hook order, but handle errors gracefully
+    let inputResult;
+    try {
+        inputResult = useInput(props);
+    } catch (error) {
+        // If useInput fails (no form context), create a mock result
+        inputResult = {
+            field: { value: [], onChange: () => { } },
+            fieldState: { error: undefined, isTouched: false },
+            isRequired: false
+        };
+    }
 
-    // Get value and onChange from either useInput or props
-    const value = props.readOnly && props.value ? props.value : inputResult?.field?.value;
-    const onChange = props.readOnly ? () => { } : inputResult?.field?.onChange || (() => { });
-    const error = inputResult?.fieldState?.error;
-    const isTouched = inputResult?.fieldState?.isTouched;
-    const isRequired = inputResult?.isRequired || false;
+    // Get value and onChange, prioritizing direct props for read-only mode
+    const value = props.readOnly && props.value !== undefined ? props.value : inputResult.field.value;
+    const onChange = props.readOnly ? () => { } : inputResult.field.onChange;
+    const error = props.readOnly ? undefined : inputResult.fieldState.error;
+    const isTouched = props.readOnly ? false : inputResult.fieldState.isTouched;
+    const isRequired = props.readOnly ? false : inputResult.isRequired;
 
     const regions: SingleRegion[] = Array.isArray(value) ? value : [];
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -195,47 +205,7 @@ export const RegionInput: React.FC<{
         });
     }, [regions.length]);
 
-    // Create memoized values for all hooks to ensure consistent hook call order
-    const [noTraysMessage, flatTrays] = React.useMemo(() => {
-        // If no tray configuration is provided, return early with message component
-        if (!trayConfiguration || !trayConfiguration.trays || trayConfiguration.trays.length === 0) {
-            const message = (
-                <Box marginTop={2} marginBottom={2}>
-                    <FieldTitle
-                        label={props.label || 'Regions'}
-                        source={props.source}
-                        resource={undefined}
-                        isRequired={isRequired}
-                    />
-                    <Typography variant="body2" color="textSecondary">
-                        No tray configuration available. Please select a tray configuration first.
-                    </Typography>
-                </Box>
-            );
-            return [message, []];
-        }
-
-        // Otherwise, process the tray configuration
-        const flattened = [];
-        for (const trayConfig of trayConfiguration.trays) {
-            for (const tray of trayConfig.trays) {
-                flattened.push({
-                    trayConfig,
-                    tray,
-                    trayName: tray.name,
-                    rotation: trayConfig.rotation_degrees
-                });
-            }
-        }
-        return [null, flattened];
-    }, [trayConfiguration, props.label, props.source, isRequired]);
-
-    // If no trays are available, show the message
-    if (noTraysMessage) {
-        return noTraysMessage;
-    }
-
-    // All hooks below this point will always run, maintaining consistent hook order
+    // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
 
     const handleNewRegion = useCallback(
         (regionObj: { trayName: string; upperLeft: Cell; lowerRight: Cell; trayConfig: any }) => {
@@ -279,10 +249,10 @@ export const RegionInput: React.FC<{
         [onChange, regions]
     );
 
-    const handleRemove = (idx: number) => {
+    const handleRemove = useCallback((idx: number) => {
         const updated = regions.filter((_, i) => i !== idx);
         onChange(updated);
-    };
+    }, [onChange, regions]);
 
     const handleRegionChange = useCallback((idx: number, field: string, newValue: string) => {
         // Get current focused element to restore focus after state update
@@ -407,6 +377,48 @@ export const RegionInput: React.FC<{
     // Create a stable no-op function for display mode
     const noOpRegionSelect = useCallback(() => { }, []);
 
+    // Create memoized values for all hooks to ensure consistent hook call order
+    const [noTraysMessage, flatTrays] = React.useMemo(() => {
+        // If no tray configuration is provided, return early with message component
+        if (!trayConfiguration || !trayConfiguration.trays || trayConfiguration.trays.length === 0) {
+            const message = (
+                <Box marginTop={2} marginBottom={2}>
+                    <FieldTitle
+                        label={props.label || 'Regions'}
+                        source={props.source}
+                        resource={undefined}
+                        isRequired={isRequired}
+                    />
+                    <Typography variant="body2" color="textSecondary">
+                        No tray configuration available. Please select a tray configuration first.
+                    </Typography>
+                </Box>
+            );
+            return [message, []];
+        }
+
+        // Otherwise, process the tray configuration
+        const flattened = [];
+        for (const trayConfig of trayConfiguration.trays) {
+            for (const tray of trayConfig.trays) {
+                flattened.push({
+                    trayConfig,
+                    tray,
+                    trayName: tray.name,
+                    rotation: trayConfig.rotation_degrees
+                });
+            }
+        }
+        return [null, flattened];
+    }, [trayConfiguration, props.label, props.source, isRequired]);
+
+    // NOW we can do conditional returns after all hooks have been called
+    if (noTraysMessage) {
+        return noTraysMessage;
+    }
+
+    // All hooks below this point will always run, maintaining consistent hook order
+
     return (
         <Box marginTop={2} marginBottom={2}>
             <FieldTitle
@@ -423,7 +435,13 @@ export const RegionInput: React.FC<{
                         const { trayConfig, tray, trayName, rotation } = flatTray;
                         const existingRegions: ExistingRegion[] = regions
                             .map((r, idx) => ({ ...r, idx }))
-                            .filter((r) => r.tray_name === trayName)
+                            .filter((r) => {
+                                // Handle regions with null tray_name by assigning them to the first tray
+                                if (r.tray_name === null || r.tray_name === undefined) {
+                                    return index === 0; // Show on first tray only
+                                }
+                                return r.tray_name === trayName;
+                            })
                             .map((r) => ({
                                 upperLeft: parseCell(r.upper_left, tray),
                                 lowerRight: parseCell(r.lower_right, tray),
