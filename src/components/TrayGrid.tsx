@@ -52,6 +52,7 @@ export interface TrayGridProps {
     orientation: Orientation;
     onRegionSelect: (region: { tray: string; upperLeft: Cell; lowerRight: Cell }) => void;
     existingRegions?: ExistingRegion[];
+    readOnly?: boolean; // Add explicit readOnly prop
 }
 
 const TrayGrid: React.FC<TrayGridProps> = ({
@@ -61,11 +62,15 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     orientation,
     onRegionSelect,
     existingRegions = [],
+    readOnly = false,
 }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [startCell, setStartCell] = useState<Cell | null>(null);
     const [endCell, setEndCell] = useState<Cell | null>(null);
     const [hoveredCell, setHoveredCell] = useState<Cell | null>(null);
+
+    // Use the explicit readOnly prop instead of trying to detect it
+    const isDisplayMode = readOnly;
 
     const rowLetters = generateRowLetters(qtyYAxis);
 
@@ -197,8 +202,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             width={svgWidth}
             height={svgHeight}
             style={{ border: '1px solid #ccc', background: '#fafafa' }}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseLeave}
+            onMouseUp={isDisplayMode ? undefined : handleMouseUp}
+            onMouseLeave={isDisplayMode ? undefined : handleMouseLeave}
         >
             {/* 1) Draw all wells (circles) */}
             {Array.from({ length: qtyYAxis }).map((_, rowIdx) =>
@@ -206,8 +211,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     const { xIndex, yIndex } = getDisplayIndices(rowIdx, colIdx);
                     const cx = SPACING + xIndex * SPACING;
                     const cy = SPACING + yIndex * SPACING;
-                    const selected = isCellInSelection(rowIdx, colIdx);
-                    const hovered = isCellHovered(rowIdx, colIdx);
+                    const selected = !isDisplayMode && isCellInSelection(rowIdx, colIdx);
+                    const hovered = !isDisplayMode && isCellHovered(rowIdx, colIdx);
                     const covered = isCellCovered(rowIdx, colIdx);
 
                     let fillColor = '#fff';
@@ -228,10 +233,12 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                             fill={fillColor}
                             stroke="#333"
                             strokeWidth={1}
-                            style={{ cursor: covered ? 'not-allowed' : 'pointer' }}
-                            onMouseDown={() => handleMouseDown(rowIdx, colIdx)}
-                            onMouseEnter={() => handleMouseEnter(rowIdx, colIdx)}
-                            onMouseLeave={handleMouseLeaveCell}
+                            style={{
+                                cursor: isDisplayMode ? 'default' : (covered ? 'not-allowed' : 'pointer')
+                            }}
+                            onMouseDown={isDisplayMode ? undefined : () => handleMouseDown(rowIdx, colIdx)}
+                            onMouseEnter={isDisplayMode ? undefined : () => handleMouseEnter(rowIdx, colIdx)}
+                            onMouseLeave={isDisplayMode ? undefined : handleMouseLeaveCell}
                         />
                     );
                 })
@@ -283,6 +290,9 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 const rectW = (maxX - minX) * SPACING + 2 * CIRCLE_RADIUS;
                 const rectH = (maxY - minY) * SPACING + 2 * CIRCLE_RADIUS;
 
+                // Check if this is in display mode (onRemove is a no-op function)
+                const isDisplayMode = region.onRemove.toString() === '() => { }' || region.onRemove.toString() === '() => {}';
+
                 return (
                     <g key={`overlay-${idx}`}>
                         <rect
@@ -311,35 +321,39 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                         >
                             {region.name || 'Unnamed'}
                         </text>
-                        <circle
-                            cx={rectX + rectW - 12}
-                            cy={rectY + 12}
-                            r={10}
-                            fill="rgba(255,255,255,0.95)"
-                            stroke={region.color}
-                            strokeWidth={2}
-                            style={{ cursor: 'pointer' }}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                region.onRemove();
-                            }}
-                        />
-                        <text
-                            x={rectX + rectW - 12}
-                            y={rectY + 17}
-                            textAnchor="middle"
-                            fontSize="16"
-                            fontFamily="Arial, sans-serif"
-                            fill={region.color}
-                            fontWeight="bold"
-                            style={{ cursor: 'pointer', userSelect: 'none' }}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                region.onRemove();
-                            }}
-                        >
-                            ×
-                        </text>
+                        {!isDisplayMode && (
+                            <>
+                                <circle
+                                    cx={rectX + rectW - 12}
+                                    cy={rectY + 12}
+                                    r={10}
+                                    fill="rgba(255,255,255,0.95)"
+                                    stroke={region.color}
+                                    strokeWidth={2}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        region.onRemove();
+                                    }}
+                                />
+                                <text
+                                    x={rectX + rectW - 12}
+                                    y={rectY + 17}
+                                    textAnchor="middle"
+                                    fontSize="16"
+                                    fontFamily="Arial, sans-serif"
+                                    fill={region.color}
+                                    fontWeight="bold"
+                                    style={{ cursor: 'pointer', userSelect: 'none' }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        region.onRemove();
+                                    }}
+                                >
+                                    ×
+                                </text>
+                            </>
+                        )}
                     </g>
                 );
             })}

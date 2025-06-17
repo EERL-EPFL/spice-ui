@@ -404,6 +404,9 @@ export const RegionInput: React.FC<{
         URL.revokeObjectURL(url);
     }, [regions]);
 
+    // Create a stable no-op function for display mode
+    const noOpRegionSelect = useCallback(() => { }, []);
+
     return (
         <Box marginTop={2} marginBottom={2}>
             <FieldTitle
@@ -439,13 +442,14 @@ export const RegionInput: React.FC<{
                                     qtyXAxis={tray.qty_x_axis}
                                     qtyYAxis={tray.qty_y_axis}
                                     orientation={rotation as Orientation}
-                                    onRegionSelect={readOnly ? () => { } : (regionObj) => handleNewRegion({
+                                    onRegionSelect={readOnly ? noOpRegionSelect : (regionObj) => handleNewRegion({
                                         trayName,
                                         upperLeft: regionObj.upperLeft,
                                         lowerRight: regionObj.lowerRight,
                                         trayConfig: tray
                                     })}
                                     existingRegions={existingRegions}
+                                    readOnly={readOnly}
                                 />
                             </Box>
                         );
