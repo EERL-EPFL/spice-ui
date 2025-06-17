@@ -109,11 +109,12 @@ const RegionsDisplay = () => {
     }
 
     return (
-        <RegionInput 
-            source="regions" 
-            label="Experiment Well Regions" 
+        <RegionInput
+            source="regions"
+            label="Experiment Well Regions"
             trayConfiguration={trayConfiguration}
             readOnly={true}
+            value={record.regions}
         />
     );
 };

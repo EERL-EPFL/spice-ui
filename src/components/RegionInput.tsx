@@ -165,12 +165,17 @@ export const RegionInput: React.FC<{
     label?: string;
     trayConfiguration?: { trays: TrayConfig[] };
     readOnly?: boolean;
+    value?: any; // Allow direct value prop for display mode
 }> = (props) => {
-    const {
-        field: { value, onChange },
-        fieldState: { error, isTouched },
-        isRequired,
-    } = useInput(props);
+    // Conditionally use useInput only when not in readOnly mode or when we don't have a direct value
+    const inputResult = props.readOnly && props.value ? null : useInput(props);
+
+    // Get value and onChange from either useInput or props
+    const value = props.readOnly && props.value ? props.value : inputResult?.field?.value;
+    const onChange = props.readOnly ? () => { } : inputResult?.field?.onChange || (() => { });
+    const error = inputResult?.fieldState?.error;
+    const isTouched = inputResult?.fieldState?.isTouched;
+    const isRequired = inputResult?.isRequired || false;
 
     const regions: SingleRegion[] = Array.isArray(value) ? value : [];
     const fileInputRef = useRef<HTMLInputElement>(null);
