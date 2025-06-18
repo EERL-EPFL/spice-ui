@@ -17,7 +17,7 @@ const CreateComponent = () => {
         <Create redirect="show">
             <SimpleForm>
                 <TextField source="id" />
-                <ReferenceInput source="campaign_id" reference="campaigns">
+                <ReferenceInput source="location_id" reference="locations">
                     <SelectInput optionText="name" />
                 </ReferenceInput>
                 <TextInput source="name" validate={[required()]} />

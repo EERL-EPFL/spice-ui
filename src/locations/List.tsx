@@ -7,10 +7,7 @@ import {
     CreateButton,
     ExportButton,
     DateField,
-    NumberField,
-    ReferenceManyCount,
     ReferenceField,
-    FunctionField,
 } from "react-admin";
 import { postFilters } from "../filters/list";
 
@@ -28,13 +25,13 @@ export const ListComponent = () => {
     return (
         <List actions={<ListComponentActions />} storeKey={false} filters={postFilters}>
             <Datagrid rowClick="show">
-                <TextField source="name" label="Name" />
-                <TextField source="type" label="Type" />
-                <ReferenceField source="location_id" reference="locations" link="show">
+                <TextField source="name" />
+                <ReferenceField source="project_id" reference="projects" link="show">
                     <TextField source="name" />
                 </ReferenceField>
-                <FunctionField label="Treatments" render={record => (record.treatments ? record.treatments.length : 0)} />
-                <DateField source="last_updated" label="Last Updated" showTime />
+                <TextField source="description" />
+                <DateField source="start_date" showTime />
+                <DateField source="end_date" showTime />
             </Datagrid>
         </List>
     );

@@ -15,7 +15,8 @@ import { keycloakAuthProvider } from './authProvider';
 import MyLayout from './layout/Layout';
 import samples from './samples';
 import assets from './assets';
-import campaigns from "./campaigns";
+import locations from "./locations";
+import projects from "./projects";
 import experiments from './experiments';
 import axios from 'axios';
 import Dashboard from './Dashboard';
@@ -94,8 +95,9 @@ const App = () => {
                 <>
                     {permissions ? (
                         <>
+                            <Resource name="projects" {...projects} />
+                            <Resource name="locations" {...locations} />
                             <Resource name="trays" {...trays} />
-                            <Resource name="campaigns" {...campaigns} />
                             <Resource name="treatments" {...treatments} />
                             <Resource name="samples" {...samples} />
                             <Resource name="experiments" {...experiments} />

@@ -212,9 +212,9 @@ const TreatmentDisplay: React.FC<{
         );
     }
 
-    // Create display text with sample and campaign info if available
-    const displayText = treatment.sample?.campaign
-        ? `${treatment.name} (${treatment.sample.name} - ${treatment.sample.campaign.name})`
+    // Create display text with sample and location info if available
+    const displayText = treatment.sample?.location
+        ? `${treatment.name} (${treatment.sample.name} - ${treatment.sample.location.name})`
         : treatment.sample
             ? `${treatment.name} (${treatment.sample.name})`
             : treatment.name;

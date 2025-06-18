@@ -6,10 +6,6 @@ import {
     TopToolbar,
     CreateButton,
     ExportButton,
-    DateField,
-    NumberField,
-    ReferenceManyCount,
-    ReferenceField,
     FunctionField,
 } from "react-admin";
 import { postFilters } from "../filters/list";
@@ -28,13 +24,22 @@ export const ListComponent = () => {
     return (
         <List actions={<ListComponentActions />} storeKey={false} filters={postFilters}>
             <Datagrid rowClick="show">
-                <TextField source="name" label="Name" />
-                <TextField source="type" label="Type" />
-                <ReferenceField source="location_id" reference="locations" link="show">
-                    <TextField source="name" />
-                </ReferenceField>
-                <FunctionField label="Treatments" render={record => (record.treatments ? record.treatments.length : 0)} />
-                <DateField source="last_updated" label="Last Updated" showTime />
+                <TextField source="name" />
+                <TextField source="note" />
+                <FunctionField
+                    source="colour"
+                    label="Color"
+                    render={record => (
+                        <div style={{
+                            display: 'inline-block',
+                            width: '20px',
+                            height: '20px',
+                            backgroundColor: record.colour || '#ccc',
+                            border: '1px solid #000',
+                            borderRadius: '3px'
+                        }} />
+                    )}
+                />
             </Datagrid>
         </List>
     );

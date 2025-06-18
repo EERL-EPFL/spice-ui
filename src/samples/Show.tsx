@@ -63,7 +63,7 @@ export const ShowComponent = () => {
             <SimpleShowLayout>
                 <TextField source="id" />
                 <TextField source="name" />
-                <ReferenceField source="campaign_id" reference="campaigns" link="show">
+                <ReferenceField source="location_id" reference="locations" link="show">
                     <TextField source="name" />
                 </ReferenceField>
                 <TextField source="type" />

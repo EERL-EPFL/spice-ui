@@ -26,36 +26,36 @@ export const TreatmentSelector = (props: {
     const dataProvider = useDataProvider();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [campaignId, setCampaignId] = useState<string | null>(null);
+    const [locationId, setLocationId] = useState<string | null>(null);
     const [sampleId, setSampleId] = useState<string | null>(null);
     const [treatmentId, setTreatmentId] = useState<string | null>(null);
 
     // Add state for options
-    const [campaignOptions, setCampaignOptions] = useState<Array<{ id: string, name: string }>>([]);
+    const [locationOptions, setLocationOptions] = useState<Array<{ id: string, name: string }>>([]);
     const [sampleOptions, setSampleOptions] = useState<Array<{ id: string, name: string }>>([]);
     const [treatmentOptions, setTreatmentOptions] = useState<Array<{ id: string, name: string }>>([]);
 
-    // Load campaigns when dialog opens
-    const loadCampaigns = useCallback(async () => {
+    // Load locations when dialog opens
+    const loadLocations = useCallback(async () => {
         setLoading(true);
         try {
-            const { data } = await dataProvider.getList('campaigns', {
+            const { data } = await dataProvider.getList('locations', {
                 pagination: { page: 1, perPage: 500 },
                 sort: { field: 'name', order: 'ASC' },
                 filter: {}
             });
-            setCampaignOptions(data);
+            setLocationOptions(data);
         } catch (error) {
-            console.error('Error loading campaigns:', error);
-            setCampaignOptions([]);
+            console.error('Error loading locations:', error);
+            setLocationOptions([]);
         } finally {
             setLoading(false);
         }
     }, [dataProvider]);
 
-    // Load samples for a selected campaign
-    const loadSamples = useCallback(async (campaignId: string) => {
-        if (!campaignId) {
+    // Load samples for a selected location
+    const loadSamples = useCallback(async (locationId: string) => {
+        if (!locationId) {
             setSampleOptions([]);
             return;
         }
@@ -65,7 +65,7 @@ export const TreatmentSelector = (props: {
             const { data } = await dataProvider.getList('samples', {
                 pagination: { page: 1, perPage: 500 },
                 sort: { field: 'name', order: 'ASC' },
-                filter: { campaign_id: campaignId }
+                filter: { location_id: locationId }
             });
             setSampleOptions(data);
         } catch (error) {
@@ -99,16 +99,16 @@ export const TreatmentSelector = (props: {
         }
     }, [dataProvider]);
 
-    // Handle campaign selection
-    const handleCampaignChange = useCallback((event: SelectChangeEvent<string>) => {
-        const newCampaignId = event.target.value;
-        setCampaignId(newCampaignId);
+    // Handle location selection
+    const handleLocationChange = useCallback((event: SelectChangeEvent<string>) => {
+        const newLocationId = event.target.value;
+        setLocationId(newLocationId);
         setSampleId(null);
         setTreatmentId(null);
         setSampleOptions([]);
         setTreatmentOptions([]);
-        if (newCampaignId) {
-            loadSamples(newCampaignId);
+        if (newLocationId) {
+            loadSamples(newLocationId);
         }
     }, [loadSamples]);
 
@@ -138,50 +138,50 @@ export const TreatmentSelector = (props: {
 
     // Get treatment name from ID
     const getTreatmentName = useCallback(async () => {
-        if (!props.value) return { campaign: '', sample: '', treatment: '' };
+        if (!props.value) return { location: '', sample: '', treatment: '' };
 
         try {
             const { data: treatment } = await dataProvider.getOne('treatments', { id: props.value });
-            if (!treatment) return { campaign: '', sample: '', treatment: '' };
+            if (!treatment) return { location: '', sample: '', treatment: '' };
 
             // Get the sample for this treatment
             const { data: sample } = await dataProvider.getOne('samples', { id: treatment.sample_id });
-            if (!sample) return { campaign: '', sample: '', treatment: treatment.name };
+            if (!sample) return { location: '', sample: '', treatment: treatment.name };
 
-            // Get the campaign for this sample
-            const { data: campaign } = await dataProvider.getOne('campaigns', { id: sample.campaign_id });
+            // Get the location for this sample
+            const { data: location } = await dataProvider.getOne('locations', { id: sample.location_id });
 
             return {
-                campaign: campaign?.name || '',
+                location: location?.name || '',
                 sample: sample.name,
                 treatment: treatment.name
             };
         } catch (error) {
             console.error('Error fetching treatment hierarchy:', error);
-            return { campaign: '', sample: '', treatment: '' };
+            return { location: '', sample: '', treatment: '' };
         }
     }, [props.value, dataProvider]);
 
     // Display the selected treatment name
-    const [displayValue, setDisplayValue] = useState<{ campaign: string; sample: string; treatment: string }>({ campaign: '', sample: '', treatment: '' });
+    const [displayValue, setDisplayValue] = useState<{ location: string; sample: string; treatment: string }>({ location: '', sample: '', treatment: '' });
 
     React.useEffect(() => {
         if (props.value) {
             getTreatmentName().then(setDisplayValue);
         } else {
-            setDisplayValue({ campaign: '', sample: '', treatment: '' });
+            setDisplayValue({ location: '', sample: '', treatment: '' });
         }
     }, [props.value, getTreatmentName]);
 
     const openDialog = () => {
-        setCampaignId(null);
+        setLocationId(null);
         setSampleId(null);
         setTreatmentId(null);
-        setCampaignOptions([]);
+        setLocationOptions([]);
         setSampleOptions([]);
         setTreatmentOptions([]);
         setOpen(true);
-        loadCampaigns();
+        loadLocations();
     };
 
     return (
@@ -217,88 +217,75 @@ export const TreatmentSelector = (props: {
                                     marginBottom: '2px'
                                 }}
                             >
-                                {displayValue.campaign}
+                                {displayValue.location}
                             </Typography>
                             <Typography
                                 variant="body2"
                                 sx={{
                                     fontSize: '0.8rem',
-                                    color: props.disabled ? 'text.disabled' : 'text.primary',
                                     lineHeight: 1.2,
-                                    fontWeight: 500
+                                    marginBottom: '1px'
                                 }}
                             >
-                                {displayValue.sample} ({displayValue.treatment})
+                                {displayValue.sample}
+                            </Typography>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    fontSize: '0.75rem',
+                                    fontWeight: 'bold',
+                                    lineHeight: 1.2
+                                }}
+                            >
+                                {displayValue.treatment}
                             </Typography>
                         </>
                     ) : (
                         <Typography
                             variant="body2"
                             sx={{
-                                fontSize: '0.8rem',
-                                color: props.disabled ? 'text.disabled' : 'text.secondary',
+                                color: 'text.secondary',
                                 fontStyle: 'italic'
                             }}
                         >
-                            Select treatment...
+                            {props.disabled ? 'No treatment selected' : 'Click to select treatment'}
                         </Typography>
                     )}
                 </Box>
             ) : (
-                // Original full mode - also use hierarchical display
-                <Box display="flex" alignItems="center" gap={1}>
-                    <Paper
-                        variant="outlined"
-                        sx={{
-                            padding: '12px 16px',
-                            minHeight: '56px',
-                            flexGrow: 1,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            backgroundColor: props.disabled ? 'action.disabledBackground' : 'background.paper',
-                            color: props.disabled ? 'text.disabled' : 'text.primary'
-                        }}
-                    >
-                        {displayValue.treatment ? (
-                            <>
-                                <Typography
-                                    variant="caption"
-                                    sx={{
-                                        fontSize: '0.7rem',
-                                        color: 'text.secondary',
-                                        lineHeight: 1.2,
-                                        marginBottom: '4px'
-                                    }}
-                                >
-                                    {displayValue.campaign}
-                                </Typography>
-                                <Typography
-                                    variant="body1"
-                                    sx={{
-                                        lineHeight: 1.2,
-                                        fontWeight: 500
-                                    }}
-                                    color="inherit"
-                                >
-                                    {displayValue.sample} ({displayValue.treatment})
-                                </Typography>
-                            </>
-                        ) : (
-                            <Typography variant="body1" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                No treatment selected
+                // Standard mode
+                <Paper
+                    elevation={1}
+                    sx={{
+                        p: 2,
+                        cursor: props.disabled ? 'default' : 'pointer',
+                        '&:hover': props.disabled ? {} : {
+                            elevation: 2
+                        }
+                    }}
+                    onClick={props.disabled ? undefined : openDialog}
+                >
+                    <Typography variant="subtitle2" gutterBottom>
+                        {props.label || 'Treatment Selection'}
+                    </Typography>
+                    {displayValue.treatment ? (
+                        <Box>
+                            <Typography variant="body2" color="text.secondary">
+                                Location: {displayValue.location}
                             </Typography>
-                        )}
-                    </Paper>
-                    <Button
-                        variant="contained"
-                        onClick={openDialog}
-                        size="small"
-                        disabled={props.disabled}
-                    >
-                        Select Treatment
-                    </Button>
-                </Box>
+                            <Typography variant="body2" color="text.secondary">
+                                Sample: {displayValue.sample}
+                            </Typography>
+                            <Typography variant="body1" fontWeight="bold">
+                                Treatment: {displayValue.treatment}
+                            </Typography>
+                        </Box>
+                    ) : (
+                        <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                            {props.disabled ? 'No treatment selected' : 'Click to select a treatment'}
+                        </Typography>
+                    )}
+                </Paper>
             )}
 
             <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth>
@@ -307,29 +294,29 @@ export const TreatmentSelector = (props: {
                     <Box display="flex" flexDirection="column" gap={2} p={1}>
                         <Box>
                             <Typography variant="subtitle2" gutterBottom>
-                                1. Select Campaign
+                                1. Select Location
                             </Typography>
                             <FormControl fullWidth variant="outlined">
-                                <InputLabel>Campaign</InputLabel>
+                                <InputLabel>Location</InputLabel>
                                 <Select
-                                    value={campaignId || ''}
-                                    onChange={handleCampaignChange}
-                                    label="Campaign"
+                                    value={locationId || ''}
+                                    onChange={handleLocationChange}
+                                    label="Location"
                                     disabled={loading}
                                 >
                                     <MenuItem value="">
-                                        <em>Select a campaign...</em>
+                                        <em>Select a location...</em>
                                     </MenuItem>
-                                    {campaignOptions.map(campaign => (
-                                        <MenuItem key={campaign.id} value={campaign.id}>
-                                            {campaign.name}
+                                    {locationOptions.map(location => (
+                                        <MenuItem key={location.id} value={location.id}>
+                                            {location.name}
                                         </MenuItem>
                                     ))}
                                 </Select>
                             </FormControl>
                         </Box>
 
-                        {campaignId && (
+                        {locationId && (
                             <Box>
                                 <Typography variant="subtitle2" gutterBottom>
                                     2. Select Sample
@@ -340,7 +327,7 @@ export const TreatmentSelector = (props: {
                                         value={sampleId || ''}
                                         onChange={handleSampleChange}
                                         label="Sample"
-                                        disabled={loading || sampleOptions.length === 0}
+                                        disabled={loading || !locationId}
                                     >
                                         <MenuItem value="">
                                             <em>Select a sample...</em>
@@ -360,48 +347,45 @@ export const TreatmentSelector = (props: {
                                 <Typography variant="subtitle2" gutterBottom>
                                     3. Select Treatment
                                 </Typography>
-
-                                {loading ? (
-                                    <Box display="flex" justifyContent="center" p={2}>
-                                        <CircularProgress size={24} />
-                                    </Box>
-                                ) : (
-                                    <FormControl fullWidth variant="outlined">
-                                        <InputLabel>Treatment</InputLabel>
-                                        <Select
-                                            value={treatmentId || ''}
-                                            onChange={handleTreatmentChange}
-                                            label="Treatment"
-                                            disabled={treatmentOptions.length === 0}
-                                        >
-                                            <MenuItem value="">
-                                                <em>Select a treatment...</em>
+                                <FormControl fullWidth variant="outlined">
+                                    <InputLabel>Treatment</InputLabel>
+                                    <Select
+                                        value={treatmentId || ''}
+                                        onChange={handleTreatmentChange}
+                                        label="Treatment"
+                                        disabled={loading || !sampleId}
+                                    >
+                                        <MenuItem value="">
+                                            <em>Select a treatment...</em>
+                                        </MenuItem>
+                                        {treatmentOptions.map(treatment => (
+                                            <MenuItem key={treatment.id} value={treatment.id}>
+                                                {treatment.name}
                                             </MenuItem>
-                                            {treatmentOptions.map(treatment => (
-                                                <MenuItem key={treatment.id} value={treatment.id}>
-                                                    {treatment.name}
-                                                </MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                )}
+                                        ))}
+                                    </Select>
+                                </FormControl>
                             </Box>
                         )}
-                    </Box>
 
-                    <Box display="flex" justifyContent="flex-end" mt={2}>
-                        <Button onClick={() => setOpen(false)} color="inherit">
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleSelect}
-                            color="primary"
-                            disabled={!treatmentId}
-                            variant="contained"
-                            sx={{ ml: 1 }}
-                        >
-                            Select
-                        </Button>
+                        {loading && (
+                            <Box display="flex" justifyContent="center" p={2}>
+                                <CircularProgress size={24} />
+                            </Box>
+                        )}
+
+                        <Box display="flex" justifyContent="flex-end" gap={1} mt={2}>
+                            <Button onClick={() => setOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleSelect}
+                                variant="contained"
+                                disabled={!treatmentId}
+                            >
+                                Select
+                            </Button>
+                        </Box>
                     </Box>
                 </DialogContent>
             </Dialog>

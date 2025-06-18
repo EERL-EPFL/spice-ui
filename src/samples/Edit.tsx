@@ -20,7 +20,7 @@ const EditComponent = () => {
         <Edit>
             <SimpleForm>
                 <TextInput disabled label="Id" source="id" />
-                <ReferenceInput source="campaign_id" reference="campaigns">
+                <ReferenceInput source="location_id" reference="locations">
                     <SelectInput optionText="name" />
                 </ReferenceInput>
                 <TextInput source="name" validate={[required()]} />
