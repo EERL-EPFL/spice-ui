@@ -7,39 +7,39 @@ import CloseIcon from '@mui/icons-material/Close';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
 
-// Generate dynamic row letters based on tray dimensions
-const generateRowLetters = (maxRows: number): string[] => {
+// Generate dynamic column letters based on tray dimensions
+const generateColumnLetters = (maxCols: number): string[] => {
     const letters = [];
-    for (let i = 0; i < maxRows; i++) {
+    for (let i = 0; i < maxCols; i++) {
         letters.push(String.fromCharCode(65 + i)); // A, B, C, etc.
     }
     return letters;
 };
 
-const rowIndexToLetter = (idx: number, maxRows: number): string => {
-    const letters = generateRowLetters(maxRows);
+const colIndexToLetter = (idx: number, maxCols: number): string => {
+    const letters = generateColumnLetters(maxCols);
     return letters[idx] || 'A';
 };
 
-const colIndexToNumber = (idx: number): number => idx + 1;
+const rowIndexToNumber = (idx: number): number => idx + 1;
 
-const letterToRowIndex = (letter: string, maxRows: number): number => {
-    const letters = generateRowLetters(maxRows);
+const letterToColIndex = (letter: string, maxCols: number): number => {
+    const letters = generateColumnLetters(maxCols);
     return letters.indexOf(letter.toUpperCase());
 };
 
-const numberToColIndex = (num: number): number => num - 1;
+const numberToRowIndex = (num: number): number => num - 1;
 
 // Parse cell string with dynamic tray dimensions
-// Format: Letter (row) + Number (column), e.g., "A1", "D5"
+// Format: Letter (column) + Number (row), e.g., "A1", "D5"
 const parseCell = (s: string, trayConfig?: any): Cell => {
     if (!trayConfig) return { row: 0, col: 0 };
 
     const match = s.match(/^([A-Za-z])(\d{1,2})$/);
     if (match) {
-        const row = letterToRowIndex(match[1], trayConfig.qty_y_axis); // Letter = row (Y-axis)
-        const colNumber = parseInt(match[2], 10);
-        let col = numberToColIndex(colNumber); // Number = column (X-axis)
+        const col = letterToColIndex(match[1], trayConfig.qty_x_axis); // Letter = column (X-axis)
+        const rowNumber = parseInt(match[2], 10);
+        let row = numberToRowIndex(rowNumber); // Number = row (Y-axis)
 
         // Validate bounds to prevent invalid coordinates
         if (row < 0 || row >= trayConfig.qty_y_axis || col < 0 || col >= trayConfig.qty_x_axis) {
@@ -53,7 +53,7 @@ const parseCell = (s: string, trayConfig?: any): Cell => {
 };
 
 // Convert Cell back to string with dynamic tray dimensions
-// Format: Letter (row) + Number (column), e.g., "A1", "D5"
+// Format: Letter (column) + Number (row), e.g., "A1", "D5"
 const cellToString = (cell: Cell, trayConfig: any): string => {
     // Validate bounds before converting
     if (cell.row < 0 || cell.row >= trayConfig.qty_y_axis ||
@@ -62,9 +62,9 @@ const cellToString = (cell: Cell, trayConfig: any): string => {
         return 'A1'; // Return safe default
     }
 
-    const letter = rowIndexToLetter(cell.row, trayConfig.qty_y_axis); // Row = letter (Y-axis)
-    const colNumber = cell.col + 1; // Column = number (X-axis)
-    return `${letter}${colNumber}`;
+    const letter = colIndexToLetter(cell.col, trayConfig.qty_x_axis); // Column = letter (X-axis)
+    const rowNumber = cell.row + 1; // Row = number (Y-axis)
+    return `${letter}${rowNumber}`;
 };
 
 // Helper to convert a cell to string, considering tray rotation
@@ -74,9 +74,9 @@ const cellToStringWithRotation = (cell: Cell, trayConfig: any, rotation: number)
 
     // Don't apply any rotation transformation - the cell coordinates should already be correct
     // The TrayGrid handles the visual rotation, so we just need to convert the logical coordinates
-    const letter = rowIndexToLetter(cell.row, trayConfig.qty_y_axis);
-    const colNumber = cell.col + 1;
-    const result = `${letter}${colNumber}`;
+    const letter = colIndexToLetter(cell.col, trayConfig.qty_x_axis);
+    const rowNumber = cell.row + 1;
+    const result = `${letter}${rowNumber}`;
 
     console.log(`Converted to: ${result}`);
     return result;

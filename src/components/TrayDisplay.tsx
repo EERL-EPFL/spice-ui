@@ -77,38 +77,20 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
         const topLabels = [];
         const leftLabels = [];
 
-        // For rotated views, we need to adjust which labels appear where
-        if (rotation === 0 || rotation === 180) {
-            // X-axis (columns): letters A, B, C...
-            for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
-                const letter = String.fromCharCode(65 + colIdx);
-                const { xIndex } = getDisplayIndices(0, colIdx);
-                const cx = LABEL_MARGIN + xIndex * SPACING;
-                topLabels.push({ x: cx, y: TITLE_HEIGHT + LABEL_MARGIN / 2, label: letter });
-            }
-            // Y-axis (rows): numbers 1, 2, 3...
-            for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
-                const number = rowIdx + 1;
-                const { yIndex } = getDisplayIndices(rowIdx, 0);
-                const cy = TITLE_HEIGHT + LABEL_MARGIN + yIndex * SPACING;
-                leftLabels.push({ x: LABEL_MARGIN / 2, y: cy, label: number });
-            }
-        } else if (rotation === 90 || rotation === 270) {
-            // For 90°/270° rotation, columns become rows and vice versa
-            // X-axis (what were originally rows): numbers 1, 2, 3...
-            for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
-                const number = rowIdx + 1;
-                const { xIndex } = getDisplayIndices(rowIdx, 0);
-                const cx = LABEL_MARGIN + xIndex * SPACING;
-                topLabels.push({ x: cx, y: TITLE_HEIGHT + LABEL_MARGIN / 2, label: number });
-            }
-            // Y-axis (what were originally columns): letters A, B, C...
-            for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
-                const letter = String.fromCharCode(65 + colIdx);
-                const { yIndex } = getDisplayIndices(0, colIdx);
-                const cy = TITLE_HEIGHT + LABEL_MARGIN + yIndex * SPACING;
-                leftLabels.push({ x: LABEL_MARGIN / 2, y: cy, label: letter });
-            }
+        // Standard convention: columns are always letters (top), rows are always numbers (left)
+        // X-axis (columns): letters A, B, C...
+        for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
+            const letter = String.fromCharCode(65 + colIdx);
+            const { xIndex } = getDisplayIndices(0, colIdx);
+            const cx = LABEL_MARGIN + xIndex * SPACING;
+            topLabels.push({ x: cx, y: TITLE_HEIGHT + LABEL_MARGIN / 2, label: letter });
+        }
+        // Y-axis (rows): numbers 1, 2, 3...
+        for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
+            const number = rowIdx + 1;
+            const { yIndex } = getDisplayIndices(rowIdx, 0);
+            const cy = TITLE_HEIGHT + LABEL_MARGIN + yIndex * SPACING;
+            leftLabels.push({ x: LABEL_MARGIN / 2, y: cy, label: number });
         }
 
         return { topLabels, leftLabels };

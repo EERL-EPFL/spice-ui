@@ -16,10 +16,10 @@ import React, { useState } from 'react';
 // A "Cell" is { row: 0..qtyYAxis-1, col: 0..qtyXAxis-1 } in logical coordinates.
 //
 
-// Generate dynamic row letters based on tray dimensions
-const generateRowLetters = (maxRows: number): string[] => {
+// Generate dynamic column letters based on tray dimensions
+const generateColumnLetters = (maxCols: number): string[] => {
     const letters = [];
-    for (let i = 0; i < maxRows; i++) {
+    for (let i = 0; i < maxCols; i++) {
         letters.push(String.fromCharCode(65 + i)); // A, B, C, etc.
     }
     return letters;
@@ -72,7 +72,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     // Use the explicit readOnly prop instead of trying to detect it
     const isDisplayMode = readOnly;
 
-    const rowLetters = generateRowLetters(qtyYAxis);
+    const columnLetters = generateColumnLetters(qtyXAxis);
 
     // Calculate display dimensions based on orientation
     const isRotated90or270 = orientation === 90 || orientation === 270;
@@ -179,18 +179,18 @@ const TrayGrid: React.FC<TrayGridProps> = ({
         const topLabels = [];
         const leftLabels = [];
 
-        // Always: top = numbers (columns), left = letters (rows)
+        // Always: top = letters (columns), left = numbers (rows)
         for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
-            const number = colIdx + 1;
+            const letter = columnLetters[colIdx] || String.fromCharCode(65 + colIdx);
             const { xIndex } = getDisplayIndices(0, colIdx);
             const cx = SPACING + xIndex * SPACING;
-            topLabels.push({ x: cx, y: 15, label: number });
+            topLabels.push({ x: cx, y: 15, label: letter });
         }
         for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
-            const letter = rowLetters[rowIdx] || String.fromCharCode(65 + rowIdx);
+            const number = rowIdx + 1;
             const { yIndex } = getDisplayIndices(rowIdx, 0);
             const cy = SPACING + yIndex * SPACING;
-            leftLabels.push({ x: 15, y: cy + 5, label: letter });
+            leftLabels.push({ x: 15, y: cy + 5, label: number });
         }
         return { topLabels, leftLabels };
     };
