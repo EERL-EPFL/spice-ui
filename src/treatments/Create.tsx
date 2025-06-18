@@ -12,8 +12,6 @@ const CreateComponent = () => {
     return (
         <Create redirect="show">
             <SimpleForm>
-                <TextInput source="name" label="Name" />
-                <TextInput source="notes" label="Notes" multiline />
                 <ReferenceInput
                     source="sample_id"
                     reference="samples"
@@ -24,6 +22,8 @@ const CreateComponent = () => {
                         optionText="name"
                     />
                 </ReferenceInput>
+                <TextInput source="name" label="Name" />
+                <TextInput source="notes" label="Notes" multiline />
                 <NumberInput source="enzyme_volume_microlitres" label="Enzyme Volume (μL)" />
             </SimpleForm>
         </Create>

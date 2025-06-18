@@ -62,15 +62,15 @@ export const ShowComponent = () => {
                             </Datagrid>
                         </ArrayField>
                     </TabbedShowLayout.Tab>
-                    <TabbedShowLayout.Tab label="experiments">
+                    <TabbedShowLayout.Tab label="Associated Experiments">
                         <ArrayField source="experiments">
                             <Datagrid
                                 bulkActionButtons={false}
                                 rowClick={(id) => { return createPath({ resource: 'experiments', id, type: 'show' }) }}
                             >
+                                <DateField source="performed_at" label="Date" showTime />
                                 <TextField source="name" />
-                                <TextField source="type" />
-                                <TextField source="treatment" />
+                                <TextField source="remarks" />
                             </Datagrid>
                         </ArrayField>
                     </TabbedShowLayout.Tab>
