@@ -36,11 +36,11 @@ const CreateComponent = () => {
                 <TextInput source="material_description" />
                 <TextInput source="extraction_procedure" />
                 <TextInput source="filter_substrate" />
-                <NumberInput source="suspension_volume_liters" />
-                <NumberInput source="air_volume_liters" />
-                <NumberInput source="water_volume_liters" />
+                <NumberInput source="suspension_volume_litres" />
+                <NumberInput source="air_volume_litres" />
+                <NumberInput source="water_volume_litres" />
                 <NumberInput source="initial_concentration_gram_l" />
-                <NumberInput source="well_volume_liters" />
+                <NumberInput source="well_volume_litres" defaultValue={5e-5} />
                 <TextInput source="background_region_key" />
                 <TextInput source="remarks" />
             </SimpleForm>

@@ -72,11 +72,11 @@ export const ShowComponent = () => {
                 <TextField source="material_description" />
                 <TextField source="extraction_procedure" />
                 <TextField source="filter_substrate" />
-                <NumberField source="suspension_volume_liters" />
-                <NumberField source="air_volume_liters" />
-                <NumberField source="water_volume_liters" />
+                <NumberField source="suspension_volume_litres" />
+                <NumberField source="air_volume_litres" />
+                <NumberField source="water_volume_litres" />
                 <NumberField source="initial_concentration_gram_l" />
-                <NumberField source="well_volume_liters" />
+                <NumberField source="well_volume_litres" />
                 <TextField source="remarks" />
                 <DateField source="created_at" showTime />
                 <DateField source="last_updated" showTime />
