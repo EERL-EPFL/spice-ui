@@ -21,13 +21,13 @@ const EditComponent = () => {
                     enableGetChoices={({ q }) => typeof q === 'string' && q.length >= 2}
                 >
                     <AutocompleteInput
-                        optionText="name"              
-                        placeholder="Search samples…"  
+                        optionText="name"
+                        placeholder="Search samples…"
                         filterToQuery={searchText => ({ q: searchText })}
                         fullWidth
                     />
                 </ReferenceInput>
-                <NumberInput source="enzyme_volume_microlitres" label="Enzyme Volume (μL)" />
+                <NumberInput source="enzyme_volume_litres" label="Enzyme Volume (μL)" />
             </SimpleForm>
         </Edit>
     );

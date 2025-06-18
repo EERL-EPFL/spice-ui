@@ -31,7 +31,7 @@ export const ListComponent = () => {
                 <ReferenceField source="sample_id" reference="samples" link="show">
                     <TextField source="name" />
                 </ReferenceField>
-                <NumberField source="enzyme_volume_microlitres" label="Enzyme Volume (μL)" />
+                <NumberField source="enzyme_volume_litres" label="Enzyme Volume (μL)" />
                 <DateField source="last_updated" label="Last Updated" showTime />
             </Datagrid>
         </List>

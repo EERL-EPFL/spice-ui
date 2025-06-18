@@ -21,14 +21,14 @@ import {
 
 export const ShowComponent = () => {
     return (
-        <Show actions={<TopToolbar><EditButton/><DeleteButton/></TopToolbar>}>
+        <Show actions={<TopToolbar><EditButton /><DeleteButton /></TopToolbar>}>
             <SimpleShowLayout>
                 <TextField source="id" />
                 <TextField source="name" />
                 <ReferenceField source="sample_id" reference="samples" link="show">
                     <TextField source="name" />
                 </ReferenceField>
-                <NumberField source="enzyme_volume_microlitres" />
+                <NumberField source="enzyme_volume_litres" />
                 <DateField source="created_at" showTime />
                 <DateField source="last_updated" showTime />
                 <TextField source="notes" />

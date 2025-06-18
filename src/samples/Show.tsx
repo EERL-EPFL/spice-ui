@@ -77,7 +77,6 @@ export const ShowComponent = () => {
                 <NumberField source="water_volume_liters" />
                 <NumberField source="initial_concentration_gram_l" />
                 <NumberField source="well_volume_liters" />
-                <TextField source="background_region_key" />
                 <TextField source="remarks" />
                 <DateField source="created_at" showTime />
                 <DateField source="last_updated" showTime />
@@ -89,7 +88,7 @@ export const ShowComponent = () => {
                         <Datagrid bulkActionButtons={false} rowClick="show">
                             <TextField source="name" />
                             <TextField source="notes" />
-                            <NumberField source="enzyme_volume_microlitres" />
+                            <NumberField source="enzyme_volume_litres" />
                             <DateField source="last_updated" showTime />
                         </Datagrid>
                     </>

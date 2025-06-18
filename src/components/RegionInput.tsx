@@ -2,7 +2,7 @@ import React, { useCallback, useRef } from 'react';
 import { useInput, FieldTitle, useGetOne, Link } from 'react-admin';
 import TrayGrid, { Cell, ExistingRegion, Orientation } from './TrayGrid';
 import { TreatmentSelector } from './TreatmentSelector';
-import { Box, Typography, TextField, IconButton, Button } from '@mui/material';
+import { Box, Typography, TextField, IconButton, Button, Checkbox, FormControlLabel } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -90,11 +90,12 @@ interface SingleRegion {
     color: string;
     treatment_id?: string;  // Changed from sample to treatment_id
     dilution?: string;     // Add dilution field
+    is_region_key?: boolean; // Add is_region_key field
     treatment?: {  // Add the nested treatment object
         id: string;
         name: string;
         notes?: string;
-        enzyme_volume_microlitres?: number;
+        enzyme_volume_litres?: number;
         sample?: {
             id: string;
             name: string;
@@ -319,7 +320,8 @@ export const RegionInput: React.FC<{
                     lower_right: lrStr,
                     color,
                     treatment_id: '',
-                    dilution: ''
+                    dilution: '',
+                    is_region_key: false // Default to false
                 },
             ];
             onChange(updated);
@@ -332,7 +334,7 @@ export const RegionInput: React.FC<{
         onChange(updated);
     }, [onChange, regions]);
 
-    const handleRegionChange = useCallback((idx: number, field: string, newValue: string) => {
+    const handleRegionChange = useCallback((idx: number, field: string, newValue: string | boolean) => {
         // Get current focused element to restore focus after state update
         const activeElement = document.activeElement as HTMLElement;
         const activeId = activeElement?.id;
@@ -382,7 +384,8 @@ export const RegionInput: React.FC<{
                                 lower_right: region.lower_right,
                                 color: color,
                                 treatment_id: '',
-                                dilution: ''
+                                dilution: '',
+                                is_region_key: false // Default to false
                             });
                             colorIndex++;
                         });
@@ -610,12 +613,14 @@ export const RegionInput: React.FC<{
 
                                 <TextField
                                     id={`region-${idx}-name`}
-                                    placeholder="Name"
+                                    placeholder="Name*"
                                     size="small"
                                     value={r.name}
                                     onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'name', e.target.value)}
                                     variant="standard"
                                     disabled={readOnly}
+                                    required
+                                    error={!r.name && !readOnly}
                                     sx={{ width: 90 }}
                                     inputRef={inputRefs.current[`region-${idx}-name`]}
                                     InputProps={{
@@ -647,13 +652,15 @@ export const RegionInput: React.FC<{
 
                                 <TextField
                                     id={`region-${idx}-dilution`}
-                                    placeholder="Dilution"
+                                    placeholder="Dilution Factor*"
                                     size="small"
                                     value={r.dilution || ''}
                                     onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'dilution', e.target.value)}
                                     variant="standard"
                                     disabled={readOnly}
-                                    sx={{ width: 70 }}
+                                    required
+                                    error={!r.dilution && !readOnly}
+                                    sx={{ width: 100 }}
                                     inputRef={inputRefs.current[`region-${idx}-dilution`]}
                                     InputProps={{
                                         disableUnderline: true,
@@ -661,9 +668,37 @@ export const RegionInput: React.FC<{
                                     }}
                                 />
 
-                                <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.65rem', minWidth: 45 }}>
-                                    {ulStr}–{lrStr}
-                                </Typography>
+                                <FormControlLabel
+                                    control={
+                                        <Checkbox
+                                            checked={r.is_region_key || false}
+                                            onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'is_region_key', e.target.checked)}
+                                            disabled={readOnly}
+                                            size="small"
+                                            color="primary"
+                                            sx={{
+                                                padding: '4px',
+                                                '&.Mui-checked': {
+                                                    color: 'primary.main',
+                                                },
+                                                '& .MuiSvgIcon-root': {
+                                                    fontSize: '1.2rem'
+                                                }
+                                            }}
+                                        />
+                                    }
+                                    label="Background key"
+                                    sx={{
+                                        margin: 0,
+                                        minWidth: 90,
+                                        '& .MuiFormControlLabel-label': {
+                                            fontSize: '0.75rem',
+                                            fontWeight: 500,
+                                            color: 'text.primary'
+                                        }
+                                    }}
+                                />
+
 
                                 {!readOnly && (
                                     <IconButton

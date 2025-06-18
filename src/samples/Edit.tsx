@@ -51,7 +51,7 @@ const EditComponent = () => {
                     <SimpleFormIterator inline>
                         <TextInput source="name" />
                         <TextInput source="notes" />
-                        <NumberInput source="enzyme_volume_microlitres" />
+                        <NumberInput source="enzyme_volume_litres" />
                     </SimpleFormIterator>
                 </ArrayInput>
             </SimpleForm>
