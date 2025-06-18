@@ -54,9 +54,9 @@ const CreateComponent: React.FC = () => {
                             : date?.toISOString() || null
                     }
                 />
-                <NumberInput source="temperature_ramp" />
-                <NumberInput source="temperature_start" />
-                <NumberInput source="temperature_end" />
+                <NumberInput source="temperature_ramp" defaultValue={0.33} />
+                <NumberInput source="temperature_start" defaultValue={2} />
+                <NumberInput source="temperature_end" defaultValue={-35} />
                 <TextInput source="remarks" />
                 <BooleanInput source="is_calibration" />
 
@@ -92,9 +92,9 @@ const CreateComponent: React.FC = () => {
                             }
 
                             return (
-                                <RegionInput 
-                                    source="regions" 
-                                    label="Define Well Regions" 
+                                <RegionInput
+                                    source="regions"
+                                    label="Define Well Regions"
                                     trayConfiguration={trayConfiguration}
                                 />
                             );
