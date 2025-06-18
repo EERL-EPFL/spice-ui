@@ -165,7 +165,12 @@ const dataProvider = (
         return httpClient(`${apiUrl}/${resource}/${params.id}`, {
             method: 'PUT',
             body: JSON.stringify(params.data),
-        }).then(({ json }) => ({ data: json }));
+        }).then(({ json }) => ({
+            data: {
+                ...json,
+                id: json.id || params.id  // Ensure ID is preserved
+            }
+        }));
     },
 
     // simple-rest doesn't handle provide an updateMany route, so we fallback to calling update n times instead

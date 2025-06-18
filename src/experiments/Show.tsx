@@ -22,6 +22,7 @@ import {
 } from "react-admin";
 import React from "react";
 import { Button, Box } from "@mui/material";
+import DownloadIcon from '@mui/icons-material/Download';
 import { UppyUploader } from "../uploader/Uppy";
 import RegionInput from '../components/RegionInput';
 
@@ -119,6 +120,69 @@ const RegionsDisplay = () => {
     );
 };
 
+const ExportRegionsButton = () => {
+    const record = useRecordContext();
+
+    if (!record?.regions || !Array.isArray(record.regions) || record.regions.length === 0) {
+        return null;
+    }
+
+    const handleYAMLExport = () => {
+        const regions = record.regions;
+        const groupedRegions: { [key: string]: any[] } = {};
+
+        regions.forEach((region: any) => {
+            const regionName = region.name || 'Unnamed';
+
+            if (!groupedRegions[regionName]) {
+                groupedRegions[regionName] = [];
+            }
+
+            groupedRegions[regionName].push({
+                tray: region.tray_name,
+                upper_left: region.upper_left,
+                lower_right: region.lower_right
+            });
+        });
+
+        let yamlContent = '';
+        Object.entries(groupedRegions).forEach(([regionName, regionData], index) => {
+            if (index > 0) yamlContent += '\n';
+            yamlContent += `${regionName}:\n`;
+
+            regionData.forEach(region => {
+                yamlContent += `  - tray: ${region.tray}\n`;
+                yamlContent += `    upper_left: ${region.upper_left}\n`;
+                yamlContent += `    lower_right: ${region.lower_right}\n`;
+                yamlContent += '\n';
+            });
+        });
+
+        // Create and download file
+        const blob = new Blob([yamlContent.trim()], { type: 'text/yaml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `experiment_${record.id}_regions.yaml`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    return (
+        <Button
+            variant="contained"
+            size="small"
+            onClick={handleYAMLExport}
+            startIcon={<DownloadIcon />}
+            sx={{ fontSize: '0.8rem', padding: '6px 12px', marginBottom: 2 }}
+        >
+            Export Regions YAML
+        </Button>
+    );
+};
+
 export const ShowComponent = () => {
     return (
         <Show actions={<ShowComponentActions />}>
@@ -173,6 +237,7 @@ export const ShowComponent = () => {
                 </Box>
                 <TabbedShowLayout>
                     <TabbedShowLayout.Tab label="Regions">
+                        <ExportRegionsButton />
                         <RegionsDisplay />
                     </TabbedShowLayout.Tab>
                     <TabbedShowLayout.Tab label="Asset list">

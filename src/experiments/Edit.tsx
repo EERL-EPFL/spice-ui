@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
     BooleanField,
     BooleanInput,
@@ -18,7 +18,7 @@ import RegionInput from '../components/RegionInput';
 
 const EditComponent = () => {
     return (
-        <Edit>
+        <Edit redirect="show" mutationMode="pessimistic">
             <SimpleForm>
                 <TextInput disabled label="Id" source="id" />
                 <TextInput source="name" validate={[required()]} />

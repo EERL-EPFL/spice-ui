@@ -290,9 +290,6 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 const rectW = (maxX - minX) * SPACING + 2 * CIRCLE_RADIUS;
                 const rectH = (maxY - minY) * SPACING + 2 * CIRCLE_RADIUS;
 
-                // Check if this is in display mode (onRemove is a no-op function)
-                const isDisplayMode = region.onRemove.toString() === '() => { }' || region.onRemove.toString() === '() => {}';
-
                 return (
                     <g key={`overlay-${idx}`}>
                         <rect
@@ -321,7 +318,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                         >
                             {region.name || 'Unnamed'}
                         </text>
-                        {!isDisplayMode && (
+                        {!readOnly && (
                             <>
                                 <circle
                                     cx={rectX + rectW - 12}

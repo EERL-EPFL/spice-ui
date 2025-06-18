@@ -16,8 +16,9 @@ import {
     Datagrid,
     CreateButton,
     useCreatePath,
-    useRecordContext, 
+    useRecordContext,
     useRedirect,
+    Button,
 } from "react-admin";
 
 const ShowComponentActions = () => {
@@ -35,27 +36,22 @@ const ShowComponentActions = () => {
 };
 
 
-
 const CreateTreatmentButton = () => {
     const { permissions } = usePermissions();
     const record = useRecordContext();
-    const createPath = useCreatePath();
     const redirect = useRedirect();
 
     if (permissions !== 'admin') return null;
     if (!record) return null;
 
-    console.log("Record", record.id);
+    // console.log("Record", record.id);
     const handleClick = () => {
-        redirect(
-            'create', "treatments", undefined, {}, { sample_id: record.id  }
-        );
+        redirect('create', 'treatments', undefined, {}, { record: { sample_id: record.id } });
     };
 
     return (
-        <CreateButton
-            resource="treatments"
-            label="Create"
+        <Button
+            label="Create Treatment"
             onClick={handleClick}
         />
     );

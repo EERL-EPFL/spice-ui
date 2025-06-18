@@ -4,10 +4,11 @@ import {
     TextInput,
     NumberInput,
     ReferenceInput,
-    AutocompleteInput,
+    SelectInput,
 } from 'react-admin';
 
 const CreateComponent = () => {
+
     return (
         <Create redirect="show">
             <SimpleForm>
@@ -16,14 +17,11 @@ const CreateComponent = () => {
                 <ReferenceInput
                     source="sample_id"
                     reference="samples"
+                    perPage={1000}
                     allowEmpty
-                    enableGetChoices={({ q }) => typeof q === 'string' && q.length >= 2}
                 >
-                    <AutocompleteInput
-                        optionText="name"              
-                        placeholder="Search samples…"  
-                        filterToQuery={searchText => ({ q: searchText })}
-                        fullWidth
+                    <SelectInput
+                        optionText="name"
                     />
                 </ReferenceInput>
                 <NumberInput source="enzyme_volume_microlitres" label="Enzyme Volume (μL)" />

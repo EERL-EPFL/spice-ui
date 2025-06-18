@@ -13,6 +13,7 @@ import {
     useRedirect,
     useCreatePath,
     NumberField,
+    FunctionField,
 } from "react-admin";
 
 
@@ -44,30 +45,36 @@ export const ShowComponent = () => {
                 <DateField source="last_updated" showTime />
                 <TabbedShowLayout>
                     <TabbedShowLayout.Tab label="samples">
-                    <ArrayField source="samples">
-                        <Datagrid 
-                        bulkActionButtons={false}
-                        rowClick={(id) => { return createPath({ resource: 'samples', id, type: 'show' })}}
-                        >
-                            <TextField source="name" />
-                            <TextField source="type" />
-                            <TextField source="treatment" />
-                        </Datagrid>
-                    </ArrayField>
-                </TabbedShowLayout.Tab>
-                <TabbedShowLayout.Tab label="experiments">
-                    <ArrayField source="experiments">
-                        <Datagrid
-                            bulkActionButtons={false}
-                            rowClick={(id) => { return createPath({ resource: 'experiments', id, type: 'show' })}}
-                        >
-                            <TextField source="name" />
-                            <TextField source="type" />
-                            <TextField source="treatment" />
-                        </Datagrid>
-                    </ArrayField>
-                </TabbedShowLayout.Tab>
-            </TabbedShowLayout>
+                        <ArrayField source="samples">
+                            <Datagrid
+                                bulkActionButtons={false}
+                                rowClick={(id) => { return createPath({ resource: 'samples', id, type: 'show' }) }}
+                            >
+                                <TextField source="name" />
+                                <TextField source="type" />
+                                <FunctionField
+                                    source="treatments"
+                                    label="Treatments"
+                                    render={(record) =>
+                                        record.treatments?.map(t => t.name).join(', ') || 'None'
+                                    }
+                                />
+                            </Datagrid>
+                        </ArrayField>
+                    </TabbedShowLayout.Tab>
+                    <TabbedShowLayout.Tab label="experiments">
+                        <ArrayField source="experiments">
+                            <Datagrid
+                                bulkActionButtons={false}
+                                rowClick={(id) => { return createPath({ resource: 'experiments', id, type: 'show' }) }}
+                            >
+                                <TextField source="name" />
+                                <TextField source="type" />
+                                <TextField source="treatment" />
+                            </Datagrid>
+                        </ArrayField>
+                    </TabbedShowLayout.Tab>
+                </TabbedShowLayout>
             </SimpleShowLayout>
         </Show>
     );

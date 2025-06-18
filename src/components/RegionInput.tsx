@@ -1,5 +1,5 @@
 import React, { useCallback, useRef } from 'react';
-import { useInput, FieldTitle } from 'react-admin';
+import { useInput, FieldTitle, useGetOne, Link } from 'react-admin';
 import TrayGrid, { Cell, ExistingRegion, Orientation } from './TrayGrid';
 import { TreatmentSelector } from './TreatmentSelector';
 import { Box, Typography, TextField, IconButton, Button } from '@mui/material';
@@ -88,8 +88,22 @@ interface SingleRegion {
     upper_left: string;
     lower_right: string;
     color: string;
-    sample?: string;       // Add sample field
+    treatment_id?: string;  // Changed from sample to treatment_id
     dilution?: string;     // Add dilution field
+    treatment?: {  // Add the nested treatment object
+        id: string;
+        name: string;
+        notes?: string;
+        enzyme_volume_microlitres?: number;
+        sample?: {
+            id: string;
+            name: string;
+            campaign?: {
+                id: string;
+                name: string;
+            };
+        };
+    };
 }
 
 interface TrayConfig {
@@ -160,6 +174,70 @@ const parseYAML = (yamlText: string, trayConfigs: TrayConfig[]): any => {
     return result;
 };
 
+// Component to display treatment information in read-only mode
+const TreatmentDisplay: React.FC<{
+    treatmentId: string;
+    treatmentData?: SingleRegion['treatment']
+}> = ({ treatmentId, treatmentData }) => {
+    const { data: fetchedTreatment, isLoading } = useGetOne(
+        'treatments',
+        { id: treatmentId },
+        { enabled: !!treatmentId && !treatmentData }
+    );
+
+    const treatment = treatmentData || fetchedTreatment;
+
+    if (!treatmentId) {
+        return (
+            <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.8rem' }}>
+                No treatment
+            </Typography>
+        );
+    }
+
+    if (!treatment && isLoading) {
+        return (
+            <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.8rem' }}>
+                Loading...
+            </Typography>
+        );
+    }
+
+    if (!treatment) {
+        return (
+            <Typography variant="caption" color="error" sx={{ fontSize: '0.8rem' }}>
+                Treatment not found
+            </Typography>
+        );
+    }
+
+    // Create display text with sample and campaign info if available
+    const displayText = treatment.sample?.campaign
+        ? `${treatment.name} (${treatment.sample.name} - ${treatment.sample.campaign.name})`
+        : treatment.sample
+            ? `${treatment.name} (${treatment.sample.name})`
+            : treatment.name;
+
+    return (
+        <Button
+            component={Link}
+            to={`/treatments/${treatmentId}/show`}
+            variant="text"
+            size="small"
+            sx={{
+                fontSize: '0.8rem',
+                padding: '2px 4px',
+                minWidth: 'auto',
+                textTransform: 'none',
+                justifyContent: 'flex-start',
+                textAlign: 'left'
+            }}
+        >
+            {displayText}
+        </Button>
+    );
+};
+
 export const RegionInput: React.FC<{
     source: string;
     label?: string;
@@ -196,7 +274,7 @@ export const RegionInput: React.FC<{
     // Initialize or update input refs when regions change
     React.useEffect(() => {
         regions.forEach((region, idx) => {
-            ['name', 'sample', 'dilution'].forEach(field => {
+            ['name', 'treatment', 'dilution'].forEach(field => {
                 const key = `region-${idx}-${field}`;
                 if (!inputRefs.current[key]) {
                     inputRefs.current[key] = React.createRef();
@@ -240,7 +318,7 @@ export const RegionInput: React.FC<{
                     upper_left: ulStr,
                     lower_right: lrStr,
                     color,
-                    sample: '',
+                    treatment_id: '',
                     dilution: ''
                 },
             ];
@@ -303,7 +381,7 @@ export const RegionInput: React.FC<{
                                 upper_left: region.upper_left,
                                 lower_right: region.lower_right,
                                 color: color,
-                                sample: '',
+                                treatment_id: '',
                                 dilution: ''
                             });
                             colorIndex++;
@@ -451,8 +529,8 @@ export const RegionInput: React.FC<{
                             }));
 
                         return (
-                            <Box key={index} minWidth="280px">
-                                <Typography variant="caption" fontWeight="medium" marginBottom={0.25}>
+                            <Box key={index} minWidth="280px" display="flex" flexDirection="column" alignItems="center">
+                                <Typography variant="caption" fontWeight="medium" marginBottom={0.25} textAlign="center">
                                     {trayName} ({rotation}°)
                                 </Typography>
                                 <TrayGrid
@@ -547,17 +625,24 @@ export const RegionInput: React.FC<{
                                 />
 
                                 <Box sx={{ width: 120 }}>
-                                    <TreatmentSelector
-                                        value={r.sample || ''}
-                                        label=""
-                                        disabled={readOnly}
-                                        onChange={(treatmentId) => {
-                                            if (!readOnly) {
-                                                handleRegionChange(idx, 'sample', treatmentId);
-                                            }
-                                        }}
-                                        compact={true}
-                                    />
+                                    {readOnly ? (
+                                        <TreatmentDisplay
+                                            treatmentId={r.treatment_id || ''}
+                                            treatmentData={r.treatment}
+                                        />
+                                    ) : (
+                                        <TreatmentSelector
+                                            value={r.treatment_id || ''}
+                                            label=""
+                                            disabled={readOnly}
+                                            onChange={(treatmentId) => {
+                                                if (!readOnly) {
+                                                    handleRegionChange(idx, 'treatment_id', treatmentId);
+                                                }
+                                            }}
+                                            compact={true}
+                                        />
+                                    )}
                                 </Box>
 
                                 <TextField
