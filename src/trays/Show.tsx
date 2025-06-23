@@ -7,8 +7,12 @@ import {
     DeleteButton,
     BooleanField,
     useRecordContext,
+    ArrayField,
+    Datagrid,
+    DateField,
+    useCreatePath,
 } from "react-admin";
-import { Box, Grid, Typography } from '@mui/material';
+import { Box, Grid, Typography, Alert } from '@mui/material';
 import TrayDisplay from '../components/TrayDisplay';
 
 const TrayConfigurationDisplay = () => {
@@ -53,13 +57,71 @@ const TrayConfigurationDisplay = () => {
     );
 };
 
+const AssociatedExperimentsDisplay = () => {
+    const record = useRecordContext();
+    const createPath = useCreatePath();
+
+    if (!record || !record.associated_experiments || record.associated_experiments.length === 0) {
+        return null;
+    }
+
+    return (
+        <Box marginTop={3}>
+            <Typography variant="h6" marginBottom={2}>
+                Associated Experiments ({record.associated_experiments.length})
+            </Typography>
+            <ArrayField source="associated_experiments" label="">
+                <Datagrid 
+                    bulkActionButtons={false} 
+                    rowClick={(id) => createPath({ resource: 'experiments', id, type: 'show' })}
+                >
+                    <DateField source="performed_at" label="Date" showTime />
+                    <TextField source="name" label="Experiment Name" />
+                    <TextField source="username" label="Username" />
+
+                </Datagrid>
+            </ArrayField>
+        </Box>
+    );
+};
+
+const ConditionalTopToolbar = () => {
+    const record = useRecordContext();
+    const hasAssociatedExperiments = record?.associated_experiments && record.associated_experiments.length > 0;
+
+    return (
+        <TopToolbar>
+            {!hasAssociatedExperiments && <EditButton />}
+            {!hasAssociatedExperiments && <DeleteButton />}
+        </TopToolbar>
+    );
+};
+
+const AssociatedExperimentsWarning = () => {
+    const record = useRecordContext();
+    const hasAssociatedExperiments = record?.associated_experiments && record.associated_experiments.length > 0;
+
+    if (!hasAssociatedExperiments) {
+        return null;
+    }
+
+    return (
+        <Alert severity="warning" sx={{ marginBottom: 2 }}>
+            This tray configuration has {record.associated_experiments.length} associated experiment(s). 
+            Editing or deleting this configuration is disabled as it would affect existing experiments.
+        </Alert>
+    );
+};
+
 export const ShowComponent = () => {
     return (
-        <Show actions={<TopToolbar><EditButton /><DeleteButton /></TopToolbar>}>
+        <Show actions={<ConditionalTopToolbar />}>
             <SimpleShowLayout title="Tray Configuration">
+                <AssociatedExperimentsWarning />
                 <TextField source="name" />
                 <BooleanField source="experiment_default" />
                 <TrayConfigurationDisplay />
+                <AssociatedExperimentsDisplay />
             </SimpleShowLayout>
         </Show>
     );

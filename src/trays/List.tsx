@@ -23,7 +23,7 @@ const ListComponentActions = () => {
 export const ListComponent = () => {
     return (
         <List actions={<ListComponentActions />} storeKey={false} filters={postFilters}>
-            <Datagrid rowClick="show">
+            <Datagrid rowClick="show" bulkActionButtons={false}>
                 <TextField source="name" />
                 <BooleanField source="experiment_default" />
             </Datagrid>
