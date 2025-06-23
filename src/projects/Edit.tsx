@@ -4,6 +4,7 @@ import {
     TextInput,
     required
 } from 'react-admin';
+import { ColorInput } from 'react-admin-color-picker';
 
 const EditComponent = () => {
     return (
@@ -12,7 +13,8 @@ const EditComponent = () => {
                 <TextInput disabled label="Id" source="id" />
                 <TextInput source="name" validate={[required()]} />
                 <TextInput source="note" multiline />
-                <TextInput source="colour" label="Color" />
+                <ColorInput source="colour" label="Colour"/>
+
             </SimpleForm>
         </Edit>
     );

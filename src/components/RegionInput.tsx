@@ -90,7 +90,7 @@ interface SingleRegion {
     color: string;
     treatment_id?: string;  // Changed from sample to treatment_id
     dilution?: string;     // Add dilution field
-    is_region_key?: boolean; // Add is_region_key field
+    is_background_key?: boolean; // Changed from is_region_key to is_background_key
     treatment?: {  // Add the nested treatment object
         id: string;
         name: string;
@@ -212,30 +212,22 @@ const TreatmentDisplay: React.FC<{
         );
     }
 
-    // Create display text with sample and location info if available
-    const displayText = treatment.sample?.location
-        ? `${treatment.name} (${treatment.sample.name} - ${treatment.sample.location.name})`
-        : treatment.sample
-            ? `${treatment.name} (${treatment.sample.name})`
-            : treatment.name;
-
     return (
-        <Button
-            component={Link}
-            to={`/treatments/${treatmentId}/show`}
-            variant="text"
-            size="small"
-            sx={{
-                fontSize: '0.8rem',
-                padding: '2px 4px',
-                minWidth: 'auto',
-                textTransform: 'none',
-                justifyContent: 'flex-start',
-                textAlign: 'left'
-            }}
-        >
-            {displayText}
-        </Button>
+        <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '48px', justifyContent: 'center' }}>
+            {treatment.sample?.name && (
+                <Typography variant="caption" sx={{ fontSize: '0.75rem', lineHeight: 1.2, fontWeight: 'medium' }}>
+                    {treatment.sample.name}
+                </Typography>
+            )}
+            <Typography variant="caption" sx={{ fontSize: '0.7rem', lineHeight: 1.2, color: 'text.secondary' }}>
+                {treatment.name}
+            </Typography>
+            {treatment.sample?.location?.name && (
+                <Typography variant="caption" sx={{ fontSize: '0.65rem', lineHeight: 1.2, color: 'text.secondary' }}>
+                    {treatment.sample.location.name}
+                </Typography>
+            )}
+        </Box>
     );
 };
 
@@ -321,7 +313,7 @@ export const RegionInput: React.FC<{
                     color,
                     treatment_id: '',
                     dilution: '',
-                    is_region_key: false // Default to false
+                    is_background_key: false // Default to false
                 },
             ];
             onChange(updated);
@@ -385,7 +377,7 @@ export const RegionInput: React.FC<{
                                 color: color,
                                 treatment_id: '',
                                 dilution: '',
-                                is_region_key: false // Default to false
+                                is_background_key: false // Default to false
                             });
                             colorIndex++;
                         });
@@ -671,8 +663,8 @@ export const RegionInput: React.FC<{
                                 <FormControlLabel
                                     control={
                                         <Checkbox
-                                            checked={r.is_region_key || false}
-                                            onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'is_region_key', e.target.checked)}
+                                            checked={r.is_background_key || false}
+                                            onChange={readOnly ? undefined : (e) => handleRegionChange(idx, 'is_background_key', e.target.checked)}
                                             disabled={readOnly}
                                             size="small"
                                             color="primary"

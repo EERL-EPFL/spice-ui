@@ -5,6 +5,7 @@ import {
     TextInput,
     required,
 } from 'react-admin';
+import { ColorInput } from 'react-admin-color-picker';
 
 const CreateComponent = () => {
     return (
@@ -13,7 +14,10 @@ const CreateComponent = () => {
                 <TextField source="id" />
                 <TextInput source="name" validate={[required()]} />
                 <TextInput source="note" multiline />
-                <TextInput source="colour" label="Color" />
+                <ColorInput source="colour" 
+                    label="Colour" 
+                    helperText="Used to differentiate projects on maps"
+                />
             </SimpleForm>
         </Create>
     );

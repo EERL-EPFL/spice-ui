@@ -95,9 +95,9 @@ const App = () => {
                 <>
                     {permissions ? (
                         <>
+                            <Resource name="trays" {...trays} />
                             <Resource name="projects" {...projects} />
                             <Resource name="locations" {...locations} />
-                            <Resource name="trays" {...trays} />
                             <Resource name="treatments" {...treatments} />
                             <Resource name="samples" {...samples} />
                             <Resource name="experiments" {...experiments} />
