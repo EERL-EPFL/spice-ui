@@ -42,6 +42,7 @@ const EditComponent = () => {
                     source="tray_configuration_id"
                     reference="trays"
                     sort={{ field: 'experiment_default', order: 'ASC' }}
+                    
                 >
                     <SelectInput
                         optionText={record =>
@@ -49,6 +50,8 @@ const EditComponent = () => {
                         }
                         optionValue="id"
                         validate={[required()]}
+                        disabled
+                        helperText="Tray configuration cannot be changed after creation, create another experiment if necessary."
                     />
                 </ReferenceInput>
                 <FormDataConsumer>

@@ -237,11 +237,60 @@ export const RegionInput: React.FC<{
     trayConfiguration?: { trays: TrayConfig[] };
     readOnly?: boolean;
     value?: any; // Allow direct value prop for display mode
+    validate?: (value: any) => string | undefined; // Add validate prop
 }> = (props) => {
     // Always call useInput to maintain consistent hook order, but handle errors gracefully
     let inputResult;
     try {
-        inputResult = useInput(props);
+        // Create a custom validation function that includes duplicate checking
+        const customValidate = (value: any) => {
+            const regions: SingleRegion[] = Array.isArray(value) ? value : [];
+            
+            // Check for duplicate names
+            const nameCount: { [key: string]: number } = {};
+            let hasDuplicates = false;
+            
+            regions.forEach((region) => {
+                const name = region.name?.trim();
+                if (name) {
+                    nameCount[name] = (nameCount[name] || 0) + 1;
+                    if (nameCount[name] > 1) {
+                        hasDuplicates = true;
+                    }
+                }
+            });
+            
+            if (hasDuplicates) {
+                return 'Duplicate region names are not allowed';
+            }
+            
+            // Check for empty required fields
+            const hasEmptyNames = regions.some(r => !r.name?.trim());
+            const hasEmptyTreatments = regions.some(r => !r.treatment_id?.trim());
+            const hasEmptyDilutions = regions.some(r => !r.dilution?.trim());
+            
+            if (hasEmptyNames) {
+                return 'All regions must have a name';
+            }
+            if (hasEmptyTreatments) {
+                return 'All regions must have a treatment selected';
+            }
+            if (hasEmptyDilutions) {
+                return 'All regions must have a dilution factor';
+            }
+            
+            // Call any additional validation passed as prop
+            if (props.validate) {
+                return props.validate(value);
+            }
+            
+            return undefined;
+        };
+
+        inputResult = useInput({
+            ...props,
+            validate: customValidate
+        });
     } catch (error) {
         // If useInput fails (no form context), create a mock result
         inputResult = {
@@ -346,6 +395,60 @@ export const RegionInput: React.FC<{
             }
         }, 0);
     }, [onChange, regions]);
+
+    // Validation function to check for duplicate names
+    const validateRegionNames = useCallback(() => {
+        const nameCount: { [key: string]: number } = {};
+        const duplicateIndices: Set<number> = new Set();
+
+        regions.forEach((region, idx) => {
+            const name = region.name?.trim();
+            if (name) {
+                nameCount[name] = (nameCount[name] || 0) + 1;
+                if (nameCount[name] > 1) {
+                    // Mark all regions with this name as duplicates
+                    regions.forEach((r, i) => {
+                        if (r.name?.trim() === name) {
+                            duplicateIndices.add(i);
+                        }
+                    });
+                }
+            }
+        });
+
+        return duplicateIndices;
+    }, [regions]);
+
+    const duplicateIndices = validateRegionNames();
+    const hasDuplicates = duplicateIndices.size > 0;
+
+    // Add validation effect to propagate form errors
+    React.useEffect(() => {
+        if (!props.readOnly && inputResult.fieldState) {
+            const hasEmptyNames = regions.some(r => !r.name?.trim());
+            const hasEmptyTreatments = regions.some(r => !r.treatment_id?.trim());
+            const hasEmptyDilutions = regions.some(r => !r.dilution?.trim());
+            
+            if (hasDuplicates || hasEmptyNames || hasEmptyTreatments || hasEmptyDilutions) {
+                // Create a custom error that react-hook-form will recognize
+                const errorMessage = hasDuplicates 
+                    ? 'Duplicate region names are not allowed'
+                    : 'All fields are required';
+                    
+                // This will be handled by the form validation
+                if (inputResult.field.onChange) {
+                    // We need to trigger validation without changing the actual value
+                    setTimeout(() => {
+                        const form = document.querySelector('form');
+                        if (form) {
+                            const event = new Event('input', { bubbles: true });
+                            form.dispatchEvent(event);
+                        }
+                    }, 0);
+                }
+            }
+        }
+    }, [hasDuplicates, regions, props.readOnly, inputResult.fieldState, inputResult.field.onChange]);
 
     const handleYAMLImport = useCallback(() => {
         fileInputRef.current?.click();
@@ -612,12 +715,32 @@ export const RegionInput: React.FC<{
                                     variant="standard"
                                     disabled={readOnly}
                                     required
-                                    error={!r.name && !readOnly}
+                                    error={(!r.name && !readOnly) || duplicateIndices.has(idx)}
+                                    helperText={duplicateIndices.has(idx) ? 'Duplicate name' : undefined}
                                     sx={{ width: 90 }}
                                     inputRef={inputRefs.current[`region-${idx}-name`]}
                                     InputProps={{
                                         disableUnderline: true,
-                                        sx: { fontSize: '0.8rem' }
+                                        sx: { 
+                                            fontSize: '0.8rem',
+                                            '& .MuiInputBase-input': {
+                                                borderBottom: duplicateIndices.has(idx) ? '2px solid #f44336' : undefined
+                                            }
+                                        },
+                                        endAdornment: duplicateIndices.has(idx) ? (
+                                            <CloseIcon sx={{ 
+                                                fontSize: '0.8rem', 
+                                                color: 'error.main',
+                                                marginLeft: 0.5
+                                            }} />
+                                        ) : undefined
+                                    }}
+                                    FormHelperTextProps={{
+                                        sx: {
+                                            fontSize: '0.6rem',
+                                            marginTop: 0.25,
+                                            color: 'error.main'
+                                        }
                                     }}
                                 />
 
