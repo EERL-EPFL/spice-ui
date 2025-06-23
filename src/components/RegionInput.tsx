@@ -84,9 +84,11 @@ const cellToStringWithRotation = (cell: Cell, trayConfig: any, rotation: number)
 
 interface SingleRegion {
     name: string;
-    tray_name: string;     // Now use tray name instead of number
-    upper_left: string;
-    lower_right: string;
+    tray_sequence_id: number;       // Changed from tray_name to tray_sequence_id (order_sequence)
+    col_min: number;       // Changed from upper_left string to numeric columns
+    col_max: number;       // New field for maximum column
+    row_min: number;       // Changed from lower_right string to numeric rows  
+    row_max: number;       // New field for maximum row
     color: string;
     treatment_id?: string;  // Changed from sample to treatment_id
     dilution?: string;     // Add dilution field
@@ -328,20 +330,16 @@ export const RegionInput: React.FC<{
     // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
 
     const handleNewRegion = useCallback(
-        (regionObj: { trayName: string; upperLeft: Cell; lowerRight: Cell; trayConfig: any }) => {
-            const { trayName, upperLeft, lowerRight, trayConfig } = regionObj;
-            const ulStr = cellToString(upperLeft, trayConfig);
-            const lrStr = cellToString(lowerRight, trayConfig);
+        (regionObj: { trayName: string; upperLeft: Cell; lowerRight: Cell; trayConfig: any; trayId: number }) => {
+            const { trayName, upperLeft, lowerRight, trayConfig, trayId } = regionObj;
 
-            // Check overlap on same tray
-            const existingOnTray = regions.filter((r) => r.tray_name === trayName);
+            // Check overlap on same tray using new coordinate system
+            const existingOnTray = regions.filter((r) => r.tray_sequence_id === trayId);
             for (const r of existingOnTray) {
-                const rUL = parseCell(r.upper_left, trayConfig);
-                const rLR = parseCell(r.lower_right, trayConfig);
                 const overlapInRows =
-                    upperLeft.row <= rLR.row && lowerRight.row >= rUL.row;
+                    upperLeft.row <= r.row_max && lowerRight.row >= r.row_min;
                 const overlapInCols =
-                    upperLeft.col <= rLR.col && lowerRight.col >= rUL.col;
+                    upperLeft.col <= r.col_max && lowerRight.col >= r.col_min;
                 if (overlapInRows && overlapInCols) {
                     window.alert('Cannot create overlapping regions.');
                     return;
@@ -351,14 +349,16 @@ export const RegionInput: React.FC<{
             // Pick a color
             const color = COLOR_PALETTE[regions.length % COLOR_PALETTE.length];
 
-            // Append new region
+            // Append new region with numeric coordinates
             const updated: SingleRegion[] = [
                 ...regions,
                 {
                     name: '',
-                    tray_name: trayName,
-                    upper_left: ulStr,
-                    lower_right: lrStr,
+                    tray_sequence_id: trayId,
+                    col_min: upperLeft.col,
+                    col_max: lowerRight.col,
+                    row_min: upperLeft.row,
+                    row_max: lowerRight.row,
                     color,
                     treatment_id: '',
                     dilution: '',
@@ -435,20 +435,17 @@ export const RegionInput: React.FC<{
                     ? 'Duplicate region names are not allowed'
                     : 'All fields are required';
                     
-                // This will be handled by the form validation
-                if (inputResult.field.onChange) {
-                    // We need to trigger validation without changing the actual value
-                    setTimeout(() => {
-                        const form = document.querySelector('form');
-                        if (form) {
-                            const event = new Event('input', { bubbles: true });
-                            form.dispatchEvent(event);
-                        }
-                    }, 0);
-                }
+                // Trigger validation without changing the actual value
+                setTimeout(() => {
+                    const form = document.querySelector('form');
+                    if (form) {
+                        const event = new Event('input', { bubbles: true });
+                        form.dispatchEvent(event);
+                    }
+                }, 0);
             }
         }
-    }, [hasDuplicates, regions, props.readOnly, inputResult.fieldState, inputResult.field.onChange]);
+    }, [hasDuplicates, regions, props.readOnly, inputResult.fieldState]);
 
     const handleYAMLImport = useCallback(() => {
         fileInputRef.current?.click();
@@ -472,16 +469,29 @@ export const RegionInput: React.FC<{
                         regionData.forEach((region) => {
                             const color = COLOR_PALETTE[colorIndex % COLOR_PALETTE.length];
 
-                            importedRegions.push({
-                                name: regionName,
-                                tray_name: region.tray,
-                                upper_left: region.upper_left,
-                                lower_right: region.lower_right,
-                                color: color,
-                                treatment_id: '',
-                                dilution: '',
-                                is_background_key: false // Default to false
-                            });
+                            // Find the tray config by tray name to get its order_sequence (tray_sequence_id)
+                            const trayConfigInfo = trayConfiguration?.trays?.find(tc => 
+                                tc.trays.some(t => t.name === region.tray)
+                            );
+                            const trayInfo = trayConfigInfo?.trays.find(t => t.name === region.tray);
+
+                            if (trayConfigInfo && trayInfo) {
+                                const upperLeftCell = parseCell(region.upper_left, trayInfo);
+                                const lowerRightCell = parseCell(region.lower_right, trayInfo);
+
+                                importedRegions.push({
+                                    name: regionName,
+                                    tray_sequence_id: trayConfigInfo.order_sequence, // Use the order_sequence as tray_sequence_id
+                                    col_min: upperLeftCell.col,
+                                    col_max: lowerRightCell.col,
+                                    row_min: upperLeftCell.row,
+                                    row_max: lowerRightCell.row,
+                                    color: color,
+                                    treatment_id: '',
+                                    dilution: '',
+                                    is_background_key: false // Default to false
+                                });
+                            }
                             colorIndex++;
                         });
                     }
@@ -502,53 +512,6 @@ export const RegionInput: React.FC<{
             fileInputRef.current.value = '';
         }
     }, [regions, onChange, trayConfiguration]);
-
-    const handleYAMLExport = useCallback(() => {
-        if (regions.length === 0) {
-            window.alert('No regions to export.');
-            return;
-        }
-
-        const groupedRegions: { [key: string]: any[] } = {};
-
-        regions.forEach(region => {
-            const regionName = region.name || 'Unnamed';
-
-            if (!groupedRegions[regionName]) {
-                groupedRegions[regionName] = [];
-            }
-
-            groupedRegions[regionName].push({
-                tray: region.tray_name,
-                upper_left: region.upper_left,
-                lower_right: region.lower_right
-            });
-        });
-
-        let yamlContent = '';
-        Object.entries(groupedRegions).forEach(([regionName, regionData], index) => {
-            if (index > 0) yamlContent += '\n';
-            yamlContent += `${regionName}:\n`;
-
-            regionData.forEach(region => {
-                yamlContent += `  - tray: ${region.tray}\n`;
-                yamlContent += `    upper_left: ${region.upper_left}\n`;
-                yamlContent += `    lower_right: ${region.lower_right}\n`;
-                yamlContent += '\n';
-            });
-        });
-
-        // Create and download file
-        const blob = new Blob([yamlContent.trim()], { type: 'text/yaml' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = 'regions.yaml';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    }, [regions]);
 
     // Create a stable no-op function for display mode
     const noOpRegionSelect = useCallback(() => { }, []);
@@ -588,6 +551,153 @@ export const RegionInput: React.FC<{
         return [null, flattened];
     }, [trayConfiguration, props.label, props.source, isRequired]);
 
+    // YAML export must be defined AFTER flatTrays is available
+    const handleYAMLExport = useCallback(() => {
+        if (regions.length === 0) {
+            window.alert('No regions to export.');
+            return;
+        }
+
+        console.log('=== RegionInput YAML EXPORT DEBUG ===');
+        console.log('Regions:', regions);
+        console.log('FlatTrays:', flatTrays);
+        console.log('TrayConfiguration:', trayConfiguration);
+
+        const groupedRegions: { [key: string]: any[] } = {};
+
+        regions.forEach(region => {
+            console.log('--- Processing region for export ---');
+            console.log('Region:', region);
+            
+            const regionName = region.name || 'Unnamed';
+
+            if (!groupedRegions[regionName]) {
+                groupedRegions[regionName] = [];
+            }
+
+            // MIGRATION LOGIC: Handle old regions that don't have tray_sequence_id set
+            let effectiveTrayId = region.tray_sequence_id;
+            if (effectiveTrayId === undefined || effectiveTrayId === null) {
+                effectiveTrayId = 1; // Default to first tray configuration
+                console.warn(`Region "${region.name}" has no tray_sequence_id, defaulting to 1 for export`);
+            }
+            
+            console.log('Effective tray_sequence_id for export:', effectiveTrayId);
+            console.log('Looking for trayConfig with order_sequence:', effectiveTrayId);
+
+            // Debug: Log all available order_sequences
+            flatTrays.forEach((ft, idx) => {
+                console.log(`FlatTray[${idx}]:`, {
+                    trayName: ft.trayName,
+                    order_sequence: ft.trayConfig.order_sequence,
+                    rotation: ft.rotation
+                });
+            });
+
+            // Find the tray info by matching the order_sequence with the region's effective tray_sequence_id
+            const trayInfo = flatTrays.find(t => t.trayConfig.order_sequence === effectiveTrayId);
+            console.log('Found trayInfo for export:', trayInfo);
+            
+            if (trayInfo) {
+                // Convert numeric coordinates back to letter+number format for YAML export
+                const upperLeftCell: Cell = { row: region.row_min, col: region.col_min };
+                const lowerRightCell: Cell = { row: region.row_max, col: region.col_max };
+                const upperLeftStr = cellToString(upperLeftCell, trayInfo.tray);
+                const lowerRightStr = cellToString(lowerRightCell, trayInfo.tray);
+
+                const trayName = trayInfo.tray.name || trayInfo.trayName || `Tray_${effectiveTrayId}`;
+                console.log('Using tray name for export:', trayName);
+
+                groupedRegions[regionName].push({
+                    tray: trayName, // Use the actual tray name
+                    upper_left: upperLeftStr,
+                    lower_right: lowerRightStr
+                });
+            } else {
+                // Fallback if tray info not found
+                console.warn(`Tray info not found for effective tray_sequence_id: ${effectiveTrayId}`);
+                console.log('Available tray configs:', flatTrays.map(ft => ({
+                    name: ft.trayName,
+                    order_sequence: ft.trayConfig.order_sequence
+                })));
+                
+                const upperLeftStr = `${String.fromCharCode(65 + region.col_min)}${region.row_min + 1}`;
+                const lowerRightStr = `${String.fromCharCode(65 + region.col_max)}${region.row_max + 1}`;
+                
+                groupedRegions[regionName].push({
+                    tray: `Tray_${effectiveTrayId}`,
+                    upper_left: upperLeftStr,
+                    lower_right: lowerRightStr
+                });
+            }
+        });
+
+        let yamlContent = '';
+        Object.entries(groupedRegions).forEach(([regionName, regionData], index) => {
+            if (index > 0) yamlContent += '\n';
+            yamlContent += `${regionName}:\n`;
+
+            regionData.forEach(region => {
+                yamlContent += `  - tray: ${region.tray}\n`;
+                yamlContent += `    upper_left: ${region.upper_left}\n`;
+                yamlContent += `    lower_right: ${region.lower_right}\n`;
+                yamlContent += '\n';
+            });
+        });
+
+        // Create and download file
+        const blob = new Blob([yamlContent.trim()], { type: 'text/yaml' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'regions.yaml';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }, [regions, flatTrays, trayConfiguration]);
+
+    // Add a one-time migration effect to fix legacy regions
+    React.useEffect(() => {
+        if (!readOnly && regions.some(r => r.tray_sequence_id === null || r.tray_sequence_id === undefined)) {
+            console.log('Found regions with null tray_sequence_id, performing one-time migration...');
+            
+            const updatedRegions = regions.map((region, idx) => {
+                if (region.tray_sequence_id === null || region.tray_sequence_id === undefined) {
+                    // For the regions currently showing as null, we need to determine which tray they belong to
+                    // Looking at the console logs and visual placement:
+                    // - SA and T8_PB_D1 should be on tray 1 (P1)
+                    // - But we need a more systematic way to determine this
+                    
+                    // Check which tray this region is currently being displayed on
+                    // by finding which tray configuration contains a region at these coordinates
+                    for (let i = 0; i < flatTrays.length; i++) {
+                        const flatTray = flatTrays[i];
+                        const trayConfig = flatTray.trayConfig;
+                        
+                        // Check if this region's coordinates are within this tray's bounds
+                        if (region.row_max < trayConfig.trays[0].qty_y_axis && 
+                            region.col_max < trayConfig.trays[0].qty_x_axis) {
+                            console.log(`Migrating region "${region.name}" to tray_sequence_id: ${trayConfig.order_sequence}`);
+                            return { ...region, tray_sequence_id: trayConfig.order_sequence };
+                        }
+                    }
+                    
+                    // Fallback: assign to first tray
+                    console.log(`Fallback: Migrating region "${region.name}" to tray_sequence_id: 1`);
+                    return { ...region, tray_sequence_id: 1 };
+                }
+                return region;
+            });
+            
+            // Only update if there were changes
+            if (updatedRegions.some((r, idx) => r.tray_sequence_id !== regions[idx].tray_sequence_id)) {
+                console.log('Applying migration fix for tray_sequence_id...');
+                onChange(updatedRegions);
+            }
+        }
+    }, [regions, readOnly, onChange, flatTrays]);
+
     // NOW we can do conditional returns after all hooks have been called
     if (noTraysMessage) {
         return noTraysMessage;
@@ -612,15 +722,15 @@ export const RegionInput: React.FC<{
                         const existingRegions: ExistingRegion[] = regions
                             .map((r, idx) => ({ ...r, idx }))
                             .filter((r) => {
-                                // Handle regions with null tray_name by assigning them to the first tray
-                                if (r.tray_name === null || r.tray_name === undefined) {
+                                // Handle regions with null tray_sequence_id by assigning them to the first tray
+                                if (r.tray_sequence_id === null || r.tray_sequence_id === undefined) {
                                     return index === 0; // Show on first tray only
                                 }
-                                return r.tray_name === trayName;
+                                return r.tray_sequence_id === trayConfig.order_sequence;
                             })
                             .map((r) => ({
-                                upperLeft: parseCell(r.upper_left, tray),
-                                lowerRight: parseCell(r.lower_right, tray),
+                                upperLeft: { row: r.row_min, col: r.col_min },
+                                lowerRight: { row: r.row_max, col: r.col_max },
                                 name: r.name || 'Unnamed',
                                 color: r.color,
                                 onRemove: readOnly ? () => { } : () => handleRemove(r.idx),
@@ -640,7 +750,8 @@ export const RegionInput: React.FC<{
                                         trayName,
                                         upperLeft: regionObj.upperLeft,
                                         lowerRight: regionObj.lowerRight,
-                                        trayConfig: tray
+                                        trayConfig: tray,
+                                        trayId: trayConfig.order_sequence
                                     })}
                                     existingRegions={existingRegions}
                                     readOnly={readOnly}
@@ -663,17 +774,40 @@ export const RegionInput: React.FC<{
                     )}
 
                     {regions.map((r, idx) => {
+                        // MIGRATION LOGIC: Handle old regions that don't have tray_sequence_id set
+                        let effectiveTrayId = r.tray_sequence_id;
+                        
+                        // If tray_sequence_id is undefined/null, try to determine it from the region's position
+                        if (effectiveTrayId === undefined || effectiveTrayId === null) {
+                            // For existing regions without tray_sequence_id, we need to make an educated guess
+                            // Based on the console logs, assign to first tray as fallback
+                            effectiveTrayId = 1;
+                            console.warn(`Region "${r.name}" has no tray_sequence_id, defaulting to 1 in display`);
+                        }
+                        
                         // Find the tray config and rotation for this region
-                        const trayInfo = flatTrays.find(t => t.trayName === r.tray_name);
+                        const trayInfo = flatTrays.find(t => t.trayConfig.order_sequence === effectiveTrayId);
                         const trayConfig = trayInfo?.tray;
                         const rotation = trayInfo?.rotation || 0;
-                        let ulStr = r.upper_left;
-                        let lrStr = r.lower_right;
-                        if (trayConfig) {
-                            const ulCell = parseCell(r.upper_left, trayConfig);
-                            const lrCell = parseCell(r.lower_right, trayConfig);
+                        
+                        // Debug logging
+                        console.log('Region:', r);
+                        console.log('Effective tray_sequence_id:', effectiveTrayId);
+                        console.log('Found trayInfo:', trayInfo);
+                        console.log('TrayConfig:', trayConfig);
+                        
+                        // Convert numeric coordinates to letter+number format for display
+                        let ulStr = 'A1';
+                        let lrStr = 'A1';
+                        let trayName = 'Unknown';
+                        if (trayInfo && trayConfig) {
+                            const ulCell: Cell = { row: r.row_min, col: r.col_min };
+                            const lrCell: Cell = { row: r.row_max, col: r.col_max };
                             ulStr = cellToStringWithRotation(ulCell, trayConfig, rotation);
                             lrStr = cellToStringWithRotation(lrCell, trayConfig, rotation);
+                            // Use the actual tray name from the tray configuration
+                            trayName = trayConfig.name || trayInfo.trayName || `Tray ${effectiveTrayId}`;
+                            console.log('Final trayName:', trayName);
                         }
                         return (
                             <Box
@@ -703,7 +837,7 @@ export const RegionInput: React.FC<{
                                         color: r.color,
                                     }}
                                 >
-                                    {r.tray_name}: {ulStr}–{lrStr}
+                                    {trayName}: {ulStr}–{lrStr}
                                 </Box>
 
                                 <TextField

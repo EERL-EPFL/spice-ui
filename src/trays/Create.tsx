@@ -94,8 +94,9 @@ const CreateComponent = () => {
                                     />
                                     <TextInput
                                         source="trays[0].well_relative_diameter"
-                                        label="Well Diameter"
+                                        label="Well diameter"
                                         fullWidth
+                                        defaultValue={0.6}
                                     />
                                 </Box>
                                 {/* Right: Tray preview (fixed width) */}
