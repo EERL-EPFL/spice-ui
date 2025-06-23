@@ -98,8 +98,8 @@ const App = () => {
                             <Resource name="trays" {...trays} />
                             <Resource name="projects" {...projects} />
                             <Resource name="locations" {...locations} />
-                            <Resource name="treatments" {...treatments} />
                             <Resource name="samples" {...samples} />
+                            <Resource name="treatments" {...treatments} />
                             <Resource name="experiments" {...experiments} />
                             <Resource name="assets" {...assets} />
                         </>

@@ -5,6 +5,7 @@ import {
     ReferenceInput,
     SimpleForm,
     TextInput,
+    SelectInput,
 } from 'react-admin';
 
 const EditComponent = () => {
@@ -12,7 +13,15 @@ const EditComponent = () => {
         <Edit>
             <SimpleForm>
                 <TextInput disabled label="Id" source="id" />
-                <TextInput source="name" label="Name" />
+                <SelectInput 
+                    source="name" 
+                    label="Treatment Type" 
+                    choices={[
+                        { id: 'none', name: 'None' },
+                        { id: 'heat', name: 'Heat' },
+                        { id: 'h2o2', name: 'H2O2' },
+                    ]}
+                />
                 <TextInput source="notes" label="Notes" multiline />
                 <ReferenceInput
                     source="sample_id"
@@ -22,7 +31,6 @@ const EditComponent = () => {
                 >
                     <AutocompleteInput
                         optionText="name"
-                        placeholder="Search samples…"
                         filterToQuery={searchText => ({ q: searchText })}
                         fullWidth
                     />
