@@ -69,16 +69,12 @@ const cellToString = (cell: Cell, trayConfig: any): string => {
 
 // Helper to convert a cell to string, considering tray rotation
 const cellToStringWithRotation = (cell: Cell, trayConfig: any, rotation: number): string => {
-    // For debugging, let's see what we're getting
-    console.log(`Original cell: row=${cell.row}, col=${cell.col}, rotation=${rotation}`);
-
     // Don't apply any rotation transformation - the cell coordinates should already be correct
     // The TrayGrid handles the visual rotation, so we just need to convert the logical coordinates
     const letter = colIndexToLetter(cell.col, trayConfig.qty_x_axis);
     const rowNumber = cell.row + 1;
     const result = `${letter}${rowNumber}`;
 
-    console.log(`Converted to: ${result}`);
     return result;
 };
 
@@ -558,17 +554,9 @@ export const RegionInput: React.FC<{
             return;
         }
 
-        console.log('=== RegionInput YAML EXPORT DEBUG ===');
-        console.log('Regions:', regions);
-        console.log('FlatTrays:', flatTrays);
-        console.log('TrayConfiguration:', trayConfiguration);
-
         const groupedRegions: { [key: string]: any[] } = {};
 
         regions.forEach(region => {
-            console.log('--- Processing region for export ---');
-            console.log('Region:', region);
-            
             const regionName = region.name || 'Unnamed';
 
             if (!groupedRegions[regionName]) {
@@ -581,22 +569,9 @@ export const RegionInput: React.FC<{
                 effectiveTrayId = 1; // Default to first tray configuration
                 console.warn(`Region "${region.name}" has no tray_sequence_id, defaulting to 1 for export`);
             }
-            
-            console.log('Effective tray_sequence_id for export:', effectiveTrayId);
-            console.log('Looking for trayConfig with order_sequence:', effectiveTrayId);
-
-            // Debug: Log all available order_sequences
-            flatTrays.forEach((ft, idx) => {
-                console.log(`FlatTray[${idx}]:`, {
-                    trayName: ft.trayName,
-                    order_sequence: ft.trayConfig.order_sequence,
-                    rotation: ft.rotation
-                });
-            });
 
             // Find the tray info by matching the order_sequence with the region's effective tray_sequence_id
             const trayInfo = flatTrays.find(t => t.trayConfig.order_sequence === effectiveTrayId);
-            console.log('Found trayInfo for export:', trayInfo);
             
             if (trayInfo) {
                 // Convert numeric coordinates back to letter+number format for YAML export
@@ -606,7 +581,6 @@ export const RegionInput: React.FC<{
                 const lowerRightStr = cellToString(lowerRightCell, trayInfo.tray);
 
                 const trayName = trayInfo.tray.name || trayInfo.trayName || `Tray_${effectiveTrayId}`;
-                console.log('Using tray name for export:', trayName);
 
                 groupedRegions[regionName].push({
                     tray: trayName, // Use the actual tray name
@@ -616,10 +590,6 @@ export const RegionInput: React.FC<{
             } else {
                 // Fallback if tray info not found
                 console.warn(`Tray info not found for effective tray_sequence_id: ${effectiveTrayId}`);
-                console.log('Available tray configs:', flatTrays.map(ft => ({
-                    name: ft.trayName,
-                    order_sequence: ft.trayConfig.order_sequence
-                })));
                 
                 const upperLeftStr = `${String.fromCharCode(65 + region.col_min)}${region.row_min + 1}`;
                 const lowerRightStr = `${String.fromCharCode(65 + region.col_max)}${region.row_max + 1}`;
@@ -790,12 +760,6 @@ export const RegionInput: React.FC<{
                         const trayConfig = trayInfo?.tray;
                         const rotation = trayInfo?.rotation || 0;
                         
-                        // Debug logging
-                        console.log('Region:', r);
-                        console.log('Effective tray_sequence_id:', effectiveTrayId);
-                        console.log('Found trayInfo:', trayInfo);
-                        console.log('TrayConfig:', trayConfig);
-                        
                         // Convert numeric coordinates to letter+number format for display
                         let ulStr = 'A1';
                         let lrStr = 'A1';
@@ -807,7 +771,6 @@ export const RegionInput: React.FC<{
                             lrStr = cellToStringWithRotation(lrCell, trayConfig, rotation);
                             // Use the actual tray name from the tray configuration
                             trayName = trayConfig.name || trayInfo.trayName || `Tray ${effectiveTrayId}`;
-                            console.log('Final trayName:', trayName);
                         }
                         return (
                             <Box

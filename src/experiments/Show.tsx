@@ -153,19 +153,7 @@ const ExportRegionsButton = () => {
         const regions = record.regions;
         const groupedRegions: { [key: string]: any[] } = {};
 
-        // Debug logging to see what we're working with
-        console.log('=== YAML EXPORT DEBUG ===');
-        console.log('Record:', record);
-        console.log('Regions:', regions);
-        console.log('Tray Configuration:', trayConfiguration);
-        console.log('Is Loading:', isLoading);
-        console.log('Error:', error);
-
         regions.forEach((region: any) => {
-            console.log('--- Processing region ---');
-            console.log('Region object:', region);
-            console.log('region.tray_sequence_id:', region.tray_sequence_id, 'type:', typeof region.tray_sequence_id);
-            
             const regionName = region.name || 'Unnamed';
 
             if (!groupedRegions[regionName]) {
@@ -178,8 +166,6 @@ const ExportRegionsButton = () => {
                 effectiveTrayId = 1; // Default to first tray configuration
                 console.warn(`Region "${region.name}" has no tray_sequence_id, defaulting to 1`);
             }
-            
-            console.log('Effective tray_sequence_id:', effectiveTrayId, 'type:', typeof effectiveTrayId);
 
             // Convert from numeric coordinates back to letter+number format for YAML export
             const colLetter = String.fromCharCode(65 + (region.col_min || 0)); // A, B, C...
@@ -192,36 +178,19 @@ const ExportRegionsButton = () => {
 
             // Find the actual tray name from the tray configuration
             let trayName = `Tray_${effectiveTrayId}`;
-            console.log('Initial tray name:', trayName);
-            console.log('Available tray configs:', trayConfiguration?.trays);
             
             if (trayConfiguration?.trays && Array.isArray(trayConfiguration.trays)) {
-                console.log('Searching through', trayConfiguration.trays.length, 'tray configs');
-                
                 const trayConfigInfo = trayConfiguration.trays.find(tc => {
-                    console.log('Checking tray config:', tc);
-                    console.log('tc.order_sequence:', tc.order_sequence, 'type:', typeof tc.order_sequence);
-                    console.log('effectiveTrayId:', effectiveTrayId, 'type:', typeof effectiveTrayId);
-                    const matches = tc.order_sequence === effectiveTrayId;
-                    console.log('Match result:', matches);
-                    return matches;
+                    return tc.order_sequence === effectiveTrayId;
                 });
-                
-                console.log('Found trayConfigInfo:', trayConfigInfo);
                 
                 if (trayConfigInfo && trayConfigInfo.trays && trayConfigInfo.trays.length > 0) {
                     const foundTrayName = trayConfigInfo.trays[0].name;
-                    console.log('Found tray name in config:', foundTrayName);
                     if (foundTrayName) {
                         trayName = foundTrayName;
-                        console.log('Updated tray name to:', trayName);
                     }
                 }
-            } else {
-                console.log('No tray configuration available or not an array');
             }
-            
-            console.log('Final tray name for YAML:', trayName);
 
             groupedRegions[regionName].push({
                 tray: trayName,
