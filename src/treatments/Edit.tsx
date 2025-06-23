@@ -6,6 +6,7 @@ import {
     SimpleForm,
     TextInput,
     SelectInput,
+    required,
 } from 'react-admin';
 
 const EditComponent = () => {
@@ -21,6 +22,7 @@ const EditComponent = () => {
                         { id: 'heat', name: 'Heat' },
                         { id: 'h2o2', name: 'H2O2' },
                     ]}
+                    validate={[required()]}
                 />
                 <TextInput source="notes" label="Notes" multiline />
                 <ReferenceInput

@@ -5,6 +5,7 @@ import {
     NumberInput,
     ReferenceInput,
     SelectInput,
+    required,
 } from 'react-admin';
 
 const CreateComponent = () => {
@@ -30,6 +31,7 @@ const CreateComponent = () => {
                         { id: 'heat', name: 'Heat' },
                         { id: 'h2o2', name: 'H2O2' },
                     ]}
+                    validate={[required()]}
                 />
                 <TextInput source="notes" label="Notes" multiline />
                 <NumberInput source="enzyme_volume_litres" label="Enzyme Volume (μL)" />
