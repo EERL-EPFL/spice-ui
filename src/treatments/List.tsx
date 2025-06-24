@@ -8,11 +8,11 @@ import {
     ExportButton,
     DateField,
     NumberField,
-    ReferenceManyCount,
+    FunctionField,
     ReferenceField,
 } from "react-admin";
 import { postFilters } from "../filters/list";
-
+import { treatmentName } from ".";
 const ListComponentActions = () => {
     const { permissions } = usePermissions();
     return (
@@ -27,7 +27,11 @@ export const ListComponent = () => {
     return (
         <List actions={<ListComponentActions />} storeKey={false} filters={postFilters}>
             <Datagrid rowClick="show">
-                <TextField source="name" label="Name" />
+                <FunctionField
+                    source="name"
+                    label="Treatment Type"
+                    render={record => { return treatmentName[record.name] || record.name; }}
+                />
                 <ReferenceField source="sample_id" reference="samples" link="show">
                     <TextField source="name" />
                 </ReferenceField>

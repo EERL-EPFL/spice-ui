@@ -11,6 +11,8 @@ import {
     BooleanField,
     BooleanInput,
 } from 'react-admin';
+import { sampleType } from ".";
+
 
 const CreateComponent = () => {
     return (
@@ -23,12 +25,7 @@ const CreateComponent = () => {
                 <TextInput source="name" validate={[required()]} />
                 <SelectInput
                     source="type"
-                    choices={[
-                        { id: 'Bulk', name: 'Bulk' },
-                        { id: 'Filter', name: 'Filter' },
-                        { id: 'ProceduralBlank', name: 'ProceduralBlank' },
-                        { id: 'PureWater', name: 'PureWater' },
-                    ]}
+                    choices={Object.entries(sampleType).map(([id, name]) => ({ id, name }))}
                     validate={[required()]}
                 />
                 <NumberInput source="latitude" />

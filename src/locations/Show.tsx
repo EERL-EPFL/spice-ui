@@ -16,6 +16,7 @@ import {
     FunctionField,
     ReferenceField,
 } from "react-admin";
+import { treatmentName } from "../treatments";
 
 const ShowComponentActions = () => {
     const { permissions } = usePermissions();
@@ -60,7 +61,7 @@ export const ShowComponent = () => {
                                     source="treatments"
                                     label="Treatments"
                                     render={(record) =>
-                                        record.treatments?.map(t => t.name).join(', ') || 'None'
+                                        record.treatments?.map(t => treatmentName[t.name] || t.name).join(', ') || 'No treatments'
                                     }
                                 />
                             </Datagrid>

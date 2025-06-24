@@ -12,3 +12,10 @@ export default {
     // recordRepresentation: 'name.en',
     icon: ScienceIcon,
 };
+
+export const sampleType = {
+    'bulk': 'Bulk',
+    'filter': 'Filter',
+    'procedural_blank': 'ProceduralBlank',
+    'pure_water': 'PureWater'
+};

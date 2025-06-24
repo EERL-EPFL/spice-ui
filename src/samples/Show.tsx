@@ -9,19 +9,17 @@ import {
     DateField,
     NumberField,
     ReferenceField,
-    ReferenceArrayField,
-    SingleFieldList,
-    ChipField,
     ReferenceManyField,
     Datagrid,
-    CreateButton,
-    useCreatePath,
     useRecordContext,
     useRedirect,
     Button,
     Labeled,
+    FunctionField,
 } from "react-admin";
 import { Box, Typography } from "@mui/material";
+import { sampleType } from ".";
+import { treatmentName } from "../treatments";
 
 const ShowComponentActions = () => {
     const { permissions } = usePermissions();
@@ -46,7 +44,6 @@ const CreateTreatmentButton = () => {
     if (permissions !== 'admin') return null;
     if (!record) return null;
 
-    // console.log("Record", record.id);
     const handleClick = () => {
         redirect('create', 'treatments', undefined, {}, { record: { sample_id: record.id } });
     };
@@ -78,7 +75,11 @@ export const ShowComponent = () => {
                             </ReferenceField>
                         </Labeled>
                         <Labeled>
-                            <TextField source="type" />
+                            <FunctionField
+                                source="type"
+                                label="Type"
+                                render={record => { return sampleType[record.type] || record.type; }}
+                            />
                         </Labeled>
                         <Labeled>
                             <NumberField source="latitude" label="Latitude (°)" />
@@ -120,7 +121,7 @@ export const ShowComponent = () => {
                             <DateField source="last_updated" showTime />
                         </Labeled>
                     </Box>
-                    
+
                     {/* Right column - Treatments */}
                     <Box flex={1} minWidth="400px">
                         <Typography variant="h6" gutterBottom>
@@ -132,7 +133,13 @@ export const ShowComponent = () => {
                                     <CreateTreatmentButton />
                                 </TopToolbar>
                                 <Datagrid bulkActionButtons={false} rowClick="show">
-                                    <TextField source="name" />
+                                    <FunctionField
+                                        source="name"
+                                        label="Treatment Type"
+                                        render={record => {
+                                            return treatmentName[record.name] || record.name;
+                                        }}
+                                    />
                                     <TextField source="notes" />
                                     <NumberField source="enzyme_volume_litres" />
                                     <DateField source="last_updated" showTime />

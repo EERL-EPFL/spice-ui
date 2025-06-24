@@ -1,10 +1,5 @@
 import {
-    ArrayField,
     ArrayInput,
-    BooleanField,
-    BooleanInput,
-    Datagrid,
-    DateTimeInput,
     Edit,
     NumberInput,
     ReferenceInput,
@@ -14,7 +9,8 @@ import {
     TextInput,
     required
 } from 'react-admin';
-
+import { sampleType } from ".";
+import { treatmentName } from "../treatments";
 const EditComponent = () => {
     return (
         <Edit>
@@ -26,12 +22,7 @@ const EditComponent = () => {
                 <TextInput source="name" validate={[required()]} />
                 <SelectInput
                     source="type"
-                    choices={[
-                        { id: 'Bulk', name: 'Bulk' },
-                        { id: 'Filter', name: 'Filter' },
-                        { id: 'ProceduralBlank', name: 'ProceduralBlank' },
-                        { id: 'PureWater', name: 'PureWater' },
-                    ]}
+                    choices={Object.entries(sampleType).map(([id, name]) => ({ id, name }))}
                     validate={[required()]}
                 />
                 <NumberInput source="latitude" />
@@ -46,10 +37,14 @@ const EditComponent = () => {
                 <NumberInput source="well_volume_litres" />
                 <TextInput source="background_region_key" />
                 <TextInput source="remarks" />
-                Add treatments as input fields, here is the datagrid for the show component
                 <ArrayInput source="treatments" label="Sample Treatments">
                     <SimpleFormIterator inline>
-                        <TextInput source="name" />
+                        <SelectInput
+                            source="name"
+                            label="Treatment Type"
+                            choices={Object.entries(treatmentName).map(([id, name]) => ({ id, name }))}
+                            validate={[required()]}
+                        />
                         <TextInput source="notes" />
                         <NumberInput source="enzyme_volume_litres" />
                     </SimpleFormIterator>

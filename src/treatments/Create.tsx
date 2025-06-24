@@ -7,6 +7,7 @@ import {
     SelectInput,
     required,
 } from 'react-admin';
+import { treatmentName } from '.';
 
 const CreateComponent = () => {
 
@@ -23,14 +24,10 @@ const CreateComponent = () => {
                         optionText="name"
                     />
                 </ReferenceInput>
-                <SelectInput 
-                    source="name" 
-                    label="Treatment Type" 
-                    choices={[
-                        { id: 'none', name: 'None' },
-                        { id: 'heat', name: 'Heat' },
-                        { id: 'h2o2', name: 'H2O2' },
-                    ]}
+                <SelectInput
+                    source="name"
+                    label="Treatment Type"
+                    choices={Object.entries(treatmentName).map(([id, name]) => ({ id, name }))}
                     validate={[required()]}
                 />
                 <TextInput source="notes" label="Notes" multiline />

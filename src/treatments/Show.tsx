@@ -5,18 +5,12 @@ import {
     TopToolbar,
     EditButton,
     DeleteButton,
-    usePermissions,
     DateField,
     NumberField,
     ReferenceField,
-    ReferenceArrayField,
-    SingleFieldList,
-    ChipField,
-    ReferenceManyField,
-    Datagrid,
-    Edit,
+    FunctionField,
 } from "react-admin";
-
+import { treatmentName } from ".";
 
 
 export const ShowComponent = () => {
@@ -24,7 +18,11 @@ export const ShowComponent = () => {
         <Show actions={<TopToolbar><EditButton /><DeleteButton /></TopToolbar>}>
             <SimpleShowLayout>
                 <TextField source="id" />
-                <TextField source="name" />
+                <FunctionField
+                    source="name"
+                    label="Treatment Type"
+                    render={record => { return treatmentName[record.name] || record.name; }}
+                />
                 <ReferenceField source="sample_id" reference="samples" link="show">
                     <TextField source="name" />
                 </ReferenceField>

@@ -11,3 +11,9 @@ export default {
     show: ShowComponent,
     icon: ColorizeIcon,
 };
+
+export const treatmentName = {
+    'none': 'None',
+    'heat': 'Heat',
+    'h2o2': 'H2O2'
+}

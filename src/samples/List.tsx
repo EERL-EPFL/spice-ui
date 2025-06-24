@@ -13,8 +13,10 @@ import {
     FunctionField,
 } from "react-admin";
 import { postFilters } from "../filters/list";
+import { sampleType } from ".";
 
 const ListComponentActions = () => {
+
     const { permissions } = usePermissions();
     return (
         <TopToolbar>
@@ -29,7 +31,11 @@ export const ListComponent = () => {
         <List actions={<ListComponentActions />} storeKey={false} filters={postFilters}>
             <Datagrid rowClick="show">
                 <TextField source="name" label="Name" />
-                <TextField source="type" label="Type" />
+                <FunctionField
+                    source="type"
+                    label="Type"
+                    render={record => { return sampleType[record.type] || record.type; }}
+                />
                 <ReferenceField source="location_id" reference="locations" link="show">
                     <TextField source="name" />
                 </ReferenceField>
