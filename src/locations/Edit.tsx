@@ -17,15 +17,7 @@ const EditComponent = () => {
                     <SelectInput optionText="name" validate={[required()]} />
                 </ReferenceInput>
                 <TextInput source="name" validate={[required()]} />
-                <TextInput source="description" multiline />
-                <DateTimeInput source="start_date" parse={(date: string | Date) => {
-                    const parsedDate = typeof date === 'string' ? new Date(date) : date;
-                    return parsedDate ? parsedDate.toISOString() : null;
-                }} />
-                <DateTimeInput source="end_date" parse={(date: string | Date) => {
-                    const parsedDate = typeof date === 'string' ? new Date(date) : date;
-                    return parsedDate ? parsedDate.toISOString() : null;
-                }} />
+                <TextInput source="comment" multiline />
             </SimpleForm>
         </Edit>
     );

@@ -31,7 +31,7 @@ const CreateComponent = () => {
                     validate={[required()]}
                 />
                 <TextInput source="notes" label="Notes" multiline />
-                <NumberInput source="enzyme_volume_litres" label="Enzyme Volume (μL)" />
+                <NumberInput source="enzyme_volume_litres" label="Enzyme Volume (L)" />
             </SimpleForm>
         </Create>
     );

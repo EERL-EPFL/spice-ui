@@ -26,7 +26,7 @@ export const ShowComponent = () => {
                 <ReferenceField source="sample_id" reference="samples" link="show">
                     <TextField source="name" />
                 </ReferenceField>
-                <NumberField source="enzyme_volume_litres" />
+                <NumberField source="enzyme_volume_litres" label="Enzyme Volume (L)" />
                 <DateField source="created_at" showTime />
                 <DateField source="last_updated" showTime />
                 <TextField source="notes" />

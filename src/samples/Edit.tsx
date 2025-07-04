@@ -7,6 +7,7 @@ import {
     SimpleForm,
     SimpleFormIterator,
     TextInput,
+    DateTimeInput,
     required
 } from 'react-admin';
 import { sampleType } from ".";
@@ -27,15 +28,18 @@ const EditComponent = () => {
                 />
                 <NumberInput source="latitude" />
                 <NumberInput source="longitude" />
+                <DateTimeInput source="start_time" label="Start Time" />
+                <DateTimeInput source="stop_time" label="Stop Time" />
+                <NumberInput source="flow_litres_per_minute" label="Flow Rate (L/min)" />
+                <NumberInput source="total_volume" label="Total Volume (L)" />
                 <TextInput source="material_description" />
                 <TextInput source="extraction_procedure" />
                 <TextInput source="filter_substrate" />
-                <NumberInput source="suspension_volume_litres" />
-                <NumberInput source="air_volume_litres" />
-                <NumberInput source="water_volume_litres" />
+                <NumberInput source="suspension_volume_litres" label="Suspension Volume (L)" />
+                <NumberInput source="air_volume_litres" label="Air Volume (L)" />
+                <NumberInput source="water_volume_litres" label="Water Volume (L)" />
                 <NumberInput source="initial_concentration_gram_l" />
-                <NumberInput source="well_volume_litres" />
-                <TextInput source="background_region_key" />
+                <NumberInput source="well_volume_litres" label="Well Volume (L)" />
                 <TextInput source="remarks" />
                 <ArrayInput source="treatments" label="Sample Treatments">
                     <SimpleFormIterator inline>

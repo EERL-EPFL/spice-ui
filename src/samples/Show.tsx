@@ -88,6 +88,18 @@ export const ShowComponent = () => {
                             <NumberField source="longitude" label="Longitude (°)" />
                         </Labeled>
                         <Labeled>
+                            <DateField source="start_time" label="Start Time" showTime />
+                        </Labeled>
+                        <Labeled>
+                            <DateField source="stop_time" label="Stop Time" showTime />
+                        </Labeled>
+                        <Labeled>
+                            <NumberField source="flow_litres_per_minute" label="Flow Rate (L/min)" />
+                        </Labeled>
+                        <Labeled>
+                            <NumberField source="total_volume" label="Total Volume (L)" />
+                        </Labeled>
+                        <Labeled>
                             <TextField source="material_description" />
                         </Labeled>
                         <Labeled>
@@ -97,19 +109,19 @@ export const ShowComponent = () => {
                             <TextField source="filter_substrate" />
                         </Labeled>
                         <Labeled>
-                            <NumberField source="suspension_volume_litres" />
+                            <NumberField source="suspension_volume_litres" label="Suspension Volume (L)" />
                         </Labeled>
                         <Labeled>
-                            <NumberField source="air_volume_litres" />
+                            <NumberField source="air_volume_litres" label="Air Volume (L)" />
                         </Labeled>
                         <Labeled>
-                            <NumberField source="water_volume_litres" />
+                            <NumberField source="water_volume_litres" label="Water Volume (L)" />
                         </Labeled>
                         <Labeled>
                             <NumberField source="initial_concentration_gram_l" />
                         </Labeled>
                         <Labeled>
-                            <NumberField source="well_volume_litres" />
+                            <NumberField source="well_volume_litres" label="Well Volume (L)" />
                         </Labeled>
                         <Labeled>
                             <TextField source="remarks" />

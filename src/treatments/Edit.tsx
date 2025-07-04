@@ -34,7 +34,7 @@ const EditComponent = () => {
                         fullWidth
                     />
                 </ReferenceInput>
-                <NumberInput source="enzyme_volume_litres" label="Enzyme Volume (μL)" />
+                <NumberInput source="enzyme_volume_litres" label="Enzyme Volume (L)" />
             </SimpleForm>
         </Edit>
     );

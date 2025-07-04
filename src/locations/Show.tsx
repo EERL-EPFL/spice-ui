@@ -43,9 +43,7 @@ export const ShowComponent = () => {
                 <ReferenceField source="project_id" reference="projects" link="show">
                     <TextField source="name" />
                 </ReferenceField>
-                <TextField source="description" />
-                <DateField source="start_date" showTime />
-                <DateField source="end_date" showTime />
+                <TextField source="comment" />
                 <DateField source="last_updated" showTime />
 
                 <TabbedShowLayout>
