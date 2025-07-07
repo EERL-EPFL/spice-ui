@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from 'react';
-import { useInput, FieldTitle, useGetOne, Link } from 'react-admin';
+import { useInput, FieldTitle, useGetOne, Link, useDataProvider } from 'react-admin';
 import TrayGrid, { Cell, ExistingRegion, Orientation } from './TrayGrid';
-import { TreatmentSelector } from './TreatmentSelector';
+import { EnhancedTreatmentSelector } from './EnhancedTreatmentSelector';
 import { Box, Typography, TextField, IconButton, Button, Checkbox, FormControlLabel } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -237,6 +237,7 @@ export const RegionInput: React.FC<{
     value?: any; // Allow direct value prop for display mode
     validate?: (value: any) => string | undefined; // Add validate prop
 }> = (props) => {
+    const dataProvider = useDataProvider();
     // Always call useInput to maintain consistent hook order, but handle errors gracefully
     let inputResult;
     try {
@@ -442,6 +443,53 @@ export const RegionInput: React.FC<{
             }
         }
     }, [hasDuplicates, regions, props.readOnly, inputResult.fieldState]);
+
+    // Hook to enhance regions with treatment information for display
+    const [enhancedRegions, setEnhancedRegions] = React.useState<SingleRegion[]>([]);
+    
+    React.useEffect(() => {
+        const enhanceRegionsWithTreatmentData = async () => {
+            const enhanced = await Promise.all(
+                regions.map(async (region) => {
+                    // If we already have treatment data, use it
+                    if (region.treatment?.sample?.name) {
+                        return region;
+                    }
+                    
+                    // If we have a treatment_id but no nested treatment data, fetch it
+                    if (region.treatment_id && !region.treatment?.sample?.name) {
+                        try {
+                            const { data: treatment } = await dataProvider.getOne('treatments', { id: region.treatment_id });
+                            
+                            // Get the sample for this treatment
+                            const { data: sample } = await dataProvider.getOne('samples', { id: treatment.sample_id });
+                            
+                            return {
+                                ...region,
+                                treatment: {
+                                    ...treatment,
+                                    sample: sample
+                                }
+                            };
+                        } catch (error) {
+                            console.error('Error fetching treatment data for region:', region.name, error);
+                            return region;
+                        }
+                    }
+                    
+                    return region;
+                })
+            );
+            
+            setEnhancedRegions(enhanced);
+        };
+
+        if (regions.length > 0) {
+            enhanceRegionsWithTreatmentData();
+        } else {
+            setEnhancedRegions([]);
+        }
+    }, [regions, dataProvider]);
 
     const handleYAMLImport = useCallback(() => {
         fileInputRef.current?.click();
@@ -689,7 +737,7 @@ export const RegionInput: React.FC<{
                 <Box display="flex" gap={0.5} flexWrap="wrap" flex={1}>
                     {flatTrays.map((flatTray, index) => {
                         const { trayConfig, tray, trayName, rotation } = flatTray;
-                        const existingRegions: ExistingRegion[] = regions
+                        const existingRegions: ExistingRegion[] = enhancedRegions
                             .map((r, idx) => ({ ...r, idx }))
                             .filter((r) => {
                                 // Handle regions with null tray_sequence_id by assigning them to the first tray
@@ -698,13 +746,25 @@ export const RegionInput: React.FC<{
                                 }
                                 return r.tray_sequence_id === trayConfig.order_sequence;
                             })
-                            .map((r) => ({
-                                upperLeft: { row: r.row_min, col: r.col_min },
-                                lowerRight: { row: r.row_max, col: r.col_max },
-                                name: r.name || 'Unnamed',
-                                color: r.color,
-                                onRemove: readOnly ? () => { } : () => handleRemove(r.idx),
-                            }));
+                            .map((r) => {
+                                // Create a display name that includes treatment and sample info
+                                let displayName = r.name || 'Unnamed';
+                                
+                                // Add treatment/sample info if available
+                                if (r.treatment?.sample?.name && r.treatment?.name) {
+                                    displayName = `${displayName}\n${r.treatment.sample.name}\n${r.treatment.name}`;
+                                } else if (r.treatment?.name) {
+                                    displayName = `${displayName}\n${r.treatment.name}`;
+                                }
+                                
+                                return {
+                                    upperLeft: { row: r.row_min, col: r.col_min },
+                                    lowerRight: { row: r.row_max, col: r.col_max },
+                                    name: displayName,
+                                    color: r.color,
+                                    onRemove: readOnly ? () => { } : () => handleRemove(r.idx),
+                                };
+                            });
 
                         return (
                             <Box key={index} minWidth="280px" display="flex" flexDirection="column" alignItems="center">
@@ -848,7 +908,7 @@ export const RegionInput: React.FC<{
                                             treatmentData={r.treatment}
                                         />
                                     ) : (
-                                        <TreatmentSelector
+                                        <EnhancedTreatmentSelector
                                             value={r.treatment_id || ''}
                                             label=""
                                             disabled={readOnly}
@@ -857,7 +917,28 @@ export const RegionInput: React.FC<{
                                                     handleRegionChange(idx, 'treatment_id', treatmentId);
                                                 }
                                             }}
+                                            onApplyToAll={(treatmentId) => {
+                                                if (!readOnly) {
+                                                    // Apply the treatment to all regions
+                                                    const updatedRegions = regions.map(region => ({
+                                                        ...region,
+                                                        treatment_id: treatmentId
+                                                    }));
+                                                    onChange(updatedRegions);
+                                                }
+                                            }}
                                             compact={true}
+                                            existingRegionTreatments={enhancedRegions
+                                                .map((region, index) => ({
+                                                    regionName: region.name || `Region ${index + 1}`,
+                                                    regionIndex: index,
+                                                    treatment: region.treatment || { id: region.treatment_id || '', name: 'Unknown' },
+                                                    dilution: region.dilution
+                                                }))
+                                                .filter(rt => rt.treatment.id && rt.regionIndex !== idx)
+                                            }
+                                            currentRegionIndex={idx}
+                                            currentRegionName={r.name || `Region ${idx + 1}`}
                                         />
                                     )}
                                 </Box>

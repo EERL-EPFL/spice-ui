@@ -21,12 +21,15 @@ import RegionInput from '../components/RegionInput';
  * Once we know the default tray ID, shove it into the form.
  */
 const InjectDefaultTray: React.FC<{ defaultTrayId?: any }> = ({ defaultTrayId }) => {
-    const { setValue, getValues } = useFormContext();
+    const { setValue, getValues, watch } = useFormContext();
+    const currentValue = watch('tray_configuration_id');
+    
     useEffect(() => {
-        if (defaultTrayId != null && !getValues('tray_configuration_id')) {
-            setValue('tray_configuration_id', defaultTrayId);
+        if (defaultTrayId != null && !currentValue) {
+            console.log('Setting default tray configuration ID:', defaultTrayId);
+            setValue('tray_configuration_id', defaultTrayId, { shouldValidate: true });
         }
-    }, [defaultTrayId, setValue, getValues]);
+    }, [defaultTrayId, setValue, currentValue]);
     return null;
 };
 

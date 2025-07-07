@@ -306,17 +306,27 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                         />
                         <text
                             x={rectX + rectW / 2}
-                            y={rectY + rectH / 2 + 5}
+                            y={rectY + rectH / 2}
                             textAnchor="middle"
-                            fontSize="14"
+                            fontSize="12"
                             fontFamily="Arial, sans-serif"
                             fontWeight="600"
                             fill="#000"
                             stroke="#fff"
-                            strokeWidth="3"
+                            strokeWidth="2"
                             paintOrder="stroke fill"
                         >
-                            {region.name || 'Unnamed'}
+                            {(region.name || 'Unnamed').split('\n').map((line, index, lines) => (
+                                <tspan
+                                    key={index}
+                                    x={rectX + rectW / 2}
+                                    dy={index === 0 ? -(lines.length - 1) * 6 : 12}
+                                    fontSize={index === 0 ? "12" : "10"}
+                                    fontWeight={index === 0 ? "600" : "400"}
+                                >
+                                    {line}
+                                </tspan>
+                            ))}
                         </text>
                         {!readOnly && (
                             <>
