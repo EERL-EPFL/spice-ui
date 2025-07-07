@@ -23,6 +23,7 @@ import Dashboard from './Dashboard';
 import './App.css';
 import trays from './trays';
 import treatments from './treatments';
+import phase_changes from './phase_changes';
 
 
 const initOptions: KeycloakInitOptions = { onLoad: 'login-required', checkLoginIframe: false };
@@ -102,6 +103,7 @@ const App = () => {
                             <Resource name="treatments" {...treatments} />
                             <Resource name="experiments" {...experiments} />
                             <Resource name="assets" {...assets} />
+                            <Resource name="phase_change_events" {...phase_changes} />
                         </>
                     ) : null}
                 </>

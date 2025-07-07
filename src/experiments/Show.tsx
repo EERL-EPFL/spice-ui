@@ -24,6 +24,9 @@ import React from "react";
 import { Button, Box } from "@mui/material";
 import DownloadIcon from '@mui/icons-material/Download';
 import { UppyUploader } from "../uploader/Uppy";
+import { PhaseChangeUploader } from "../uploader/PhaseChangeUploader";
+import { TimePointUploader } from "../uploader/TimePointUploader";
+import { TimePointVisualization } from "../components/TimePointVisualization";
 import RegionInput from '../components/RegionInput';
 
 
@@ -316,6 +319,42 @@ export const ShowComponent = () => {
                                 <DateField source="created_at" showTime />
                             </Datagrid>
                         </ReferenceManyField>
+                    </TabbedShowLayout.Tab>
+                    <TabbedShowLayout.Tab label="Time Points">
+                        <Box>
+                            <h3>Upload Phase Change Data</h3>
+                            <TimePointUploader />
+                        </Box>
+                        <Box mt={4}>
+                            <TimePointVisualization />
+                        </Box>
+                    </TabbedShowLayout.Tab>
+                    <TabbedShowLayout.Tab label="Phase Changes (Legacy)">
+                        <Box>
+                            <h3>Upload Phase Change Data (Legacy CSV)</h3>
+                            <PhaseChangeUploader />
+                        </Box>
+                        <Box mt={4}>
+                            <ReferenceManyField
+                                reference="phase_change_events"
+                                target="experiment_id"
+                                label="Phase Change Events"
+                                pagination={<Pagination />}
+                            >
+                                <Datagrid rowClick={false}>
+                                    <TextField source="well_coordinate" label="Well" />
+                                    <FunctionField
+                                        source="phase_state"
+                                        label="State"
+                                        render={(record) => record.phase_state === 1 ? 'Frozen' : 'Liquid'}
+                                    />
+                                    <DateField source="timestamp" showTime label="Time" />
+                                    <ReferenceField source="tray_id" reference="trays" link={false}>
+                                        <TextField source="name" />
+                                    </ReferenceField>
+                                </Datagrid>
+                            </ReferenceManyField>
+                        </Box>
                     </TabbedShowLayout.Tab>
                 </TabbedShowLayout>
             </SimpleShowLayout>

@@ -43,6 +43,7 @@ services:
       - ../crudcrate-derive:/crudcrate-derive
     labels:
       - "traefik.http.routers.spice-api.rule=Host(`spice`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.spice-api.priority=100"
       - "traefik.http.services.spice-api.loadbalancer.server.port=3000"
 
   spice-ui:
@@ -51,6 +52,7 @@ services:
       dockerfile: Dockerfile.dev  # Uses the dockerfile containing yarn dev
     labels:
       - "traefik.http.routers.spice-ui.rule=Host(`spice`)"
+      - "traefik.http.routers.spice-ui.priority=1"
       - "traefik.http.services.spice-ui.loadbalancer.server.port=5173"
     volumes:
       - ../spice-ui:/app

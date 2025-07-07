@@ -16,6 +16,7 @@
     "@mui/icons-material": "^7.1.1",
     "@mui/material": "^7.1.1",
     "@types/js-yaml": "^4.0.9",
+    "@types/xlsx": "^0.0.36",
     "@uppy/core": "^4.4.5",
     "@uppy/dashboard": "^4.3.2",
     "@uppy/drag-drop": "^4.1.1",
@@ -49,7 +50,8 @@
     "react-leaflet-draw": "^0.20.4",
     "react-plotly.js": "^2.6.0",
     "recharts": "^2.9.1",
-    "uppy": "^4.13.4"
+    "uppy": "^4.13.4",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",
