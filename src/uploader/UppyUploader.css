@@ -9,12 +9,7 @@
     /* Custom color for progress bar */
 }
 
-#dragdrop {
-    border: 2px dashed #4caf50;
-    padding: 20px;
-    background-color: #f9f9f9;
-    text-align: center;
-}
+/* Styling now handled in the component via sx prop */
 
 #statusbar {
     margin-top: 20px;

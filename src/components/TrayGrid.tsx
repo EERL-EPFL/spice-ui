@@ -73,6 +73,7 @@ export interface TrayGridProps {
     colorScale?: (value: number | null) => string;
     onWellClick?: (well: WellSummary) => void;
     showTimePointVisualization?: boolean;
+    viewMode?: 'regions' | 'results';
 }
 
 const TrayGrid: React.FC<TrayGridProps> = ({
@@ -87,6 +88,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     colorScale,
     onWellClick,
     showTimePointVisualization = false,
+    viewMode = 'regions',
 }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [startCell, setStartCell] = useState<Cell | null>(null);
@@ -139,11 +141,13 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             if (well?.first_phase_change_seconds !== null) {
                 return colorScale(well.first_phase_change_seconds);
             }
-            return '#f5f5f5';
+            return '#ffcccc';
+        } else if (covered && viewMode === 'regions') {
+            return 'rgba(245,245,245,0.3)'; // More transparent in regions mode
         } else if (covered) {
             return '#f5f5f5';
         }
-        return '#fff';
+        return viewMode === 'regions' ? 'rgba(255,255,255,0.7)' : '#fff'; // Slightly transparent wells in regions mode
     };
 
     // Calculate display dimensions based on orientation
@@ -251,9 +255,9 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             !isCellCovered(row, col) && !isDragging;
     };
 
-    // SVG size: width = (num displayed columns × SPACING + margin), height = (num displayed rows × SPACING + margin + 20 for labels)
+    // SVG size: width = (num displayed columns × SPACING + margin), height = (num displayed rows × SPACING + margin + 30 for labels)
     const svgWidth = displayCols * SPACING + SPACING;
-    const svgHeight = displayRows * SPACING + SPACING + 20;
+    const svgHeight = displayRows * SPACING + SPACING + 30;
 
     // Generate all label positions based on orientation
     const getLabels = () => {
@@ -265,13 +269,13 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             const letter = columnLetters[colIdx] || String.fromCharCode(65 + colIdx);
             const { xIndex } = getDisplayIndices(0, colIdx);
             const cx = SPACING + xIndex * SPACING;
-            topLabels.push({ x: cx, y: 15, label: letter });
+            topLabels.push({ x: cx, y: 12, label: letter });
         }
         for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
             const number = rowIdx + 1;
             const { yIndex } = getDisplayIndices(rowIdx, 0);
             const cy = SPACING + yIndex * SPACING;
-            leftLabels.push({ x: 15, y: cy + 5, label: number });
+            leftLabels.push({ x: 8, y: cy + 5, label: number });
         }
         return { topLabels, leftLabels };
     };
@@ -334,7 +338,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     y={label.y}
                     textAnchor="middle"
                     fontSize="12"
-                    fill="#333"
+                    fill="#000"
+                    fontWeight="bold"
                 >
                     {label.label}
                 </text>
@@ -348,7 +353,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     y={label.y}
                     textAnchor="middle"
                     fontSize="12"
-                    fill="#333"
+                    fill="#000"
+                    fontWeight="bold"
                 >
                     {label.label}
                 </text>
@@ -372,9 +378,10 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 const rectW = (maxX - minX) * SPACING + 2 * CIRCLE_RADIUS;
                 const rectH = (maxY - minY) * SPACING + 2 * CIRCLE_RADIUS;
 
-                // Adjust opacity based on whether we're showing time point visualization
-                const fillOpacity = showTimePointVisualization ? 0.15 : 0.3;
-                const strokeOpacity = showTimePointVisualization ? 0.8 : 1.0;
+                // Adjust opacity based on view mode
+                const fillOpacity = viewMode === 'results' ? 0.1 : 0.3;
+                const strokeOpacity = viewMode === 'results' ? 0.4 : 1.0;
+                const textVisible = viewMode === 'regions';
 
                 return (
                     <g key={`overlay-${idx}`}>
@@ -392,34 +399,36 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                             ry={CIRCLE_RADIUS}
                             style={{ pointerEvents: 'none' }} // Allow clicks to pass through to wells
                         />
-                        <text
-                            x={rectX + rectW / 2}
-                            y={rectY + rectH / 2}
-                            textAnchor="middle"
-                            fontSize="12"
-                            fontFamily="Arial, sans-serif"
-                            fontWeight="600"
-                            fill="#000"
-                            fillOpacity={showTimePointVisualization ? 0.9 : 1.0}
-                            stroke="#fff"
-                            strokeWidth="2"
-                            strokeOpacity={showTimePointVisualization ? 0.8 : 1.0}
-                            paintOrder="stroke fill"
-                            style={{ pointerEvents: 'none' }} // Allow clicks to pass through to wells
-                        >
-                            {(region.name || 'Unnamed').split('\n').map((line, index, lines) => (
-                                <tspan
-                                    key={index}
-                                    x={rectX + rectW / 2}
-                                    dy={index === 0 ? -(lines.length - 1) * 6 : 12}
-                                    fontSize={index === 0 ? "12" : "10"}
-                                    fontWeight={index === 0 ? "600" : "400"}
-                                >
-                                    {line}
-                                </tspan>
-                            ))}
-                        </text>
-                        {!readOnly && (
+                        {textVisible && (
+                            <text
+                                x={rectX + rectW / 2}
+                                y={rectY + rectH / 2}
+                                textAnchor="middle"
+                                fontSize="12"
+                                fontFamily="Arial, sans-serif"
+                                fontWeight="600"
+                                fill="#000"
+                                fillOpacity={1.0}
+                                stroke="#fff"
+                                strokeWidth="2"
+                                strokeOpacity={1.0}
+                                paintOrder="stroke fill"
+                                style={{ pointerEvents: 'none' }} // Allow clicks to pass through to wells
+                            >
+                                {(region.name || 'Unnamed').split('\n').map((line, index, lines) => (
+                                    <tspan
+                                        key={index}
+                                        x={rectX + rectW / 2}
+                                        dy={index === 0 ? -(lines.length - 1) * 6 : 12}
+                                        fontSize={index === 0 ? "12" : "10"}
+                                        fontWeight={index === 0 ? "600" : "400"}
+                                    >
+                                        {line}
+                                    </tspan>
+                                ))}
+                            </text>
+                        )}
+                        {!readOnly && textVisible && (
                             <>
                                 <circle
                                     cx={rectX + rectW - 12}
