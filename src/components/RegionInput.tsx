@@ -1,8 +1,8 @@
 import React, { useCallback, useRef, useState, useMemo } from 'react';
-import { useInput, FieldTitle, useGetOne, Link, useDataProvider, useRecordContext } from 'react-admin';
+import { useInput, FieldTitle, useGetOne, Link, useDataProvider, useRecordContext, useRedirect } from 'react-admin';
 import TrayGrid, { Cell, ExistingRegion, Orientation } from './TrayGrid';
 import { EnhancedTreatmentSelector } from './EnhancedTreatmentSelector';
-import { Box, Typography, TextField, IconButton, Button, Checkbox, FormControlLabel, Card, CardContent, Chip, Grid, Tooltip, Alert, CircularProgress, Tabs, Tab, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { Box, Typography, TextField, IconButton, Button, Checkbox, FormControlLabel, Card, CardContent, Chip, Grid, Tooltip, Alert, CircularProgress, Tabs, Tab, ToggleButton, ToggleButtonGroup, Link as MuiLink } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -190,6 +190,76 @@ const parseYAML = (yamlText: string, trayConfigs: TrayConfig[]): any => {
     }
 
     return result;
+};
+
+// Component to display well details with hyperlink functionality
+const WellDetailsDisplay: React.FC<{
+    well: WellSummary;
+    formatSeconds: (seconds: number) => string;
+}> = ({ well, formatSeconds }) => {
+    const redirect = useRedirect();
+
+    const handleTreatmentClick = () => {
+        if (well.treatment_id) {
+            redirect('show', 'treatments', well.treatment_id);
+        }
+    };
+
+    return (
+        <Box 
+            mt={3} 
+            p={2} 
+            borderRadius={1}
+            sx={{ 
+                backgroundColor: 'action.hover',
+                border: 1,
+                borderColor: 'divider'
+            }}
+        >
+            <Typography variant="subtitle2" gutterBottom color="text.primary">
+                Well {well.coordinate}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+                <strong>State:</strong> {well.final_state}
+            </Typography>
+            {well.first_phase_change_seconds !== null && (
+                <Typography variant="body2" color="text.secondary">
+                    <strong>Freezing time:</strong> {formatSeconds(well.first_phase_change_seconds)}
+                </Typography>
+            )}
+            {well.sample_name && (
+                <Typography variant="body2" color="text.secondary">
+                    <strong>Sample:</strong> {well.sample_name}
+                </Typography>
+            )}
+            {well.treatment_name && (
+                <Typography variant="body2" color="text.secondary">
+                    <strong>Treatment:</strong> {' '}
+                    {well.treatment_id ? (
+                        <MuiLink 
+                            component="button" 
+                            variant="body2" 
+                            onClick={handleTreatmentClick}
+                            sx={{ 
+                                cursor: 'pointer',
+                                textDecoration: 'underline',
+                                color: 'primary.main'
+                            }}
+                        >
+                            {well.treatment_name}
+                        </MuiLink>
+                    ) : (
+                        well.treatment_name
+                    )}
+                </Typography>
+            )}
+            {well.dilution_factor && (
+                <Typography variant="body2" color="text.secondary">
+                    <strong>Dilution:</strong> {well.dilution_factor}
+                </Typography>
+            )}
+        </Box>
+    );
 };
 
 // Component to display treatment information in read-only mode
@@ -383,6 +453,35 @@ export const RegionInput: React.FC<{
         });
         return map;
     }, [resultsSummary, showTimePointVisualization]);
+
+    // Function to fetch average temperature for each tray
+    const [trayTemperatures, setTrayTemperatures] = useState<Map<number, number>>(new Map());
+
+    React.useEffect(() => {
+        const fetchTrayTemperatures = async () => {
+            if (!record?.id || !showTimePointVisualization) return;
+
+            try {
+                // Fetch temperature data for the experiment
+                const response = await dataProvider.getOne('experiments', {
+                    id: record.id,
+                    meta: { include_temperature_summary: true }
+                });
+
+                if (response.data?.temperature_summary?.average_temperatures_by_tray) {
+                    const tempMap = new Map<number, number>();
+                    response.data.temperature_summary.average_temperatures_by_tray.forEach((temp: { tray_id: number; avg_temperature: number }) => {
+                        tempMap.set(temp.tray_id, temp.avg_temperature);
+                    });
+                    setTrayTemperatures(tempMap);
+                }
+            } catch (error) {
+                console.error('Error fetching tray temperatures:', error);
+            }
+        };
+
+        fetchTrayTemperatures();
+    }, [record?.id, showTimePointVisualization, dataProvider]);
 
     const formatSeconds = (seconds: number) => {
         const minutes = Math.floor(seconds / 60);
@@ -873,6 +972,11 @@ export const RegionInput: React.FC<{
                             <Box key={index} minWidth="280px" display="flex" flexDirection="column" alignItems="center">
                                 <Typography variant="caption" fontWeight="medium" marginBottom={1.5} textAlign="center">
                                     {trayName} ({rotation}°)
+                                    {trayTemperatures.has(trayConfig.order_sequence) && (
+                                        <span style={{ display: 'block', fontSize: '0.8rem', color: '#666' }}>
+                                            Avg: {trayTemperatures.get(trayConfig.order_sequence)?.toFixed(1)}°C
+                                        </span>
+                                    )}
                                 </Typography>
                                 <TrayGrid
                                     tray={trayName}
@@ -1250,43 +1354,10 @@ export const RegionInput: React.FC<{
 
                         {/* Selected Well Details */}
                         {selectedWell && (
-                            <Box 
-                                mt={3} 
-                                p={2} 
-                                borderRadius={1}
-                                sx={{ 
-                                    backgroundColor: 'action.hover',
-                                    border: 1,
-                                    borderColor: 'divider'
-                                }}
-                            >
-                                <Typography variant="subtitle2" gutterBottom color="text.primary">
-                                    Well {selectedWell.coordinate}
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    <strong>State:</strong> {selectedWell.final_state}
-                                </Typography>
-                                {selectedWell.first_phase_change_seconds !== null && (
-                                    <Typography variant="body2" color="text.secondary">
-                                        <strong>Freezing time:</strong> {formatSeconds(selectedWell.first_phase_change_seconds)}
-                                    </Typography>
-                                )}
-                                {selectedWell.sample_name && (
-                                    <Typography variant="body2" color="text.secondary">
-                                        <strong>Sample:</strong> {selectedWell.sample_name}
-                                    </Typography>
-                                )}
-                                {selectedWell.treatment_name && (
-                                    <Typography variant="body2" color="text.secondary">
-                                        <strong>Treatment:</strong> {selectedWell.treatment_name}
-                                    </Typography>
-                                )}
-                                {selectedWell.dilution_factor && (
-                                    <Typography variant="body2" color="text.secondary">
-                                        <strong>Dilution:</strong> {selectedWell.dilution_factor}
-                                    </Typography>
-                                )}
-                            </Box>
+                            <WellDetailsDisplay 
+                                well={selectedWell} 
+                                formatSeconds={formatSeconds}
+                            />
                         )}
                         </Box>
                     )}

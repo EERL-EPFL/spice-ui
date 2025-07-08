@@ -20,7 +20,7 @@ import {
     Labeled,
     useGetOne,
 } from "react-admin";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Button, Box, Card, CardContent, Typography } from "@mui/material";
 import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -284,6 +284,63 @@ const CompactUploader: React.FC<{
     );
 };
 
+const TabbedContent = () => {
+    const record = useRecordContext();
+    const [currentTab, setCurrentTab] = useState(0);
+    const [hasAutoSwitched, setHasAutoSwitched] = useState(false);
+    
+    // Check if results are available
+    const hasResults = record?.results_summary && record.results_summary.total_time_points > 0;
+    
+    // Force re-render when results become available
+    useEffect(() => {
+        if (hasResults && !hasAutoSwitched) {
+            // Force re-render by switching tab temporarily
+            setCurrentTab(1);
+            setTimeout(() => {
+                setCurrentTab(0);
+            }, 100);
+            setHasAutoSwitched(true);
+        }
+    }, [hasResults, hasAutoSwitched]);
+
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+        setCurrentTab(newValue);
+    };
+
+    return (
+        <TabbedShowLayout syncWithLocation={false} value={currentTab} onChange={handleTabChange}>
+            <TabbedShowLayout.Tab label={hasResults ? "Results" : "Regions"}>
+                <ExportRegionsButton />
+                <RegionsDisplay />
+            </TabbedShowLayout.Tab>
+            <TabbedShowLayout.Tab label="Asset list">
+                <DownloadAllButton />
+                <ReferenceManyField
+                    reference="assets"
+                    target="experiment_id"
+                    label="Tags"
+                    pagination={<Pagination />}
+                >
+                    <Datagrid rowClick={false}>
+                        <TextField source="original_filename" />
+                        <TextField source="type" />
+                        <FunctionField
+                            source="size_bytes"
+                            render={(record) =>
+                                record.size_bytes
+                                    ? `${(record.size_bytes / 1024 / 1024).toFixed(2)} MB`
+                                    : ""
+                            }
+                        />
+                        <DateField source="created_at" showTime />
+                    </Datagrid>
+                </ReferenceManyField>
+            </TabbedShowLayout.Tab>
+        </TabbedShowLayout>
+    );
+};
+
 export const ShowComponent = () => {
     return (
         <Show actions={<ShowComponentActions />}>
@@ -349,35 +406,7 @@ export const ShowComponent = () => {
                         />
                     </Box>
                 </Box>
-                <TabbedShowLayout>
-                    <TabbedShowLayout.Tab label="Regions & Results">
-                        <ExportRegionsButton />
-                        <RegionsDisplay />
-                    </TabbedShowLayout.Tab>
-                    <TabbedShowLayout.Tab label="Asset list">
-                        <DownloadAllButton />
-                        <ReferenceManyField
-                            reference="assets"
-                            target="experiment_id"
-                            label="Tags"
-                            pagination={<Pagination />}
-                        >
-                            <Datagrid rowClick={false}>
-                                <TextField source="original_filename" />
-                                <TextField source="type" />
-                                <FunctionField
-                                    source="size_bytes"
-                                    render={(record) =>
-                                        record.size_bytes
-                                            ? `${(record.size_bytes / 1024 / 1024).toFixed(2)} MB`
-                                            : ""
-                                    }
-                                />
-                                <DateField source="created_at" showTime />
-                            </Datagrid>
-                        </ReferenceManyField>
-                    </TabbedShowLayout.Tab>
-                </TabbedShowLayout>
+                <TabbedContent />
             </SimpleShowLayout>
         </Show>
     );

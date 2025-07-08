@@ -57,6 +57,7 @@ export interface WellSummary {
     final_state: string;
     sample_name: string | null;
     treatment_name: string | null;
+    treatment_id?: string;
     dilution_factor: number | null;
 }
 
