@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { Box } from '@mui/material';
 import {
     useAuthProvider,
     useNotify,
@@ -14,7 +15,7 @@ import '@uppy/drag-drop/dist/style.min.css';
 import '@uppy/status-bar/dist/style.min.css';
 import './UppyUploader.css'; // Import custom CSS
 
-export const UppyUploader = () => {
+export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) => {
     const record = useRecordContext();
     if (!record) {
         return null;
@@ -25,9 +26,9 @@ export const UppyUploader = () => {
     const refresh = useRefresh();
     const notify = useNotify();
     const pondRef = useRef(null);
-    const instructionText = `
-        Drop related assets to this experiment
-    `;
+    const instructionText = compact 
+        ? 'Drop files or click to browse'
+        : 'Drop related assets to this experiment';
     const headers = {
         authorization: `Bearer ${token}`,
     };
@@ -53,9 +54,9 @@ export const UppyUploader = () => {
     }));
 
     return (
-        <>
+        <Box sx={{ '& #dragdrop': compact ? { padding: '12px', fontSize: '0.875rem' } : {} }}>
             <DragDrop id="dragdrop" uppy={uppy} note={instructionText} />
             <StatusBar id="statusbar" uppy={uppy} />
-        </>
+        </Box>
     );
 };

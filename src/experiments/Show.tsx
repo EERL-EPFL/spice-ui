@@ -21,12 +21,13 @@ import {
     useGetOne,
 } from "react-admin";
 import React from "react";
-import { Button, Box } from "@mui/material";
+import { Button, Box, Card, CardContent, Typography } from "@mui/material";
 import DownloadIcon from '@mui/icons-material/Download';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import DescriptionIcon from '@mui/icons-material/Description';
 import { UppyUploader } from "../uploader/Uppy";
 import { PhaseChangeUploader } from "../uploader/PhaseChangeUploader";
-import { TimePointUploader } from "../uploader/TimePointUploader";
-import { TimePointVisualization } from "../components/TimePointVisualization";
+import OptimizedExcelUploader from "../uploader/OptimizedExcelUploader";
 import RegionInput from '../components/RegionInput';
 
 
@@ -112,13 +113,17 @@ const RegionsDisplay = () => {
         return <div>No regions defined for this experiment.</div>;
     }
 
+    // Check if we have time point data to show visualization
+    const hasTimePointData = record?.results_summary && record.results_summary.total_time_points > 0;
+
     return (
         <RegionInput
             source="regions"
-            label="Experiment Well Regions"
+            label={hasTimePointData ? "Experiment Regions & Time Point Results" : "Experiment Well Regions"}
             trayConfiguration={trayConfiguration}
             readOnly={true}
             value={record.regions}
+            showTimePointVisualization={hasTimePointData}
         />
     );
 };
@@ -174,19 +179,19 @@ const ExportRegionsButton = () => {
             const colLetter = String.fromCharCode(65 + (region.col_min || 0)); // A, B, C...
             const rowNumber = (region.row_min || 0) + 1; // 1, 2, 3...
             const upperLeft = `${colLetter}${rowNumber}`;
-            
+
             const colLetterMax = String.fromCharCode(65 + (region.col_max || 0));
             const rowNumberMax = (region.row_max || 0) + 1;
             const lowerRight = `${colLetterMax}${rowNumberMax}`;
 
             // Find the actual tray name from the tray configuration
             let trayName = `Tray_${effectiveTrayId}`;
-            
+
             if (trayConfiguration?.trays && Array.isArray(trayConfiguration.trays)) {
                 const trayConfigInfo = trayConfiguration.trays.find(tc => {
                     return tc.order_sequence === effectiveTrayId;
                 });
-                
+
                 if (trayConfigInfo && trayConfigInfo.trays && trayConfigInfo.trays.length > 0) {
                     const foundTrayName = trayConfigInfo.trays[0].name;
                     if (foundTrayName) {
@@ -240,6 +245,45 @@ const ExportRegionsButton = () => {
     );
 };
 
+// Compact uploader wrapper component
+const CompactUploader: React.FC<{
+    title: string;
+    description: string;
+    component: React.ReactNode;
+    icon: React.ReactNode;
+    color: 'primary' | 'secondary';
+}> = ({ title, description, component, icon, color }) => {
+    return (
+        <Card 
+            sx={{ 
+                minHeight: '120px',
+                border: `1px solid`,
+                borderColor: color === 'primary' ? 'primary.main' : 'secondary.main',
+                '&:hover': {
+                    boxShadow: 2
+                }
+            }}
+        >
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Box display="flex" alignItems="center" gap={1} mb={1}>
+                    <Box sx={{ color: color === 'primary' ? 'primary.main' : 'secondary.main' }}>
+                        {icon}
+                    </Box>
+                    <Typography variant="subtitle2" fontWeight="bold">
+                        {title}
+                    </Typography>
+                </Box>
+                <Typography variant="caption" color="text.secondary" display="block" mb={1.5}>
+                    {description}
+                </Typography>
+                <Box sx={{ '& > *': { transform: 'scale(0.85)', transformOrigin: 'top left', width: '117.6%' } }}>
+                    {component}
+                </Box>
+            </CardContent>
+        </Card>
+    );
+};
+
 export const ShowComponent = () => {
     return (
         <Show actions={<ShowComponentActions />}>
@@ -287,13 +331,26 @@ export const ShowComponent = () => {
                             </Labeled>
                         </Box>
                     </Box>
-                    {/* Right column with uploader */}
-                    <Box flex={1}>
-                        <UppyUploader />
+                    {/* Right column with uploaders */}
+                    <Box flex={1} display="flex" flexDirection="column" gap={2}>
+                        <CompactUploader 
+                            title="Phase Change Data" 
+                            description="Upload merged.xlsx file with temperature and well state data"
+                            component={<OptimizedExcelUploader compact={true} />}
+                            icon={<DescriptionIcon />}
+                            color="primary"
+                        />
+                        <CompactUploader 
+                            title="Related Assets" 
+                            description="Drop any related files to this experiment (images, docs, etc.)"
+                            component={<UppyUploader compact={true} />}
+                            icon={<CloudUploadIcon />}
+                            color="secondary"
+                        />
                     </Box>
                 </Box>
                 <TabbedShowLayout>
-                    <TabbedShowLayout.Tab label="Regions">
+                    <TabbedShowLayout.Tab label="Regions & Results">
                         <ExportRegionsButton />
                         <RegionsDisplay />
                     </TabbedShowLayout.Tab>
@@ -319,42 +376,6 @@ export const ShowComponent = () => {
                                 <DateField source="created_at" showTime />
                             </Datagrid>
                         </ReferenceManyField>
-                    </TabbedShowLayout.Tab>
-                    <TabbedShowLayout.Tab label="Time Points">
-                        <Box>
-                            <h3>Upload Phase Change Data</h3>
-                            <TimePointUploader />
-                        </Box>
-                        <Box mt={4}>
-                            <TimePointVisualization />
-                        </Box>
-                    </TabbedShowLayout.Tab>
-                    <TabbedShowLayout.Tab label="Phase Changes (Legacy)">
-                        <Box>
-                            <h3>Upload Phase Change Data (Legacy CSV)</h3>
-                            <PhaseChangeUploader />
-                        </Box>
-                        <Box mt={4}>
-                            <ReferenceManyField
-                                reference="phase_change_events"
-                                target="experiment_id"
-                                label="Phase Change Events"
-                                pagination={<Pagination />}
-                            >
-                                <Datagrid rowClick={false}>
-                                    <TextField source="well_coordinate" label="Well" />
-                                    <FunctionField
-                                        source="phase_state"
-                                        label="State"
-                                        render={(record) => record.phase_state === 1 ? 'Frozen' : 'Liquid'}
-                                    />
-                                    <DateField source="timestamp" showTime label="Time" />
-                                    <ReferenceField source="tray_id" reference="trays" link={false}>
-                                        <TextField source="name" />
-                                    </ReferenceField>
-                                </Datagrid>
-                            </ReferenceManyField>
-                        </Box>
                     </TabbedShowLayout.Tab>
                 </TabbedShowLayout>
             </SimpleShowLayout>

@@ -1,11 +1,28 @@
-import React, { useCallback, useRef } from 'react';
-import { useInput, FieldTitle, useGetOne, Link, useDataProvider } from 'react-admin';
+import React, { useCallback, useRef, useState, useMemo } from 'react';
+import { useInput, FieldTitle, useGetOne, Link, useDataProvider, useRecordContext } from 'react-admin';
 import TrayGrid, { Cell, ExistingRegion, Orientation } from './TrayGrid';
 import { EnhancedTreatmentSelector } from './EnhancedTreatmentSelector';
-import { Box, Typography, TextField, IconButton, Button, Checkbox, FormControlLabel } from '@mui/material';
+import { Box, Typography, TextField, IconButton, Button, Checkbox, FormControlLabel, Card, CardContent, Chip, Grid, Tooltip, Alert, CircularProgress } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DownloadIcon from '@mui/icons-material/Download';
+import { scaleSequential } from 'd3-scale';
+import { interpolateBlues } from 'd3-scale-chromatic';
+
+// Import the WellSummary interface from TrayGrid
+import { WellSummary } from './TrayGrid';
+
+// Interface for experiment results summary
+interface ExperimentResultsSummary {
+    total_wells: number;
+    wells_with_data: number;
+    wells_frozen: number;
+    wells_liquid: number;
+    total_time_points: number;
+    first_timestamp: string | null;
+    last_timestamp: string | null;
+    well_summaries: WellSummary[];
+}
 
 // Generate dynamic column letters based on tray dimensions
 const generateColumnLetters = (maxCols: number): string[] => {
@@ -229,6 +246,7 @@ const TreatmentDisplay: React.FC<{
     );
 };
 
+
 export const RegionInput: React.FC<{
     source: string;
     label?: string;
@@ -236,8 +254,10 @@ export const RegionInput: React.FC<{
     readOnly?: boolean;
     value?: any; // Allow direct value prop for display mode
     validate?: (value: any) => string | undefined; // Add validate prop
+    showTimePointVisualization?: boolean; // Add option to show time point data
 }> = (props) => {
     const dataProvider = useDataProvider();
+    const record = useRecordContext(); // Get the current experiment record for time point data
     // Always call useInput to maintain consistent hook order, but handle errors gracefully
     let inputResult;
     try {
@@ -310,7 +330,66 @@ export const RegionInput: React.FC<{
     const fileInputRef = useRef<HTMLInputElement>(null);
     // Add refs for inputs to maintain focus
     const inputRefs = useRef<{ [key: string]: React.RefObject<HTMLInputElement> }>({});
-    const { trayConfiguration, readOnly = false } = props;
+    const { trayConfiguration, readOnly = false, showTimePointVisualization = false } = props;
+    const [selectedWell, setSelectedWell] = useState<WellSummary | null>(null);
+
+    // Extract results summary from the experiment record for time point visualization
+    const resultsSummary: ExperimentResultsSummary | null = record?.results_summary || null;
+
+    // Calculate color scale based on freezing times for time point visualization
+    const { colorScale, minSeconds, maxSeconds } = useMemo(() => {
+        if (!showTimePointVisualization || !resultsSummary?.well_summaries) {
+            return { colorScale: () => '#f5f5f5', minSeconds: 0, maxSeconds: 0 };
+        }
+
+        const freezingTimes = resultsSummary.well_summaries
+            .filter(w => w.first_phase_change_seconds !== null)
+            .map(w => w.first_phase_change_seconds!);
+
+        if (freezingTimes.length === 0) {
+            return { colorScale: () => '#f5f5f5', minSeconds: 0, maxSeconds: 0 };
+        }
+
+        const min = Math.min(...freezingTimes);
+        const max = Math.max(...freezingTimes);
+
+        // Create a color scale from light blue (early freeze) to dark blue (late freeze)
+        const scale = scaleSequential(interpolateBlues)
+            .domain([min, max]);
+
+        return { 
+            colorScale: (value: number | null) => {
+                if (value === null) return '#f5f5f5';
+                return scale(value);
+            },
+            minSeconds: min,
+            maxSeconds: max
+        };
+    }, [resultsSummary, showTimePointVisualization]);
+
+    // Create well summary lookup for tooltip data
+    const wellSummaryMap = useMemo(() => {
+        if (!showTimePointVisualization || !resultsSummary?.well_summaries) {
+            return new Map();
+        }
+        
+        const map = new Map<string, WellSummary>();
+        resultsSummary.well_summaries.forEach(well => {
+            const key = `${well.row}-${well.col}`;
+            map.set(key, well);
+        });
+        return map;
+    }, [resultsSummary, showTimePointVisualization]);
+
+    const formatSeconds = (seconds: number) => {
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${minutes}m ${secs}s`;
+    };
+
+    const formatDateTime = (timestamp: string) => {
+        return new Date(timestamp).toLocaleString();
+    };
 
     // Initialize or update input refs when regions change
     React.useEffect(() => {
@@ -732,6 +811,130 @@ export const RegionInput: React.FC<{
                 isRequired={isRequired}
             />
 
+            {/* Show experiment summary when time point visualization is enabled */}
+            {showTimePointVisualization && resultsSummary && (
+                <Grid container spacing={2} mb={2}>
+                    <Grid item xs={12}>
+                        <Card>
+                            <CardContent>
+                                <Typography variant="h6" gutterBottom>
+                                    Results Visualization ({resultsSummary.total_time_points} time points)
+                                </Typography>
+                                <Box display="flex" gap={1} flexWrap="wrap">
+                                    <Chip 
+                                        label={`${resultsSummary.total_time_points} time points`}
+                                        color="primary"
+                                        size="small"
+                                    />
+                                    <Chip 
+                                        label={`${resultsSummary.wells_with_data} wells with data`}
+                                        color="info"
+                                        size="small"
+                                    />
+                                    <Chip 
+                                        label={`${resultsSummary.wells_frozen} frozen wells`}
+                                        color="warning"
+                                        size="small"
+                                    />
+                                    <Chip 
+                                        label={`${resultsSummary.wells_liquid} liquid wells`}
+                                        color="success"
+                                        size="small"
+                                    />
+                                </Box>
+                                
+                                {resultsSummary.first_timestamp && (
+                                    <Box mt={2}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            <strong>Start:</strong> {formatDateTime(resultsSummary.first_timestamp)}
+                                        </Typography>
+                                        {resultsSummary.last_timestamp && (
+                                            <Typography variant="body2" color="text.secondary">
+                                                <strong>End:</strong> {formatDateTime(resultsSummary.last_timestamp)}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                )}
+
+                                {/* Color Scale Legend */}
+                                {minSeconds > 0 && (
+                                    <Box mt={2}>
+                                        <Typography variant="subtitle2" gutterBottom>
+                                            Freezing Time Scale
+                                        </Typography>
+                                        <Box display="flex" alignItems="center" gap={1}>
+                                            <Box 
+                                                width={20} 
+                                                height={20} 
+                                                bgcolor={colorScale(minSeconds)}
+                                                border="1px solid #ccc"
+                                            />
+                                            <Typography variant="caption">
+                                                {formatSeconds(minSeconds)} (early freeze)
+                                            </Typography>
+                                        </Box>
+                                        <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+                                            <Box 
+                                                width={20} 
+                                                height={20} 
+                                                bgcolor={colorScale(maxSeconds)}
+                                                border="1px solid #ccc"
+                                            />
+                                            <Typography variant="caption">
+                                                {formatSeconds(maxSeconds)} (late freeze)
+                                            </Typography>
+                                        </Box>
+                                        <Box display="flex" alignItems="center" gap={1} mt={0.5}>
+                                            <Box 
+                                                width={20} 
+                                                height={20} 
+                                                bgcolor="#f5f5f5"
+                                                border="1px solid #ccc"
+                                            />
+                                            <Typography variant="caption">
+                                                No freeze / No data
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                )}
+
+                                {/* Selected Well Details */}
+                                {selectedWell && (
+                                    <Box mt={3} p={2} bgcolor="grey.50" borderRadius={1}>
+                                        <Typography variant="subtitle2" gutterBottom>
+                                            Well {selectedWell.coordinate}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            <strong>State:</strong> {selectedWell.final_state}
+                                        </Typography>
+                                        {selectedWell.first_phase_change_seconds !== null && (
+                                            <Typography variant="body2">
+                                                <strong>Freezing time:</strong> {formatSeconds(selectedWell.first_phase_change_seconds)}
+                                            </Typography>
+                                        )}
+                                        {selectedWell.sample_name && (
+                                            <Typography variant="body2">
+                                                <strong>Sample:</strong> {selectedWell.sample_name}
+                                            </Typography>
+                                        )}
+                                        {selectedWell.treatment_name && (
+                                            <Typography variant="body2">
+                                                <strong>Treatment:</strong> {selectedWell.treatment_name}
+                                            </Typography>
+                                        )}
+                                        {selectedWell.dilution_factor && (
+                                            <Typography variant="body2">
+                                                <strong>Dilution:</strong> {selectedWell.dilution_factor}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </Grid>
+                </Grid>
+            )}
+
             <Box display="flex" gap={2} alignItems="flex-start">
                 {/* Render dynamic trays with minimal spacing */}
                 <Box display="flex" gap={0.5} flexWrap="wrap" flex={1}>
@@ -768,7 +971,7 @@ export const RegionInput: React.FC<{
 
                         return (
                             <Box key={index} minWidth="280px" display="flex" flexDirection="column" alignItems="center">
-                                <Typography variant="caption" fontWeight="medium" marginBottom={0.25} textAlign="center">
+                                <Typography variant="caption" fontWeight="medium" marginBottom={1.5} textAlign="center">
                                     {trayName} ({rotation}°)
                                 </Typography>
                                 <TrayGrid
@@ -785,6 +988,10 @@ export const RegionInput: React.FC<{
                                     })}
                                     existingRegions={existingRegions}
                                     readOnly={readOnly}
+                                    wellSummaryMap={wellSummaryMap}
+                                    colorScale={colorScale}
+                                    onWellClick={setSelectedWell}
+                                    showTimePointVisualization={showTimePointVisualization}
                                 />
                             </Box>
                         );

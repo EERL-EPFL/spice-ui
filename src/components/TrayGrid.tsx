@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Tooltip } from '@mui/material';
 
 //
 // Renders a dynamic tray of wells with deep, colorblind-safe overlays.
@@ -45,6 +46,20 @@ export interface ExistingRegion {
 
 export type Orientation = 0 | 90 | 180 | 270;
 
+// Interface for well summary data from time point visualization
+export interface WellSummary {
+    row: number;
+    col: number;
+    coordinate: string;
+    tray_id?: string;
+    first_phase_change_time: string | null;
+    first_phase_change_seconds: number | null;
+    final_state: string;
+    sample_name: string | null;
+    treatment_name: string | null;
+    dilution_factor: number | null;
+}
+
 export interface TrayGridProps {
     tray: string;
     qtyXAxis: number;
@@ -53,6 +68,11 @@ export interface TrayGridProps {
     onRegionSelect: (region: { tray: string; upperLeft: Cell; lowerRight: Cell }) => void;
     existingRegions?: ExistingRegion[];
     readOnly?: boolean; // Add explicit readOnly prop
+    // Time point visualization props
+    wellSummaryMap?: Map<string, WellSummary>;
+    colorScale?: (value: number | null) => string;
+    onWellClick?: (well: WellSummary) => void;
+    showTimePointVisualization?: boolean;
 }
 
 const TrayGrid: React.FC<TrayGridProps> = ({
@@ -63,6 +83,10 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     onRegionSelect,
     existingRegions = [],
     readOnly = false,
+    wellSummaryMap,
+    colorScale,
+    onWellClick,
+    showTimePointVisualization = false,
 }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [startCell, setStartCell] = useState<Cell | null>(null);
@@ -73,6 +97,54 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     const isDisplayMode = readOnly;
 
     const columnLetters = generateColumnLetters(qtyXAxis);
+
+    // Helper function to get well summary for a cell
+    const getWellSummary = (row: number, col: number): WellSummary | undefined => {
+        if (!showTimePointVisualization || !wellSummaryMap) return undefined;
+        const key = `${row + 1}-${col + 1}`; // Convert to 1-indexed coordinates
+        return wellSummaryMap.get(key);
+    };
+
+    // Helper function to get tooltip text for a well
+    const getTooltipText = (row: number, col: number): string => {
+        const well = getWellSummary(row, col);
+        const coordinate = `${String.fromCharCode(65 + col)}${row + 1}`;
+        
+        if (!well) return `${coordinate}: No data`;
+        
+        const phaseText = well.final_state === 'frozen' ? 'Frozen' : 'Liquid';
+        let tooltip = `${coordinate}: ${phaseText}`;
+        
+        if (well.first_phase_change_seconds !== null) {
+            const minutes = Math.floor(well.first_phase_change_seconds / 60);
+            const seconds = well.first_phase_change_seconds % 60;
+            tooltip += `\nFreezing time: ${minutes}m ${seconds}s`;
+        }
+        
+        if (well.sample_name) tooltip += `\nSample: ${well.sample_name}`;
+        if (well.treatment_name) tooltip += `\nTreatment: ${well.treatment_name}`;
+        if (well.dilution_factor) tooltip += `\nDilution: ${well.dilution_factor}`;
+        
+        return tooltip;
+    };
+
+    // Helper function to get well background color
+    const getWellColor = (row: number, col: number, selected: boolean, hovered: boolean, covered: boolean): string => {
+        if (selected) {
+            return 'rgba(0,128,255,0.5)';
+        } else if (hovered) {
+            return 'rgba(0,128,255,0.2)';
+        } else if (showTimePointVisualization && colorScale) {
+            const well = getWellSummary(row, col);
+            if (well?.first_phase_change_seconds !== null) {
+                return colorScale(well.first_phase_change_seconds);
+            }
+            return '#f5f5f5';
+        } else if (covered) {
+            return '#f5f5f5';
+        }
+        return '#fff';
+    };
 
     // Calculate display dimensions based on orientation
     const isRotated90or270 = orientation === 90 || orientation === 270;
@@ -103,6 +175,15 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     };
 
     const handleMouseDown = (row: number, col: number) => {
+        // If in time point visualization mode and there's a well click handler, handle click
+        if (showTimePointVisualization && onWellClick) {
+            const well = getWellSummary(row, col);
+            if (well) {
+                onWellClick(well);
+                return;
+            }
+        }
+
         // Don't allow selection on covered cells
         if (isCellCovered(row, col)) return;
 
@@ -197,6 +278,43 @@ const TrayGrid: React.FC<TrayGridProps> = ({
 
     const { topLabels, leftLabels } = getLabels();
 
+    // Create wells render function to use in two places
+    const renderWells = (onTop = false) => Array.from({ length: qtyYAxis }).map((_, rowIdx) =>
+        Array.from({ length: qtyXAxis }).map((_, colIdx) => {
+            const { xIndex, yIndex } = getDisplayIndices(rowIdx, colIdx);
+            const cx = SPACING + xIndex * SPACING;
+            const cy = SPACING + yIndex * SPACING;
+            const selected = !isDisplayMode && isCellInSelection(rowIdx, colIdx);
+            const hovered = !isDisplayMode && isCellHovered(rowIdx, colIdx);
+            const covered = isCellCovered(rowIdx, colIdx);
+            const well = getWellSummary(rowIdx, colIdx);
+
+            const fillColor = getWellColor(rowIdx, colIdx, selected, hovered, covered);
+
+            return (
+                <circle
+                    key={`circle-${onTop ? 'top-' : ''}${rowIdx}-${colIdx}`}
+                    cx={cx}
+                    cy={cy}
+                    r={CIRCLE_RADIUS}
+                    fill={fillColor}
+                    stroke={showTimePointVisualization && well ? "#666" : "#333"}
+                    strokeWidth={showTimePointVisualization && well ? 2 : 1}
+                    style={{
+                        cursor: isDisplayMode ? 
+                            (showTimePointVisualization && well ? 'pointer' : 'default') : 
+                            (covered ? 'not-allowed' : 'pointer')
+                    }}
+                    onMouseDown={isDisplayMode ? 
+                        (showTimePointVisualization ? () => handleMouseDown(rowIdx, colIdx) : undefined) : 
+                        () => handleMouseDown(rowIdx, colIdx)}
+                    onMouseEnter={isDisplayMode ? undefined : () => handleMouseEnter(rowIdx, colIdx)}
+                    onMouseLeave={isDisplayMode ? undefined : handleMouseLeaveCell}
+                />
+            );
+        })
+    );
+
     return (
         <svg
             width={svgWidth}
@@ -205,44 +323,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             onMouseUp={isDisplayMode ? undefined : handleMouseUp}
             onMouseLeave={isDisplayMode ? undefined : handleMouseLeave}
         >
-            {/* 1) Draw all wells (circles) */}
-            {Array.from({ length: qtyYAxis }).map((_, rowIdx) =>
-                Array.from({ length: qtyXAxis }).map((_, colIdx) => {
-                    const { xIndex, yIndex } = getDisplayIndices(rowIdx, colIdx);
-                    const cx = SPACING + xIndex * SPACING;
-                    const cy = SPACING + yIndex * SPACING;
-                    const selected = !isDisplayMode && isCellInSelection(rowIdx, colIdx);
-                    const hovered = !isDisplayMode && isCellHovered(rowIdx, colIdx);
-                    const covered = isCellCovered(rowIdx, colIdx);
-
-                    let fillColor = '#fff';
-                    if (selected) {
-                        fillColor = 'rgba(0,128,255,0.5)';
-                    } else if (hovered) {
-                        fillColor = 'rgba(0,128,255,0.2)';
-                    } else if (covered) {
-                        fillColor = '#f5f5f5';
-                    }
-
-                    return (
-                        <circle
-                            key={`circle-${rowIdx}-${colIdx}`}
-                            cx={cx}
-                            cy={cy}
-                            r={CIRCLE_RADIUS}
-                            fill={fillColor}
-                            stroke="#333"
-                            strokeWidth={1}
-                            style={{
-                                cursor: isDisplayMode ? 'default' : (covered ? 'not-allowed' : 'pointer')
-                            }}
-                            onMouseDown={isDisplayMode ? undefined : () => handleMouseDown(rowIdx, colIdx)}
-                            onMouseEnter={isDisplayMode ? undefined : () => handleMouseEnter(rowIdx, colIdx)}
-                            onMouseLeave={isDisplayMode ? undefined : handleMouseLeaveCell}
-                        />
-                    );
-                })
-            )}
+            {/* 1) Draw wells first (they will be under regions if not in time point mode) */}
+            {!showTimePointVisualization && renderWells(false)}
 
             {/* 2) Top Labels */}
             {topLabels.map((label, idx) => (
@@ -290,6 +372,10 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 const rectW = (maxX - minX) * SPACING + 2 * CIRCLE_RADIUS;
                 const rectH = (maxY - minY) * SPACING + 2 * CIRCLE_RADIUS;
 
+                // Adjust opacity based on whether we're showing time point visualization
+                const fillOpacity = showTimePointVisualization ? 0.15 : 0.3;
+                const strokeOpacity = showTimePointVisualization ? 0.8 : 1.0;
+
                 return (
                     <g key={`overlay-${idx}`}>
                         <rect
@@ -298,11 +384,13 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                             width={rectW}
                             height={rectH}
                             fill={region.color}
-                            fillOpacity={0.3}
+                            fillOpacity={fillOpacity}
                             stroke={region.color}
+                            strokeOpacity={strokeOpacity}
                             strokeWidth={2}
                             rx={CIRCLE_RADIUS}
                             ry={CIRCLE_RADIUS}
+                            style={{ pointerEvents: 'none' }} // Allow clicks to pass through to wells
                         />
                         <text
                             x={rectX + rectW / 2}
@@ -312,9 +400,12 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                             fontFamily="Arial, sans-serif"
                             fontWeight="600"
                             fill="#000"
+                            fillOpacity={showTimePointVisualization ? 0.9 : 1.0}
                             stroke="#fff"
                             strokeWidth="2"
+                            strokeOpacity={showTimePointVisualization ? 0.8 : 1.0}
                             paintOrder="stroke fill"
+                            style={{ pointerEvents: 'none' }} // Allow clicks to pass through to wells
                         >
                             {(region.name || 'Unnamed').split('\n').map((line, index, lines) => (
                                 <tspan
@@ -335,7 +426,9 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                                     cy={rectY + 12}
                                     r={10}
                                     fill="rgba(255,255,255,0.95)"
+                                    fillOpacity={showTimePointVisualization ? 0.7 : 1.0}
                                     stroke={region.color}
+                                    strokeOpacity={showTimePointVisualization ? 0.7 : 1.0}
                                     strokeWidth={2}
                                     style={{ cursor: 'pointer' }}
                                     onClick={(e) => {
@@ -350,6 +443,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                                     fontSize="16"
                                     fontFamily="Arial, sans-serif"
                                     fill={region.color}
+                                    fillOpacity={showTimePointVisualization ? 0.7 : 1.0}
                                     fontWeight="bold"
                                     style={{ cursor: 'pointer', userSelect: 'none' }}
                                     onClick={(e) => {
@@ -364,6 +458,9 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     </g>
                 );
             })}
+
+            {/* 5) Draw wells on top when in time point mode */}
+            {showTimePointVisualization && renderWells(true)}
         </svg>
     );
 };

@@ -244,6 +244,20 @@ const dataProvider = (
         return httpClient(url, {
             method: 'DELETE',
         }).then(({ json }) => ({ data: json }));
+    },
+    processExcel: async (resource, params) => {
+        const { experimentId, file } = params;
+        const url = `${apiUrl}/${resource}/${experimentId}/process-excel`;
+        
+        // Create FormData for multipart upload
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        // Use httpClient but with FormData (it will handle auth headers)
+        return httpClient(url, {
+            method: 'POST',
+            body: formData,
+        }).then(({ json }) => ({ data: json }));
     }
 });
 

@@ -22,7 +22,7 @@ import {
     Description as DescriptionIcon
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
-import { useNotify } from 'react-admin';
+import { useNotify, useDataProvider, useRecordContext } from 'react-admin';
 
 interface ExcelProcessingResult {
     success: boolean;
@@ -34,23 +34,36 @@ interface ExcelProcessingResult {
 }
 
 interface OptimizedExcelUploaderProps {
-    experimentId: string;
+    experimentId?: string;
     onUploadComplete?: (result: ExcelProcessingResult) => void;
+    compact?: boolean;
 }
 
 const OptimizedExcelUploader: React.FC<OptimizedExcelUploaderProps> = ({
-    experimentId,
-    onUploadComplete
+    experimentId: propExperimentId,
+    onUploadComplete,
+    compact = false
 }) => {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [processingResult, setProcessingResult] = useState<ExcelProcessingResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const notify = useNotify();
+    const dataProvider = useDataProvider();
+    const record = useRecordContext();
+    
+    // Use prop experimentId if provided, otherwise get from record context
+    const experimentId = propExperimentId || record?.id;
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         const file = acceptedFiles[0];
         if (!file) return;
+
+        // Validate experiment ID
+        if (!experimentId) {
+            setError('No experiment ID available');
+            return;
+        }
 
         // Validate file type
         if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) {
@@ -64,30 +77,19 @@ const OptimizedExcelUploader: React.FC<OptimizedExcelUploaderProps> = ({
         setUploadProgress(0);
 
         try {
-            // Create FormData for multipart upload
-            const formData = new FormData();
-            formData.append('excel_file', file);
-
-            // Upload and process the Excel file
-            const response = await fetch(`/api/experiments/${experimentId}/process-excel`, {
-                method: 'POST',
-                body: formData,
+            // Upload and process the Excel file using dataProvider
+            const result = await dataProvider.processExcel('experiments', {
+                experimentId,
+                file
             });
+            setProcessingResult(result.data);
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result: ExcelProcessingResult = await response.json();
-            setProcessingResult(result);
-
-            if (result.success) {
+            if (result.data.success) {
                 notify(
-                    `Successfully processed ${result.records_processed} records, created ${result.time_points_created} time points`,
+                    `Successfully processed ${result.data.records_processed} records, created ${result.data.time_points_created} time points`,
                     { type: 'success' }
                 );
-                onUploadComplete?.(result);
+                onUploadComplete?.(result.data);
             } else {
                 notify('Upload completed with errors. Please check the details below.', { type: 'warning' });
             }
@@ -99,7 +101,7 @@ const OptimizedExcelUploader: React.FC<OptimizedExcelUploaderProps> = ({
             setIsUploading(false);
             setUploadProgress(100);
         }
-    }, [experimentId, notify, onUploadComplete]);
+    }, [experimentId, notify, onUploadComplete, dataProvider]);
 
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
@@ -124,7 +126,7 @@ const OptimizedExcelUploader: React.FC<OptimizedExcelUploaderProps> = ({
                 border: '2px dashed',
                 borderColor: isDragActive ? 'primary.main' : 'grey.300',
                 borderRadius: 2,
-                p: 4,
+                p: compact ? 1.5 : 4,
                 textAlign: 'center',
                 cursor: isUploading ? 'not-allowed' : 'pointer',
                 bgcolor: isDragActive ? 'action.hover' : 'transparent',
@@ -136,28 +138,36 @@ const OptimizedExcelUploader: React.FC<OptimizedExcelUploaderProps> = ({
             }}
         >
             <input {...getInputProps()} />
-            <CloudUploadIcon 
-                sx={{ 
-                    fontSize: 48, 
-                    color: isUploading ? 'grey.400' : 'primary.main',
-                    mb: 2 
-                }} 
-            />
-            <Typography variant="h6" gutterBottom>
-                {isDragActive ? 'Drop the Excel file here' : 'Upload Merged Excel File'}
+            {!compact && (
+                <CloudUploadIcon 
+                    sx={{ 
+                        fontSize: 48, 
+                        color: isUploading ? 'grey.400' : 'primary.main',
+                        mb: 2 
+                    }} 
+                />
+            )}
+            <Typography variant={compact ? "body2" : "h6"} gutterBottom>
+                {isDragActive ? 'Drop the Excel file here' : (compact ? 'Drop .xlsx file or click to browse' : 'Upload Merged Excel File')}
             </Typography>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-                Drag and drop your merged.xlsx file here, or click to browse
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-                Supported formats: .xlsx, .xls
-            </Typography>
-            {isUploading && (
-                <Box sx={{ mt: 2 }}>
-                    <CircularProgress size={24} />
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                        Processing Excel file...
+            {!compact && (
+                <>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Drag and drop your merged.xlsx file here, or click to browse
                     </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        Supported formats: .xlsx, .xls
+                    </Typography>
+                </>
+            )}
+            {isUploading && (
+                <Box sx={{ mt: compact ? 1 : 2 }}>
+                    <CircularProgress size={compact ? 16 : 24} />
+                    {!compact && (
+                        <Typography variant="body2" sx={{ mt: 1 }}>
+                            Processing Excel file...
+                        </Typography>
+                    )}
                 </Box>
             )}
         </Box>
@@ -277,13 +287,17 @@ const OptimizedExcelUploader: React.FC<OptimizedExcelUploaderProps> = ({
 
     return (
         <Box>
-            <Typography variant="h6" gutterBottom>
-                Optimized Excel Upload
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Upload your merged.xlsx file for server-side processing. This new method is much faster 
-                and can handle larger files more efficiently.
-            </Typography>
+            {!compact && (
+                <>
+                    <Typography variant="h6" gutterBottom>
+                        Optimized Excel Upload
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        Upload your merged.xlsx file for server-side processing. This new method is much faster 
+                        and can handle larger files more efficiently.
+                    </Typography>
+                </>
+            )}
 
             {renderUploadArea()}
             {renderProgressBar()}
@@ -291,9 +305,10 @@ const OptimizedExcelUploader: React.FC<OptimizedExcelUploaderProps> = ({
             {renderError()}
 
             {processingResult?.success && (
-                <Box sx={{ mt: 3, textAlign: 'center' }}>
+                <Box sx={{ mt: compact ? 2 : 3, textAlign: 'center' }}>
                     <Button
                         variant="contained"
+                        size={compact ? "small" : "medium"}
                         onClick={() => window.location.reload()}
                         startIcon={<CheckCircleIcon />}
                     >
