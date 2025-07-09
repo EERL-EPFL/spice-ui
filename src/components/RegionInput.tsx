@@ -1054,6 +1054,7 @@ export const RegionInput: React.FC<{
                                     onWellClick={setSelectedWell}
                                     showTimePointVisualization={showTimePointVisualization && viewMode === 'results'}
                                     viewMode={viewMode}
+                                    selectedWell={selectedWell}
                                 />
                             </Box>
                         );

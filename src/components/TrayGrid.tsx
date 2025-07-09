@@ -87,6 +87,7 @@ export interface TrayGridProps {
     onWellClick?: (well: WellSummary) => void;
     showTimePointVisualization?: boolean;
     viewMode?: 'regions' | 'results';
+    selectedWell?: WellSummary | null; // Add selected well for highlighting
 }
 
 const TrayGrid: React.FC<TrayGridProps> = ({
@@ -102,6 +103,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     onWellClick,
     showTimePointVisualization = false,
     viewMode = 'regions',
+    selectedWell = null,
 }) => {
     // Helper function to format seconds as minutes and seconds
     const formatSeconds = (seconds: number) => {
@@ -343,8 +345,30 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                         cy={cy}
                         r={CIRCLE_RADIUS}
                         fill={fillColor}
-                        stroke={showTimePointVisualization && well ? "#666" : "#333"}
-                        strokeWidth={showTimePointVisualization && well ? 2 : 1}
+                        stroke={(() => {
+                            // Check if this well is selected for highlighting
+                            // Match by coordinate AND ensure it's from the same tray
+                            const isSelected = selectedWell && well && 
+                                selectedWell.coordinate === well.coordinate && 
+                                selectedWell.tray_name === tray; // Only highlight in the matching tray
+                            
+                            if (isSelected) {
+                                return "#ff6b35"; // Bold orange border for selected well
+                            }
+                            return showTimePointVisualization && well ? "#666" : "#333";
+                        })()}
+                        strokeWidth={(() => {
+                            // Check if this well is selected for highlighting
+                            // Match by coordinate AND ensure it's from the same tray
+                            const isSelected = selectedWell && well && 
+                                selectedWell.coordinate === well.coordinate && 
+                                selectedWell.tray_name === tray; // Only highlight in the matching tray
+                            
+                            if (isSelected) {
+                                return 4; // Bold border width for selected well
+                            }
+                            return showTimePointVisualization && well ? 2 : 1;
+                        })()}
                         style={{
                             cursor: isDisplayMode ? 
                                 (showTimePointVisualization && well ? 'pointer' : 'default') : 
