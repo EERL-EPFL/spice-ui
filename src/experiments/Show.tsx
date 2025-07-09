@@ -21,10 +21,12 @@ import {
     useGetOne,
 } from "react-admin";
 import React, { useEffect, useState } from "react";
-import { Button, Box, Card, CardContent, Typography } from "@mui/material";
+import { Button, Box, Card, CardContent, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup, Divider } from "@mui/material";
 import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import ScienceIcon from '@mui/icons-material/Science';
 import { UppyUploader } from "../uploader/Uppy";
 import { PhaseChangeUploader } from "../uploader/PhaseChangeUploader";
 import OptimizedExcelUploader from "../uploader/OptimizedExcelUploader";
@@ -97,7 +99,58 @@ const DownloadAllButton = () => {
     );
 };
 
-const RegionsDisplay = () => {
+// Standalone Regions/Results Toggle Component
+const RegionsResultsToggle = ({ viewMode, onViewModeChange, hasResults }) => {
+    if (!hasResults) {
+        return (
+            <ToggleButtonGroup
+                value={viewMode}
+                exclusive
+                onChange={(_, newMode) => newMode && onViewModeChange(newMode)}
+                size="small"
+            >
+                <ToggleButton value="regions" aria-label="regions view">
+                    <VisibilityIcon sx={{ mr: 0.5 }} />
+                    Regions
+                </ToggleButton>
+                <ToggleButton 
+                    value="results" 
+                    aria-label="results view"
+                    disabled={true}
+                    sx={{ 
+                        color: 'text.disabled',
+                        '&.Mui-disabled': {
+                            color: 'text.disabled'
+                        }
+                    }}
+                >
+                    <ScienceIcon sx={{ mr: 0.5 }} />
+                    Results
+                </ToggleButton>
+            </ToggleButtonGroup>
+        );
+    }
+
+    return (
+        <ToggleButtonGroup
+            value={viewMode}
+            exclusive
+            onChange={(_, newMode) => newMode && onViewModeChange(newMode)}
+            size="small"
+        >
+            <ToggleButton value="regions" aria-label="regions view">
+                <VisibilityIcon sx={{ mr: 0.5 }} />
+                Regions
+            </ToggleButton>
+            <ToggleButton value="results" aria-label="results view">
+                <ScienceIcon sx={{ mr: 0.5 }} />
+                Results
+            </ToggleButton>
+        </ToggleButtonGroup>
+    );
+};
+
+const RegionsDisplay = ({ viewMode }) => {
     const record = useRecordContext();
     const { data: trayConfiguration, isLoading } = useGetOne(
         'trays',
@@ -119,131 +172,17 @@ const RegionsDisplay = () => {
     return (
         <RegionInput
             source="regions"
-            label={hasTimePointData ? "Experiment Regions & Time Point Results" : "Experiment Well Regions"}
+            label=""
             trayConfiguration={trayConfiguration}
             readOnly={true}
             value={record.regions}
             showTimePointVisualization={hasTimePointData}
+            viewMode={viewMode}
+            hideInternalToggle={true}
         />
     );
 };
 
-const ExportRegionsButton = () => {
-    const record = useRecordContext();
-    const { data: trayConfiguration, isLoading, error } = useGetOne(
-        'trays',
-        { id: record?.tray_configuration_id },
-        { enabled: !!record?.tray_configuration_id }
-    );
-
-    if (!record?.regions || !Array.isArray(record.regions) || record.regions.length === 0) {
-        return null;
-    }
-
-    const handleYAMLExport = () => {
-        // Check if tray configuration is loaded
-        if (isLoading) {
-            alert('Tray configuration is still loading. Please wait and try again.');
-            return;
-        }
-
-        if (error) {
-            alert('Error loading tray configuration. Cannot export.');
-            console.error('Tray configuration error:', error);
-            return;
-        }
-
-        if (!trayConfiguration) {
-            alert('Tray configuration not available. Cannot export.');
-            return;
-        }
-
-        const regions = record.regions;
-        const groupedRegions: { [key: string]: any[] } = {};
-
-        regions.forEach((region: any) => {
-            const regionName = region.name || 'Unnamed';
-
-            if (!groupedRegions[regionName]) {
-                groupedRegions[regionName] = [];
-            }
-
-            // MIGRATION LOGIC: Handle old regions that don't have tray_sequence_id set
-            let effectiveTrayId = region.tray_sequence_id;
-            if (effectiveTrayId === undefined || effectiveTrayId === null) {
-                effectiveTrayId = 1; // Default to first tray configuration
-                console.warn(`Region "${region.name}" has no tray_sequence_id, defaulting to 1`);
-            }
-
-            // Convert from numeric coordinates back to letter+number format for YAML export
-            const colLetter = String.fromCharCode(65 + (region.col_min || 0)); // A, B, C...
-            const rowNumber = (region.row_min || 0) + 1; // 1, 2, 3...
-            const upperLeft = `${colLetter}${rowNumber}`;
-
-            const colLetterMax = String.fromCharCode(65 + (region.col_max || 0));
-            const rowNumberMax = (region.row_max || 0) + 1;
-            const lowerRight = `${colLetterMax}${rowNumberMax}`;
-
-            // Find the actual tray name from the tray configuration
-            let trayName = `Tray_${effectiveTrayId}`;
-
-            if (trayConfiguration?.trays && Array.isArray(trayConfiguration.trays)) {
-                const trayConfigInfo = trayConfiguration.trays.find(tc => {
-                    return tc.order_sequence === effectiveTrayId;
-                });
-
-                if (trayConfigInfo && trayConfigInfo.trays && trayConfigInfo.trays.length > 0) {
-                    const foundTrayName = trayConfigInfo.trays[0].name;
-                    if (foundTrayName) {
-                        trayName = foundTrayName;
-                    }
-                }
-            }
-
-            groupedRegions[regionName].push({
-                tray: trayName,
-                upper_left: upperLeft,
-                lower_right: lowerRight
-            });
-        });
-
-        let yamlContent = '';
-        Object.entries(groupedRegions).forEach(([regionName, regionData], index) => {
-            if (index > 0) yamlContent += '\n';
-            yamlContent += `${regionName}:\n`;
-
-            regionData.forEach(region => {
-                yamlContent += `  - tray: ${region.tray}\n`;
-                yamlContent += `    upper_left: ${region.upper_left}\n`;
-                yamlContent += `    lower_right: ${region.lower_right}\n`;
-                yamlContent += '\n';
-            });
-        });
-
-        // Create and download file
-        const blob = new Blob([yamlContent.trim()], { type: 'text/yaml' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `experiment_${record.id}_regions.yaml`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    };
-
-    return (
-        <Button
-            variant="contained"
-            size="small"
-            onClick={handleYAMLExport}
-            startIcon={<DownloadIcon />}
-            sx={{ fontSize: '0.8rem', padding: '6px 12px', marginBottom: 2 }}
-        >
-            Export Regions YAML
-        </Button>
-    );
-};
 
 // Compact uploader wrapper component
 const CompactUploader: React.FC<{
@@ -284,38 +223,93 @@ const CompactUploader: React.FC<{
     );
 };
 
+// Very thin one-line uploader for in-tab use
+const ThinLineUploader: React.FC<{
+    title: string;
+    component: React.ReactNode;
+    icon: React.ReactNode;
+    color: 'primary' | 'secondary';
+}> = ({ title, component, icon, color }) => {
+    return (
+        <Box 
+            sx={{ 
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                p: 1,
+                border: `1px solid`,
+                borderColor: color === 'primary' ? 'primary.main' : 'secondary.main',
+                borderRadius: 1,
+                backgroundColor: 'background.paper',
+                minHeight: '40px'
+            }}
+        >
+            <Box display="flex" alignItems="center" gap={1} sx={{ minWidth: '150px' }}>
+                <Box sx={{ color: color === 'primary' ? 'primary.main' : 'secondary.main' }}>
+                    {icon}
+                </Box>
+                <Typography variant="body2" fontWeight="500">
+                    {title}
+                </Typography>
+            </Box>
+            <Box sx={{ flex: 1, '& > *': { transform: 'scale(0.8)', transformOrigin: 'left center' } }}>
+                {component}
+            </Box>
+        </Box>
+    );
+};
+
 const TabbedContent = () => {
     const record = useRecordContext();
     const [currentTab, setCurrentTab] = useState(0);
-    const [hasAutoSwitched, setHasAutoSwitched] = useState(false);
+    const [viewMode, setViewMode] = useState('regions');
+    
+    // Get asset count for tab label
+    const assetCount = record?.assets?.length || 0;
     
     // Check if results are available
     const hasResults = record?.results_summary && record.results_summary.total_time_points > 0;
-    
-    // Force re-render when results become available
-    useEffect(() => {
-        if (hasResults && !hasAutoSwitched) {
-            // Force re-render by switching tab temporarily
-            setCurrentTab(1);
-            setTimeout(() => {
-                setCurrentTab(0);
-            }, 100);
-            setHasAutoSwitched(true);
-        }
-    }, [hasResults, hasAutoSwitched]);
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setCurrentTab(newValue);
     };
 
+    const handleViewModeChange = (newViewMode: string) => {
+        setViewMode(newViewMode);
+    };
+
     return (
         <TabbedShowLayout syncWithLocation={false} value={currentTab} onChange={handleTabChange}>
-            <TabbedShowLayout.Tab label={hasResults ? "Results" : "Regions"}>
-                <ExportRegionsButton />
-                <RegionsDisplay />
+            <TabbedShowLayout.Tab label="Regions & Results">
+                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <RegionsResultsToggle 
+                        viewMode={viewMode}
+                        onViewModeChange={handleViewModeChange}
+                        hasResults={hasResults}
+                    />
+                    <Box sx={{ flex: 1 }}>
+                        <ThinLineUploader 
+                            title="Phase Change Data" 
+                            component={<OptimizedExcelUploader compact={true} />}
+                            icon={<DescriptionIcon />}
+                            color="primary"
+                        />
+                    </Box>
+                </Box>
+                <RegionsDisplay viewMode={viewMode} />
             </TabbedShowLayout.Tab>
-            <TabbedShowLayout.Tab label="Asset list">
-                <DownloadAllButton />
+            <TabbedShowLayout.Tab label={`Assets${assetCount > 0 ? ` (${assetCount})` : ''}`}>
+                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <DownloadAllButton />
+                    <Box sx={{ flex: 1 }}>
+                        <ThinLineUploader 
+                            title="Related Assets" 
+                            component={<UppyUploader compact={true} />}
+                            icon={<CloudUploadIcon />}
+                            color="secondary"
+                        />
+                    </Box>
+                </Box>
                 <ReferenceManyField
                     reference="assets"
                     target="experiment_id"
@@ -345,67 +339,50 @@ export const ShowComponent = () => {
     return (
         <Show actions={<ShowComponentActions />}>
             <SimpleShowLayout title="Experiment">
-                <Box display="flex" gap={2}>
-                    {/* Left column with fields */}
-                    <Box flex={2}>
-                        <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
-                            <Labeled>
-                                <TextField source="id" />
-                            </Labeled>
-                            <Labeled>
-                                <TextField source="name" />
-                            </Labeled>
-                            <Labeled>
-                                <DateField source="performed_at" showTime label="Date" />
-                            </Labeled>
-                            <Labeled>
-                                <BooleanField source="is_calibration" />
-                            </Labeled>
-                            <Labeled>
-                                <ReferenceField source="sample_id" reference="samples" link="show">
-                                    <TextField source="name" />
-                                </ReferenceField>
-                            </Labeled>
-                            <Labeled>
-                                <ReferenceField source="tray_configuration_id" reference="trays" link="show">
-                                    <TextField source="name" />
-                                </ReferenceField>
-                            </Labeled>
-                            <Labeled>
-                                <TextField source="username" />
-                            </Labeled>
-                            <Labeled>
-                                <DateField source="created_at" showTime />
-                            </Labeled>
-                            <Labeled>
-                                <NumberField source="temperature_ramp" />
-                            </Labeled>
-                            <Labeled>
-                                <NumberField source="temperature_start" />
-                            </Labeled>
-                            <Labeled>
-                                <NumberField source="temperature_end" />
-                            </Labeled>
-                        </Box>
-                    </Box>
-                    {/* Right column with uploaders */}
-                    <Box flex={1} display="flex" flexDirection="column" gap={2}>
-                        <CompactUploader 
-                            title="Phase Change Data" 
-                            description="Upload merged.xlsx file with temperature and well state data"
-                            component={<OptimizedExcelUploader compact={true} />}
-                            icon={<DescriptionIcon />}
-                            color="primary"
-                        />
-                        <CompactUploader 
-                            title="Related Assets" 
-                            description="Drop any related files to this experiment (images, docs, etc.)"
-                            component={<UppyUploader compact={true} />}
-                            icon={<CloudUploadIcon />}
-                            color="secondary"
-                        />
-                    </Box>
+                {/* Top section with key info in 3 columns */}
+                <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={3} sx={{ mb: 3 }}>
+                    <Labeled>
+                        <TextField source="id" />
+                    </Labeled>
+                    <Labeled>
+                        <TextField source="name" />
+                    </Labeled>
+                    <Labeled>
+                        <DateField source="performed_at" showTime label="Date" />
+                    </Labeled>
                 </Box>
+                
+                {/* General details section */}
+                <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2} sx={{ mb: 3 }}>
+                    <Labeled>
+                        <BooleanField source="is_calibration" />
+                    </Labeled>
+                    <Labeled>
+                        <ReferenceField source="tray_configuration_id" reference="trays" link="show">
+                            <TextField source="name" />
+                        </ReferenceField>
+                    </Labeled>
+                    <Labeled>
+                        <TextField source="username" />
+                    </Labeled>
+                </Box>
+                
+                {/* Divider between general info and temperature settings */}
+                <Divider sx={{ mb: 3 }} />
+                
+                {/* Temperature settings section */}
+                <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2} sx={{ mb: 3 }}>
+                    <Labeled>
+                        <NumberField source="temperature_ramp" />
+                    </Labeled>
+                    <Labeled>
+                        <NumberField source="temperature_start" />
+                    </Labeled>
+                    <Labeled>
+                        <NumberField source="temperature_end" />
+                    </Labeled>
+                </Box>
+                
                 <TabbedContent />
             </SimpleShowLayout>
         </Show>

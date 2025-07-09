@@ -217,11 +217,59 @@ const WellDetailsDisplay: React.FC<{
             }}
         >
             <Typography variant="subtitle2" gutterBottom color="text.primary">
-                Well {well.coordinate}
+                {well.tray_name ? `${well.tray_name}: ${well.coordinate}` : `Well ${well.coordinate}`}
             </Typography>
             <Typography variant="body2" color="text.secondary">
                 <strong>State:</strong> {well.final_state}
             </Typography>
+            {well.first_phase_change_temperature_probes?.average && (
+                <Tooltip
+                    title={
+                        well.first_phase_change_temperature_probes ? (
+                            <Box>
+                                <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                    Individual Probe Temperatures:
+                                </Typography>
+                                <Typography variant="body2">
+                                    Probe 1: {well.first_phase_change_temperature_probes.probe_1}°C
+                                </Typography>
+                                <Typography variant="body2">
+                                    Probe 2: {well.first_phase_change_temperature_probes.probe_2}°C
+                                </Typography>
+                                <Typography variant="body2">
+                                    Probe 3: {well.first_phase_change_temperature_probes.probe_3}°C
+                                </Typography>
+                                <Typography variant="body2">
+                                    Probe 4: {well.first_phase_change_temperature_probes.probe_4}°C
+                                </Typography>
+                                <Typography variant="body2">
+                                    Probe 5: {well.first_phase_change_temperature_probes.probe_5}°C
+                                </Typography>
+                                <Typography variant="body2">
+                                    Probe 6: {well.first_phase_change_temperature_probes.probe_6}°C
+                                </Typography>
+                                <Typography variant="body2">
+                                    Probe 7: {well.first_phase_change_temperature_probes.probe_7}°C
+                                </Typography>
+                                <Typography variant="body2">
+                                    Probe 8: {well.first_phase_change_temperature_probes.probe_8}°C
+                                </Typography>
+                            </Box>
+                        ) : ''
+                    }
+                    enterDelay={0}
+                    leaveDelay={200}
+                    followCursor
+                >
+                    <Typography 
+                        variant="body2" 
+                        color="text.secondary"
+                        sx={{ cursor: 'help' }}
+                    >
+                        <strong>Freezing temperature (average):</strong> {well.first_phase_change_temperature_probes.average}°C
+                    </Typography>
+                </Tooltip>
+            )}
             {well.first_phase_change_seconds !== null && (
                 <Typography variant="body2" color="text.secondary">
                     <strong>Freezing time:</strong> {formatSeconds(well.first_phase_change_seconds)}
@@ -327,6 +375,8 @@ export const RegionInput: React.FC<{
     value?: any; // Allow direct value prop for display mode
     validate?: (value: any) => string | undefined; // Add validate prop
     showTimePointVisualization?: boolean; // Add option to show time point data
+    viewMode?: 'regions' | 'results'; // External viewMode control
+    hideInternalToggle?: boolean; // Option to hide the internal toggle
 }> = (props) => {
     const dataProvider = useDataProvider();
     const record = useRecordContext(); // Get the current experiment record for time point data
@@ -404,10 +454,15 @@ export const RegionInput: React.FC<{
     const inputRefs = useRef<{ [key: string]: React.RefObject<HTMLInputElement> }>({});
     const { trayConfiguration, readOnly = false, showTimePointVisualization = false } = props;
     const [selectedWell, setSelectedWell] = useState<WellSummary | null>(null);
-    const [viewMode, setViewMode] = useState<'regions' | 'results'>('regions');
-
+    
     // Extract results summary from the experiment record for time point visualization
     const resultsSummary: ExperimentResultsSummary | null = record?.results_summary || null;
+    
+    // Use external viewMode if provided, otherwise use internal state
+    const [internalViewMode, setInternalViewMode] = useState<'regions' | 'results'>(
+        showTimePointVisualization && resultsSummary && resultsSummary.total_time_points > 0 ? 'results' : 'regions'
+    );
+    const viewMode = props.viewMode || internalViewMode;
 
     // Calculate color scale based on freezing times for time point visualization
     const { colorScale, minSeconds, maxSeconds } = useMemo(() => {
@@ -432,7 +487,7 @@ export const RegionInput: React.FC<{
 
         return { 
             colorScale: (value: number | null) => {
-                if (value === null) return '#ffcccc';
+                if (value === null) return '#d32f2f'; // Darker colorblind-friendly red
                 return scale(value);
             },
             minSeconds: min,
@@ -907,19 +962,21 @@ export const RegionInput: React.FC<{
     return (
         <Box marginTop={2} marginBottom={2}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <FieldTitle
-                    label={props.label || 'Regions'}
-                    source={props.source}
-                    resource={undefined}
-                    isRequired={isRequired}
-                />
+                {props.label && (
+                    <FieldTitle
+                        label={props.label}
+                        source={props.source}
+                        resource={undefined}
+                        isRequired={isRequired}
+                    />
+                )}
                 
-                {/* View Mode Toggle - only show when we have results data */}
-                {showTimePointVisualization && resultsSummary && (
+                {/* View Mode Toggle - only show when we have results data and not hidden */}
+                {showTimePointVisualization && resultsSummary && !props.hideInternalToggle && (
                     <ToggleButtonGroup
                         value={viewMode}
                         exclusive
-                        onChange={(_, newMode) => newMode && setViewMode(newMode)}
+                        onChange={(_, newMode) => newMode && setInternalViewMode(newMode)}
                         size="small"
                     >
                         <ToggleButton value="regions" aria-label="regions view">
@@ -934,9 +991,9 @@ export const RegionInput: React.FC<{
                 )}
             </Box>
 
-            <Box display="flex" gap={3} alignItems="flex-start">
+            <Box display="flex" gap={1} alignItems="flex-start">
                 {/* Render dynamic trays with minimal spacing */}
-                <Box display="flex" gap={0.5} flexWrap="wrap" flex={1}>
+                <Box display="flex" gap={0.5} flexWrap="wrap" flex={1} sx={{ minWidth: 0 }}>
                     {flatTrays.map((flatTray, index) => {
                         const { trayConfig, tray, trayName, rotation } = flatTray;
                         const existingRegions: ExistingRegion[] = enhancedRegions
@@ -969,8 +1026,8 @@ export const RegionInput: React.FC<{
                             });
 
                         return (
-                            <Box key={index} minWidth="280px" display="flex" flexDirection="column" alignItems="center">
-                                <Typography variant="caption" fontWeight="medium" marginBottom={1.5} textAlign="center">
+                            <Box key={index} sx={{ flex: '1 1 auto', minWidth: '240px', maxWidth: '400px' }} display="flex" flexDirection="column" alignItems="center">
+                                <Typography variant="caption" fontWeight="medium" marginBottom={0.5} textAlign="center">
                                     {trayName} ({rotation}°)
                                     {trayTemperatures.has(trayConfig.order_sequence) && (
                                         <span style={{ display: 'block', fontSize: '0.8rem', color: '#666' }}>
@@ -1005,12 +1062,27 @@ export const RegionInput: React.FC<{
 
                 {/* Unified panel controlled by view mode toggle - moved to right side */}
                 {(regions.length > 0 || (showTimePointVisualization && resultsSummary)) && (
-                    <Card sx={{ minWidth: '400px', maxWidth: '500px', height: 'fit-content' }}>
+                    <Card sx={{ flex: '0 0 auto', width: '380px', height: 'fit-content' }}>
                     <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                            {viewMode === 'regions' ? 'Selected Regions' : 'Results Visualization'}
-                            {viewMode === 'results' && resultsSummary && ` (${resultsSummary.total_time_points} time points)`}
-                        </Typography>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                            <Typography variant="h6">
+                                {viewMode === 'regions' ? 'Selected Regions' : 'Results Visualisation'}
+                                {viewMode === 'results' && resultsSummary && ` (${resultsSummary.total_time_points} time points)`}
+                            </Typography>
+                            
+                            {/* Export button for regions view in read-only mode */}
+                            {viewMode === 'regions' && readOnly && regions.length > 0 && (
+                                <Button
+                                    variant="text"
+                                    size="small"
+                                    onClick={handleYAMLExport}
+                                    startIcon={<DownloadIcon />}
+                                    sx={{ fontSize: '0.7rem', padding: '2px 8px', minWidth: 'auto' }}
+                                >
+                                    Export YAML
+                                </Button>
+                            )}
+                        </Box>
 
                     {/* Regions Content */}
                     {viewMode === 'regions' && (
@@ -1341,7 +1413,7 @@ export const RegionInput: React.FC<{
                                     <Box 
                                         width={15} 
                                         height={15} 
-                                        bgcolor="#ffcccc"
+                                        bgcolor="#d32f2f"
                                         border="1px solid #ccc"
                                         borderRadius={0.5}
                                     />

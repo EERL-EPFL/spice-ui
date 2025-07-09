@@ -276,7 +276,7 @@ export const TimePointVisualization = () => {
     return (
         <Box>
             <Typography variant="h6" gutterBottom>
-                Results Visualization ({resultsSummary.total_time_points} time points)
+                Results Visualisation ({resultsSummary.total_time_points} time points)
             </Typography>
 
             <Grid container spacing={2}>

@@ -52,8 +52,20 @@ export interface WellSummary {
     col: number;
     coordinate: string;
     tray_id?: string;
+    tray_name?: string;
     first_phase_change_time: string | null;
     first_phase_change_seconds: number | null;
+    first_phase_change_temperature_probes?: {
+        probe_1: string;
+        probe_2: string;
+        probe_3: string;
+        probe_4: string;
+        probe_5: string;
+        probe_6: string;
+        probe_7: string;
+        probe_8: string;
+        average: string;
+    };
     final_state: string;
     sample_name: string | null;
     treatment_name: string | null;
@@ -91,6 +103,12 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     showTimePointVisualization = false,
     viewMode = 'regions',
 }) => {
+    // Helper function to format seconds as minutes and seconds
+    const formatSeconds = (seconds: number) => {
+        const minutes = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${minutes}m ${secs}s`;
+    };
     const [isDragging, setIsDragging] = useState(false);
     const [startCell, setStartCell] = useState<Cell | null>(null);
     const [endCell, setEndCell] = useState<Cell | null>(null);
@@ -296,26 +314,49 @@ const TrayGrid: React.FC<TrayGridProps> = ({
 
             const fillColor = getWellColor(rowIdx, colIdx, selected, hovered, covered);
 
+            const coordinate = `${String.fromCharCode(65 + colIdx)}${rowIdx + 1}`;
+            const tooltipContent = well && showTimePointVisualization ? (
+                <div style={{ fontSize: '12px', lineHeight: '1.3' }}>
+                    <div style={{ fontWeight: 'bold' }}>
+                        {well.tray_name ? `${well.tray_name}: ${coordinate}` : coordinate}
+                    </div>
+                    {well.first_phase_change_temperature_probes?.average && (
+                        <div>{well.first_phase_change_temperature_probes.average}°C</div>
+                    )}
+                    {well.first_phase_change_seconds !== null && (
+                        <div>{formatSeconds(well.first_phase_change_seconds)}</div>
+                    )}
+                </div>
+            ) : null;
+
             return (
-                <circle
-                    key={`circle-${onTop ? 'top-' : ''}${rowIdx}-${colIdx}`}
-                    cx={cx}
-                    cy={cy}
-                    r={CIRCLE_RADIUS}
-                    fill={fillColor}
-                    stroke={showTimePointVisualization && well ? "#666" : "#333"}
-                    strokeWidth={showTimePointVisualization && well ? 2 : 1}
-                    style={{
-                        cursor: isDisplayMode ? 
-                            (showTimePointVisualization && well ? 'pointer' : 'default') : 
-                            (covered ? 'not-allowed' : 'pointer')
-                    }}
-                    onMouseDown={isDisplayMode ? 
-                        (showTimePointVisualization ? () => handleMouseDown(rowIdx, colIdx) : undefined) : 
-                        () => handleMouseDown(rowIdx, colIdx)}
-                    onMouseEnter={isDisplayMode ? undefined : () => handleMouseEnter(rowIdx, colIdx)}
-                    onMouseLeave={isDisplayMode ? undefined : handleMouseLeaveCell}
-                />
+                <Tooltip
+                    key={`tooltip-${onTop ? 'top-' : ''}${rowIdx}-${colIdx}`}
+                    title={tooltipContent || ""}
+                    enterDelay={0}
+                    leaveDelay={200}
+                    followCursor
+                    disableHoverListener={!tooltipContent}
+                >
+                    <circle
+                        cx={cx}
+                        cy={cy}
+                        r={CIRCLE_RADIUS}
+                        fill={fillColor}
+                        stroke={showTimePointVisualization && well ? "#666" : "#333"}
+                        strokeWidth={showTimePointVisualization && well ? 2 : 1}
+                        style={{
+                            cursor: isDisplayMode ? 
+                                (showTimePointVisualization && well ? 'pointer' : 'default') : 
+                                (covered ? 'not-allowed' : 'pointer')
+                        }}
+                        onMouseDown={isDisplayMode ? 
+                            (showTimePointVisualization ? () => handleMouseDown(rowIdx, colIdx) : undefined) : 
+                            () => handleMouseDown(rowIdx, colIdx)}
+                        onMouseEnter={isDisplayMode ? undefined : () => handleMouseEnter(rowIdx, colIdx)}
+                        onMouseLeave={isDisplayMode ? undefined : handleMouseLeaveCell}
+                    />
+                </Tooltip>
             );
         })
     );

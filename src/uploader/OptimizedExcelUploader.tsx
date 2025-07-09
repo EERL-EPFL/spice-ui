@@ -94,7 +94,23 @@ const OptimizedExcelUploader: React.FC<OptimizedExcelUploaderProps> = ({
                 notify('Upload completed with errors. Please check the details below.', { type: 'warning' });
             }
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+            let errorMessage = 'Upload failed';
+            
+            if (err instanceof Error) {
+                errorMessage = err.message;
+                
+                // Handle specific error cases for better user experience
+                if (err.message.includes('409') || err.message.includes('Conflict')) {
+                    errorMessage = 'Duplicate file - this Excel file already exists in the experiment';
+                } else if (err.message.includes('413')) {
+                    errorMessage = 'File too large - please use a smaller file';
+                } else if (err.message.includes('415')) {
+                    errorMessage = 'Invalid file type - please upload an Excel file (.xlsx or .xls)';
+                } else if (err.message.includes('500')) {
+                    errorMessage = 'Server error - please try again later';
+                }
+            }
+            
             setError(errorMessage);
             notify(`Upload failed: ${errorMessage}`, { type: 'error' });
         } finally {
