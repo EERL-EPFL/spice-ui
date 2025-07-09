@@ -1066,8 +1066,7 @@ export const RegionInput: React.FC<{
                     <CardContent>
                         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                             <Typography variant="h6">
-                                {viewMode === 'regions' ? 'Selected Regions' : 'Results Visualisation'}
-                                {viewMode === 'results' && resultsSummary && ` (${resultsSummary.total_time_points} time points)`}
+                                {viewMode === 'regions' ? 'Selected Regions' : 'Results'}
                             </Typography>
                             
                             {/* Export button for regions view in read-only mode */}
