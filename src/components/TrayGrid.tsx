@@ -124,8 +124,12 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     // Helper function to get well summary for a cell
     const getWellSummary = (row: number, col: number): WellSummary | undefined => {
         if (!showTimePointVisualization || !wellSummaryMap) return undefined;
-        const key = `${row + 1}-${col + 1}`; // Convert to 1-indexed coordinates
-        return wellSummaryMap.get(key);
+        // Convert grid coordinates to well coordinate string (e.g., "A6")
+        const coordinate = `${String.fromCharCode(65 + col)}${row + 1}`;
+        const well = wellSummaryMap.get(coordinate);
+        
+        
+        return well;
     };
 
     // Helper function to get tooltip text for a well
