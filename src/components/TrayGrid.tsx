@@ -129,7 +129,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     selectedWell = null,
 }) => {
     // Helper function to format seconds as minutes and seconds
-    const formatSeconds = (seconds: number) => {
+    const formatSeconds = (seconds: number | null | undefined) => {
+        if (seconds === null || seconds === undefined) return 'N/A';
         const minutes = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${minutes}m ${secs}s`;
@@ -165,7 +166,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
         const phaseText = well.final_state === 'frozen' ? 'Frozen' : 'Liquid';
         let tooltip = `${coordinate}: ${phaseText}`;
         
-        if (well.first_phase_change_seconds !== null) {
+        if (well.first_phase_change_seconds !== null && well.first_phase_change_seconds !== undefined) {
             const minutes = Math.floor(well.first_phase_change_seconds / 60);
             const seconds = well.first_phase_change_seconds % 60;
             tooltip += `\nFreezing time: ${minutes}m ${seconds}s`;
@@ -186,7 +187,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             return 'rgba(0,128,255,0.2)';
         } else if (showTimePointVisualization && colorScale) {
             const well = getWellSummary(row, col);
-            if (well?.first_phase_change_seconds !== null) {
+            if (well?.first_phase_change_seconds !== null && well?.first_phase_change_seconds !== undefined) {
                 return colorScale(well.first_phase_change_seconds);
             }
             return '#ffcccc';
@@ -344,17 +345,17 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             const fillColor = getWellColor(rowIdx, colIdx, selected, hovered, covered);
 
             const coordinate = `${String.fromCharCode(65 + colIdx)}${rowIdx + 1}`;
-            const tooltipContent = well && showTimePointVisualization ? (
+            // Capture well data at render time to prevent race conditions
+            const currentWell = well;
+            const tooltipContent = currentWell && showTimePointVisualization ? (
                 <div style={{ fontSize: '12px', lineHeight: '1.3' }}>
                     <div style={{ fontWeight: 'bold' }}>
-                        {well.tray_name ? `${well.tray_name}: ${coordinate}` : coordinate}
+                        {currentWell.tray_name ? `${currentWell.tray_name}: ${coordinate}` : coordinate}
                     </div>
-                    {well.first_phase_change_temperature_probes?.average && (
-                        <div>{well.first_phase_change_temperature_probes.average}°C</div>
+                    {currentWell.first_phase_change_temperature_probes?.average && (
+                        <div>{currentWell.first_phase_change_temperature_probes.average}°C</div>
                     )}
-                    {well.first_phase_change_seconds !== null && (
-                        <div>{formatSeconds(well.first_phase_change_seconds)}</div>
-                    )}
+                    <div>{formatSeconds(currentWell.first_phase_change_seconds)}</div>
                 </div>
             ) : null;
 

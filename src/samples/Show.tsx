@@ -177,6 +177,7 @@ const ExperimentalResultsTable = () => {
   const resultsWithId = filteredResults.map((result, index) => ({
     id: `${result.experiment_id}-${result.well_coordinate}-${index}`,
     ...result,
+    original_experiment_id: result.experiment_id, // Keep original experiment ID separate
   }));
 
   const formatTime = (seconds: number) => {
@@ -274,14 +275,18 @@ const ExperimentalResultsTable = () => {
       {/* Results Datagrid with React Admin */}
       {filteredResults.length > 0 ? (
         <ListContextProvider value={listContext}>
-          <Datagrid bulkActionButtons={false}>
+          <Datagrid bulkActionButtons={false} rowClick={false}>
             <FunctionField
               source="experiment_name"
               label="Experiment"
               render={(record) => (
                 <Button
                   onClick={() =>
-                    redirect("show", "experiments", record.experiment_id)
+                    redirect(
+                      "show",
+                      "experiments",
+                      record.original_experiment_id,
+                    )
                   }
                   sx={{
                     textTransform: "none",
@@ -508,7 +513,7 @@ const TabbedContentWithCounts = () => {
             <TopToolbar>
               <CreateTreatmentButton />
             </TopToolbar>
-            <Datagrid bulkActionButtons={false} rowClick="show">
+            <Datagrid bulkActionButtons={false} rowClick={false}>
               <FunctionField
                 source="name"
                 label="Treatment Type"

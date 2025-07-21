@@ -10,5 +10,6 @@ export default {
     edit: EditComponent,
     list: ListComponent,
     show: ShowComponent,
+    recordRepresentation: 'name',
     icon: BiotechIcon,
 };

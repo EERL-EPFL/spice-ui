@@ -38,6 +38,7 @@ import VisibilityIcon from "@mui/icons-material/Visibility";
 import ScienceIcon from "@mui/icons-material/Science";
 import { scaleSequential } from "d3-scale";
 import { interpolateBlues } from "d3-scale-chromatic";
+import { treatmentName } from "../treatments";
 
 // Import the WellSummary interface from TrayGrid
 import { WellSummary } from "./TrayGrid";
@@ -252,10 +253,23 @@ const WellDetailsDisplay: React.FC<{
   };
 
   const handleSampleClick = () => {
-    if (well.treatment?.sample?.id) {
-      redirect("show", "samples", well.treatment.sample.id);
+    // Check direct sample access first, then fall back to treatment sample
+    const sampleId = well.sample?.id || well.treatment?.sample?.id;
+    if (sampleId) {
+      redirect("show", "samples", sampleId);
     }
   };
+
+  // Debug logging
+  console.log('WellDetailsDisplay - well data:', {
+    coordinate: well.coordinate,
+    sampleName: well.sample?.name,
+    treatmentSampleName: well.treatment?.sample?.name,
+    treatmentName: well.treatment?.name,
+    treatmentId: well.treatment?.id,
+    sampleId: well.sample?.id,
+    treatmentSampleId: well.treatment?.sample?.id
+  });
 
   return (
     <Box
@@ -341,10 +355,10 @@ const WellDetailsDisplay: React.FC<{
           {formatSeconds(well.first_phase_change_seconds)}
         </Typography>
       )}
-      {well.treatment?.sample?.name && (
+      {(well.sample?.name || well.treatment?.sample?.name) && (
         <Typography variant="body2" color="text.secondary">
           <strong>Sample:</strong>{" "}
-          {well.treatment?.sample?.id ? (
+          {(well.sample?.id || well.treatment?.sample?.id) ? (
             <MuiLink
               component="button"
               variant="body2"
@@ -355,10 +369,10 @@ const WellDetailsDisplay: React.FC<{
                 color: "primary.main",
               }}
             >
-              {well.treatment.sample.name}
+              {well.sample?.name || well.treatment?.sample?.name}
             </MuiLink>
           ) : (
-            well.treatment.sample.name
+            well.sample?.name || well.treatment?.sample?.name
           )}
         </Typography>
       )}
@@ -376,10 +390,10 @@ const WellDetailsDisplay: React.FC<{
                 color: "primary.main",
               }}
             >
-              {well.treatment.name}
+              {treatmentName[well.treatment.name] || well.treatment.name}
             </MuiLink>
           ) : (
-            well.treatment.name
+            treatmentName[well.treatment.name] || well.treatment.name
           )}
         </Typography>
       )}
@@ -620,15 +634,27 @@ export const RegionInput: React.FC<{
     well: WellSummary,
     regions: any[],
   ): { sample_name: string | null; treatment_name: string | null } => {
+    // Only assign data if we have valid regions and the well has actual region assignments
+    if (!regions || regions.length === 0) {
+      return { sample_name: null, treatment_name: null };
+    }
+
     // Convert well coordinates to 0-indexed for region comparison
     const wellRow = well.row - 1; // Convert 1-indexed to 0-indexed
     const wellCol = well.col - 1; // Convert 1-indexed to 0-indexed
 
-    // Find regions that match this well's tray
+    // Find regions that match this well's tray by tray_sequence_id
     const matchingRegions = regions.filter((region) => {
-      // Check if region has tray info and matches this well's tray
-      if (!region.tray || !region.tray.name) return false;
-      return region.tray.name === well.tray_name;
+      // Skip regions without proper tray configuration
+      if (!region.tray_sequence_id) return false;
+      
+      // Find the tray configuration for this region
+      const trayInfo = flatTrays.find(
+        (t) => t.trayConfig.order_sequence === region.tray_sequence_id
+      );
+      
+      // Check if this tray matches the well's tray name
+      return trayInfo && (trayInfo.trayName === well.tray_name || trayInfo.tray.name === well.tray_name);
     });
 
     // Find the region that contains this well's coordinates
@@ -641,10 +667,13 @@ export const RegionInput: React.FC<{
       );
     });
 
+    // Only return data if we have a valid containing region with treatment and sample data
     if (
       containingRegion &&
       containingRegion.treatment &&
-      containingRegion.treatment.sample
+      containingRegion.treatment.sample &&
+      containingRegion.treatment.sample.name &&
+      containingRegion.treatment.name
     ) {
       return {
         sample_name: containingRegion.treatment.sample.name,
@@ -652,39 +681,13 @@ export const RegionInput: React.FC<{
       };
     }
 
+    // Return null if no valid region assignment is found
     return { sample_name: null, treatment_name: null };
   };
 
   // Create well summary lookup for tooltip data - organized by tray
-  const wellSummaryMapByTray = useMemo(() => {
-    if (!showTimePointVisualization || !resultsSummary?.well_summaries) {
-      return new Map();
-    }
-
-    const trayMaps = new Map<string, Map<string, WellSummary>>();
-
-    resultsSummary.well_summaries.forEach((well, index) => {
-      const trayName = well.tray_name || "unknown";
-      if (!trayMaps.has(trayName)) {
-        trayMaps.set(trayName, new Map());
-      }
-      const trayMap = trayMaps.get(trayName)!;
-
-      // Fix the sample assignment using UI-side tray filtering
-      const correctedSample = getCorrectSampleForWell(well, regions);
-      const correctedWell = {
-        ...well,
-        sample_name: correctedSample.sample_name,
-        treatment_name: correctedSample.treatment_name,
-      };
-
-      // Use coordinate as key instead of row-col to avoid conflicts
-      const key = well.coordinate;
-      trayMap.set(key, correctedWell);
-    });
-
-    return trayMaps;
-  }, [resultsSummary, showTimePointVisualization, regions]);
+  // This will be computed later after flatTrays is available
+  const [wellSummaryMapByTray, setWellSummaryMapByTray] = useState<Map<string, Map<string, WellSummary>>>(new Map());
 
   // Function to fetch average temperature for each tray
   const [trayTemperatures, setTrayTemperatures] = useState<Map<number, number>>(
@@ -1062,6 +1065,38 @@ export const RegionInput: React.FC<{
     }
     return [null, flattened];
   }, [trayConfiguration, props.label, props.source, isRequired]);
+
+  // Compute well summary map after flatTrays is available
+  React.useEffect(() => {
+    if (!showTimePointVisualization || !resultsSummary?.well_summaries || !flatTrays.length) {
+      setWellSummaryMapByTray(new Map());
+      return;
+    }
+
+    const trayMaps = new Map<string, Map<string, WellSummary>>();
+
+    resultsSummary.well_summaries.forEach((well) => {
+      const trayName = well.tray_name || "unknown";
+      if (!trayMaps.has(trayName)) {
+        trayMaps.set(trayName, new Map());
+      }
+      const trayMap = trayMaps.get(trayName)!;
+
+      // Fix the sample assignment using UI-side tray filtering
+      const correctedSample = getCorrectSampleForWell(well, regions);
+      const correctedWell = {
+        ...well,
+        sample_name: correctedSample.sample_name,
+        treatment_name: correctedSample.treatment_name,
+      };
+
+      // Use coordinate as key instead of row-col to avoid conflicts
+      const key = well.coordinate;
+      trayMap.set(key, correctedWell);
+    });
+
+    setWellSummaryMapByTray(trayMaps);
+  }, [resultsSummary, showTimePointVisualization, regions, flatTrays]);
 
   // YAML export must be defined AFTER flatTrays is available
   const handleYAMLExport = useCallback(() => {
