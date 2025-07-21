@@ -1,6 +1,5 @@
 import {
     Show,
-    SimpleShowLayout,
     TextField,
     TopToolbar,
     EditButton,
@@ -263,7 +262,6 @@ const ThinLineUploader: React.FC<{
 const TabbedContent = () => {
     const record = useRecordContext();
     const refresh = useRefresh();
-    const [currentTab, setCurrentTab] = useState(0);
     const [viewMode, setViewMode] = useState('regions');
     const [previousHasResults, setPreviousHasResults] = useState(false);
     
@@ -282,16 +280,60 @@ const TabbedContent = () => {
         setPreviousHasResults(hasResults);
     }, [hasResults, previousHasResults]);
 
-    const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-        setCurrentTab(newValue);
-    };
-
     const handleViewModeChange = (newViewMode: string) => {
         setViewMode(newViewMode);
     };
 
     return (
         <TabbedShowLayout>
+            <TabbedShowLayout.Tab label="Details">
+                <Box sx={{ mb: 3 }}>
+                    {/* Top section with key info in 3 columns */}
+                    <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={3} sx={{ mb: 3 }}>
+                        <Labeled>
+                            <TextField source="id" />
+                        </Labeled>
+                        <Labeled>
+                            <TextField source="name" />
+                        </Labeled>
+                        <Labeled>
+                            <DateField source="performed_at" showTime label="Date" />
+                        </Labeled>
+                    </Box>
+                    
+                    {/* General details section */}
+                    <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2} sx={{ mb: 3 }}>
+                        <Labeled>
+                            <BooleanField source="is_calibration" />
+                        </Labeled>
+                        <Labeled>
+                            <ReferenceField source="tray_configuration_id" reference="trays" link="show">
+                                <TextField source="name" />
+                            </ReferenceField>
+                        </Labeled>
+                        <Labeled>
+                            <TextField source="username" />
+                        </Labeled>
+                    </Box>
+                    
+                    {/* Divider between general info and temperature settings */}
+                    <Divider sx={{ mb: 3 }} />
+                    
+                    {/* Temperature settings section */}
+                    <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2} sx={{ mb: 3 }}>
+                        <Labeled>
+                            <NumberField source="temperature_ramp" />
+                        </Labeled>
+                        <Labeled>
+                            <NumberField source="temperature_start" />
+                        </Labeled>
+                        <Labeled>
+                            <NumberField source="temperature_end" />
+                        </Labeled>
+                    </Box>
+                </Box>
+            </TabbedShowLayout.Tab>
+            
             <TabbedShowLayout.Tab label="Regions & Results">
                 <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                     <RegionsResultsToggle 
@@ -310,6 +352,7 @@ const TabbedContent = () => {
                 </Box>
                 <RegionsDisplay viewMode={viewMode} />
             </TabbedShowLayout.Tab>
+            
             <TabbedShowLayout.Tab label={`Assets${assetCount > 0 ? ` (${assetCount})` : ''}`}>
                 <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                     <DownloadAllButton />
@@ -350,53 +393,7 @@ const TabbedContent = () => {
 export const ShowComponent = () => {
     return (
         <Show actions={<ShowComponentActions />}>
-            <SimpleShowLayout title="Experiment">
-                {/* Top section with key info in 3 columns */}
-                <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={3} sx={{ mb: 3 }}>
-                    <Labeled>
-                        <TextField source="id" />
-                    </Labeled>
-                    <Labeled>
-                        <TextField source="name" />
-                    </Labeled>
-                    <Labeled>
-                        <DateField source="performed_at" showTime label="Date" />
-                    </Labeled>
-                </Box>
-                
-                {/* General details section */}
-                <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2} sx={{ mb: 3 }}>
-                    <Labeled>
-                        <BooleanField source="is_calibration" />
-                    </Labeled>
-                    <Labeled>
-                        <ReferenceField source="tray_configuration_id" reference="trays" link="show">
-                            <TextField source="name" />
-                        </ReferenceField>
-                    </Labeled>
-                    <Labeled>
-                        <TextField source="username" />
-                    </Labeled>
-                </Box>
-                
-                {/* Divider between general info and temperature settings */}
-                <Divider sx={{ mb: 3 }} />
-                
-                {/* Temperature settings section */}
-                <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2} sx={{ mb: 3 }}>
-                    <Labeled>
-                        <NumberField source="temperature_ramp" />
-                    </Labeled>
-                    <Labeled>
-                        <NumberField source="temperature_start" />
-                    </Labeled>
-                    <Labeled>
-                        <NumberField source="temperature_end" />
-                    </Labeled>
-                </Box>
-                
-                <TabbedContent />
-            </SimpleShowLayout>
+            <TabbedContent />
         </Show>
     );
 };
