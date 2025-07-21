@@ -58,7 +58,7 @@ services:
       - ../spice-ui:/app
 
   spice-db:
-    image: postgis/postgis:16-master 
+    image: postgis/postgis:17-master
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=psql

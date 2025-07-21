@@ -246,8 +246,14 @@ const WellDetailsDisplay: React.FC<{
   const redirect = useRedirect();
 
   const handleTreatmentClick = () => {
-    if (well.treatment_id) {
-      redirect("show", "treatments", well.treatment_id);
+    if (well.treatment?.id) {
+      redirect("show", "treatments", well.treatment.id);
+    }
+  };
+
+  const handleSampleClick = () => {
+    if (well.treatment?.sample?.id) {
+      redirect("show", "samples", well.treatment.sample.id);
     }
   };
 
@@ -335,15 +341,31 @@ const WellDetailsDisplay: React.FC<{
           {formatSeconds(well.first_phase_change_seconds)}
         </Typography>
       )}
-      {well.sample_name && (
+      {well.treatment?.sample?.name && (
         <Typography variant="body2" color="text.secondary">
-          <strong>Sample:</strong> {well.sample_name}
+          <strong>Sample:</strong>{" "}
+          {well.treatment?.sample?.id ? (
+            <MuiLink
+              component="button"
+              variant="body2"
+              onClick={handleSampleClick}
+              sx={{
+                cursor: "pointer",
+                textDecoration: "underline",
+                color: "primary.main",
+              }}
+            >
+              {well.treatment.sample.name}
+            </MuiLink>
+          ) : (
+            well.treatment.sample.name
+          )}
         </Typography>
       )}
-      {well.treatment_name && (
+      {well.treatment?.name && (
         <Typography variant="body2" color="text.secondary">
           <strong>Treatment:</strong>{" "}
-          {well.treatment_id ? (
+          {well.treatment?.id ? (
             <MuiLink
               component="button"
               variant="body2"
@@ -354,10 +376,10 @@ const WellDetailsDisplay: React.FC<{
                 color: "primary.main",
               }}
             >
-              {well.treatment_name}
+              {well.treatment.name}
             </MuiLink>
           ) : (
-            well.treatment_name
+            well.treatment.name
           )}
         </Typography>
       )}
@@ -1243,13 +1265,12 @@ export const RegionInput: React.FC<{
           )}
       </Box>
 
-      <Box display="flex" gap={1} alignItems="flex-start">
+      <Box display="flex" gap={2} alignItems="flex-start" justifyContent="center">
         {/* Render dynamic trays with minimal spacing */}
         <Box
           display="flex"
-          gap={0.5}
+          gap={1}
           flexWrap="wrap"
-          flex={1}
           sx={{ minWidth: 0 }}
         >
           {flatTrays.map((flatTray, index) => {

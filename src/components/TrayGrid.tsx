@@ -71,6 +71,29 @@ export interface WellSummary {
     treatment_name: string | null;
     treatment_id?: string;
     dilution_factor: number | null;
+    // Full objects with UUIDs for UI linking
+    treatment?: {
+        id: string;
+        name: string;
+        notes?: string;
+        enzyme_volume_litres?: number;
+        sample?: {
+            id: string;
+            name: string;
+            location?: {
+                id: string;
+                name: string;
+            };
+        };
+    };
+    sample?: {
+        id: string;
+        name: string;
+        location?: {
+            id: string;
+            name: string;
+        };
+    };
 }
 
 export interface TrayGridProps {
@@ -148,8 +171,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             tooltip += `\nFreezing time: ${minutes}m ${seconds}s`;
         }
         
-        if (well.sample_name) tooltip += `\nSample: ${well.sample_name}`;
-        if (well.treatment_name) tooltip += `\nTreatment: ${well.treatment_name}`;
+        if (well.treatment?.sample?.name) tooltip += `\nSample: ${well.treatment.sample.name}`;
+        if (well.treatment?.name) tooltip += `\nTreatment: ${well.treatment.name}`;
         if (well.dilution_factor) tooltip += `\nDilution: ${well.dilution_factor}`;
         
         return tooltip;
@@ -339,7 +362,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 <Tooltip
                     key={`tooltip-${onTop ? 'top-' : ''}${rowIdx}-${colIdx}`}
                     title={tooltipContent || ""}
-                    enterDelay={0}
+                    enterDelay={500}
                     leaveDelay={200}
                     followCursor
                     disableHoverListener={!tooltipContent}
