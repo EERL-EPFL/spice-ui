@@ -12,7 +12,7 @@ import { treatmentName } from '.';
 
 const EditComponent = () => {
     return (
-        <Edit>
+        <Edit redirect="show">
             <SimpleForm>
                 <TextInput disabled label="Id" source="id" />
                 <SelectInput

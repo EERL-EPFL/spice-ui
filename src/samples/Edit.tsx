@@ -14,7 +14,7 @@ import { sampleType } from ".";
 import { treatmentName } from "../treatments";
 const EditComponent = () => {
     return (
-        <Edit>
+        <Edit redirect="show">
             <SimpleForm>
                 <TextInput disabled label="Id" source="id" />
                 <ReferenceInput source="location_id" reference="locations">

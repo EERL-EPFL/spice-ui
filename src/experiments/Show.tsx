@@ -19,6 +19,7 @@ import {
     useAuthProvider,
     Labeled,
     useGetOne,
+    useRefresh,
 } from "react-admin";
 import React, { useEffect, useState } from "react";
 import { Button, Box, Card, CardContent, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup, Divider } from "@mui/material";
@@ -100,7 +101,7 @@ const DownloadAllButton = () => {
 };
 
 // Standalone Regions/Results Toggle Component
-const RegionsResultsToggle = ({ viewMode, onViewModeChange, hasResults }) => {
+const RegionsResultsToggle = ({ viewMode, onViewModeChange, hasResults }: { viewMode: string; onViewModeChange: (mode: string) => void; hasResults: boolean }) => {
     if (!hasResults) {
         return (
             <ToggleButtonGroup
@@ -150,7 +151,7 @@ const RegionsResultsToggle = ({ viewMode, onViewModeChange, hasResults }) => {
     );
 };
 
-const RegionsDisplay = ({ viewMode }) => {
+const RegionsDisplay = ({ viewMode }: { viewMode: string }) => {
     const record = useRecordContext();
     const { data: trayConfiguration, isLoading } = useGetOne(
         'trays',
@@ -177,7 +178,7 @@ const RegionsDisplay = ({ viewMode }) => {
             readOnly={true}
             value={record.regions}
             showTimePointVisualization={hasTimePointData}
-            viewMode={viewMode}
+            viewMode={viewMode as "regions" | "results"}
             hideInternalToggle={true}
         />
     );
@@ -261,14 +262,25 @@ const ThinLineUploader: React.FC<{
 
 const TabbedContent = () => {
     const record = useRecordContext();
+    const refresh = useRefresh();
     const [currentTab, setCurrentTab] = useState(0);
     const [viewMode, setViewMode] = useState('regions');
+    const [previousHasResults, setPreviousHasResults] = useState(false);
     
     // Get asset count for tab label
     const assetCount = record?.assets?.length || 0;
     
     // Check if results are available
     const hasResults = record?.results_summary && record.results_summary.total_time_points > 0;
+    
+    // Auto-switch to Results view when results become newly available
+    useEffect(() => {
+        if (hasResults && !previousHasResults) {
+            // Results just became available, switch to results view
+            setViewMode('results');
+        }
+        setPreviousHasResults(hasResults);
+    }, [hasResults, previousHasResults]);
 
     const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
         setCurrentTab(newValue);
@@ -279,7 +291,7 @@ const TabbedContent = () => {
     };
 
     return (
-        <TabbedShowLayout syncWithLocation={false} value={currentTab} onChange={handleTabChange}>
+        <TabbedShowLayout>
             <TabbedShowLayout.Tab label="Regions & Results">
                 <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                     <RegionsResultsToggle 
@@ -290,7 +302,7 @@ const TabbedContent = () => {
                     <Box sx={{ flex: 1 }}>
                         <ThinLineUploader 
                             title="Phase Change Data" 
-                            component={<OptimizedExcelUploader compact={true} />}
+                            component={<OptimizedExcelUploader compact={true} onSuccess={refresh} />}
                             icon={<DescriptionIcon />}
                             color="primary"
                         />

@@ -556,7 +556,7 @@ export const RegionInput: React.FC<{
   const isTouched = props.readOnly ? false : inputResult.fieldState.isTouched;
   const isRequired = props.readOnly ? false : inputResult.isRequired;
 
-  const regions: SingleRegion[] = Array.isArray(value) ? value : [];
+  const regions: SingleRegion[] = useMemo(() => Array.isArray(value) ? value : [], [value]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Add refs for inputs to maintain focus
   const inputRefs = useRef<{
@@ -717,7 +717,7 @@ export const RegionInput: React.FC<{
     };
 
     fetchTrayTemperatures();
-  }, [record?.id, showTimePointVisualization, dataProvider]);
+  }, [record?.id, showTimePointVisualization]);
 
   const formatSeconds = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -936,7 +936,7 @@ export const RegionInput: React.FC<{
     } else {
       setEnhancedRegions([]);
     }
-  }, [regions, dataProvider]);
+  }, [regions]);
 
   const handleYAMLImport = useCallback(() => {
     fileInputRef.current?.click();

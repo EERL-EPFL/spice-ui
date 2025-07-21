@@ -33,6 +33,30 @@ const InjectDefaultTray: React.FC<{ defaultTrayId?: any }> = ({ defaultTrayId })
     return null;
 };
 
+/**
+ * Separate component for tray configuration region input to prevent unnecessary re-renders.
+ * Only re-renders when tray_configuration_id changes, not when other form fields change.
+ */
+const TrayConfigurationRegionInput: React.FC<{ trayConfigurationId?: any }> = React.memo(({ trayConfigurationId }) => {
+    const { data: trayConfiguration, isLoading } = useGetOne(
+        'trays',
+        { id: trayConfigurationId },
+        { enabled: !!trayConfigurationId }
+    );
+
+    if (isLoading) {
+        return <div>Loading tray configuration...</div>;
+    }
+
+    return (
+        <RegionInput
+            source="regions"
+            label="Define Well Regions"
+            trayConfiguration={trayConfiguration}
+        />
+    );
+});
+
 const CreateComponent: React.FC = () => {
     // load just the top‐ranked tray
     const { data: trays } = useGetList(
@@ -43,7 +67,7 @@ const CreateComponent: React.FC = () => {
 
     return (
         <Create redirect="show">
-            <SimpleForm>
+            <SimpleForm onError={(error) => console.error('Form submission error:', error)}>
                 <TextField source="id" />
                 <TextInput source="name" validate={[required()]} />
                 <TextInput source="username" />
@@ -82,29 +106,11 @@ const CreateComponent: React.FC = () => {
                 </ReferenceInput>
 
                 <FormDataConsumer>
-                    {({ formData }) => {
-                        const TrayConfigurationRegionInput = () => {
-                            const { data: trayConfiguration, isLoading } = useGetOne(
-                                'trays',
-                                { id: formData?.tray_configuration_id },
-                                { enabled: !!formData?.tray_configuration_id }
-                            );
-
-                            if (isLoading) {
-                                return <div>Loading tray configuration...</div>;
-                            }
-
-                            return (
-                                <RegionInput
-                                    source="regions"
-                                    label="Define Well Regions"
-                                    trayConfiguration={trayConfiguration}
-                                />
-                            );
-                        };
-
-                        return <TrayConfigurationRegionInput />;
-                    }}
+                    {({ formData }) => (
+                        <TrayConfigurationRegionInput 
+                            trayConfigurationId={formData?.tray_configuration_id} 
+                        />
+                    )}
                 </FormDataConsumer>
             </SimpleForm>
         </Create>

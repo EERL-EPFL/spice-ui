@@ -14,7 +14,7 @@ import {
 
 const EditComponent = () => {
     return (
-        <Edit>
+        <Edit redirect="show">
             <SimpleForm>
                 <TextInput source="id" disabled />
                 <TextInput source="original_filename" disabled />
