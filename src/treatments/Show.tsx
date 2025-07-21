@@ -35,6 +35,10 @@ import {
     TableRow,
     Paper,
     TablePagination,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from "@mui/material";
 import { CheckCircle, Cancel } from "@mui/icons-material";
 import { treatmentName } from ".";
@@ -43,6 +47,7 @@ const ExperimentalResultsTable = () => {
     const record = useRecordContext();
     const redirect = useRedirect();
     const [frozenFilter, setFrozenFilter] = React.useState('all');
+    const [experimentFilter, setExperimentFilter] = React.useState('all');
 
     if (!record || !record.experimental_results || record.experimental_results.length === 0) {
         return (
@@ -67,14 +72,38 @@ const ExperimentalResultsTable = () => {
         return 'no_result'; // No actual measurement data
     };
 
-    // Filter results based on category
+    // Get unique experiments for dropdown
+    const uniqueExperiments = Array.from(
+        new Set(record.experimental_results.map(result => result.experiment_id))
+    ).map(experimentId => {
+        const result = record.experimental_results.find(r => r.experiment_id === experimentId);
+        return {
+            id: experimentId,
+            name: result?.experiment_name || experimentId
+        };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+
+    // Filter results based on category and experiment
     const filteredResults = record.experimental_results.filter(result => {
-        if (frozenFilter === 'all') return true;
-        return categorizeResult(result) === frozenFilter;
+        // Apply frozen state filter
+        if (frozenFilter !== 'all' && categorizeResult(result) !== frozenFilter) {
+            return false;
+        }
+        
+        // Apply experiment filter
+        if (experimentFilter !== 'all' && result.experiment_id !== experimentFilter) {
+            return false;
+        }
+        
+        return true;
     });
 
     const handleFilterChange = (newFilter) => {
         setFrozenFilter(newFilter);
+    };
+
+    const handleExperimentFilterChange = (event) => {
+        setExperimentFilter(event.target.value);
     };
 
     const frozenCount = record.experimental_results.filter(r => categorizeResult(r) === 'frozen').length;
@@ -146,6 +175,22 @@ const ExperimentalResultsTable = () => {
                         No Result ({noResultCount})
                     </ToggleButton>
                 </ToggleButtonGroup>
+
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel>Filter by Experiment</InputLabel>
+                    <Select
+                        value={experimentFilter}
+                        onChange={handleExperimentFilterChange}
+                        label="Filter by Experiment"
+                    >
+                        <MenuItem value="all">All Experiments ({uniqueExperiments.length})</MenuItem>
+                        {uniqueExperiments.map((experiment) => (
+                            <MenuItem key={experiment.id} value={experiment.id}>
+                                {experiment.name}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
                 
                 {filteredResults.length > 0 && (
                     <Chip 
@@ -247,10 +292,13 @@ const ExperimentalResultsTable = () => {
     );
 };
 
-export const ShowComponent = () => {
+
+const TabbedContentWithCounts = () => {
+    const record = useRecordContext();
+    const experimentCount = record?.experimental_results?.length || 0;
+    
     return (
-        <Show actions={<TopToolbar><EditButton /><DeleteButton /></TopToolbar>}>
-            <TabbedShowLayout>
+        <TabbedShowLayout>
                 <TabbedShowLayout.Tab label="Treatment Details">
                     <Box display="flex" flexDirection="column" gap={2}>
                         <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2}>
@@ -291,10 +339,17 @@ export const ShowComponent = () => {
                     </Box>
                 </TabbedShowLayout.Tab>
 
-                <TabbedShowLayout.Tab label="Associated Experiments">
+                <TabbedShowLayout.Tab label={`Associated Experiments (${experimentCount})`}>
                     <ExperimentalResultsTable />
                 </TabbedShowLayout.Tab>
-            </TabbedShowLayout>
+        </TabbedShowLayout>
+    );
+};
+
+export const ShowComponent = () => {
+    return (
+        <Show actions={<TopToolbar><EditButton /><DeleteButton /></TopToolbar>}>
+            <TabbedContentWithCounts />
         </Show>
     );
 };
