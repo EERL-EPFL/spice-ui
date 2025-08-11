@@ -20,18 +20,22 @@ import {
     useGetOne,
     useRefresh,
     useDataProvider,
+    useNotify,
 } from "react-admin";
 import React, { useEffect, useState } from "react";
-import { Button, Box, Card, CardContent, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup, Divider, Dialog, DialogContent, DialogTitle, IconButton } from "@mui/material";
+import { Button, Box, Card, CardContent, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup, Divider, Dialog, DialogContent, DialogTitle, IconButton, Chip, CircularProgress, Tooltip } from "@mui/material";
 import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ScienceIcon from '@mui/icons-material/Science';
-import { Close } from '@mui/icons-material';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CloseIcon from '@mui/icons-material/Close';
 import { UppyUploader } from "../uploader/Uppy";
 import { PhaseChangeUploader } from "../uploader/PhaseChangeUploader";
-import OptimizedExcelUploader from "../uploader/OptimizedExcelUploader";
 import RegionInput from '../components/RegionInput';
 
 
@@ -359,14 +363,15 @@ const AssetDownloadButton = ({ record }: { record: any }) => {
     const authProvider = useAuthProvider();
     
     return (
-        <Button
-            size="small"
-            startIcon={<DownloadIcon />}
-            onClick={() => downloadAsset(record, authProvider)}
-            sx={{ mr: 1 }}
-        >
-            Download
-        </Button>
+        <Tooltip title="Download file">
+            <IconButton
+                size="small"
+                onClick={() => downloadAsset(record, authProvider)}
+                color="primary"
+            >
+                <DownloadIcon />
+            </IconButton>
+        </Tooltip>
     );
 };
 
@@ -377,14 +382,354 @@ const AssetViewButton = ({ record, onView }: { record: any; onView: (record: any
     if (!isImage) return null;
     
     return (
+        <Tooltip title="View image">
+            <IconButton
+                size="small"
+                onClick={() => onView(record)}
+                color="primary"
+            >
+                <VisibilityIcon />
+            </IconButton>
+        </Tooltip>
+    );
+};
+
+// Processing status indicator component
+const ProcessingStatusIndicator = ({ record }: { record: any }) => {
+    const isMergedXlsx = (record.original_filename?.toLowerCase().includes('merged') || 
+                         record.original_filename?.toLowerCase() === 'merged.xlsx') && 
+                        record.type === 'tabular';
+
+    if (!isMergedXlsx) {
+        return null;
+    }
+
+    const status = record.processing_status;
+    
+    if (status === 'processing') {
+        return (
+            <Tooltip title="Processing experiment data...">
+                <Chip 
+                    icon={<CircularProgress size={16} />} 
+                    label="Processing" 
+                    color="info" 
+                    size="small" 
+                />
+            </Tooltip>
+        );
+    }
+    
+    if (status === 'completed') {
+        return (
+            <Tooltip title={record.processing_message || "Processing completed successfully"}>
+                <Chip 
+                    icon={<CheckCircleIcon />} 
+                    label="Processed" 
+                    color="success" 
+                    size="small" 
+                />
+            </Tooltip>
+        );
+    }
+    
+    if (status === 'error') {
+        return (
+            <Tooltip title={record.processing_message || "Processing failed"}>
+                <Chip 
+                    icon={<ErrorIcon />} 
+                    label="Error" 
+                    color="error" 
+                    size="small" 
+                />
+            </Tooltip>
+        );
+    }
+    
+    return (
+        <Chip 
+            label="Ready" 
+            color="default" 
+            size="small" 
+        />
+    );
+};
+
+// Reprocess button component for merged.xlsx files
+const AssetReprocessButton = ({ record, onReprocess }: { record: any; onReprocess: () => void }) => {
+    const [isReprocessing, setIsReprocessing] = useState(false);
+    const dataProvider = useDataProvider();
+    const notify = useNotify();
+    const authProvider = useAuthProvider();
+
+    const isMergedXlsx = (record.original_filename?.toLowerCase().includes('merged') || 
+                         record.original_filename?.toLowerCase() === 'merged.xlsx') && 
+                        record.type === 'tabular';
+
+    if (!isMergedXlsx || record.processing_status === 'processing') {
+        return null;
+    }
+
+    const handleReprocess = async () => {
+        setIsReprocessing(true);
+        try {
+            const token = await authProvider.getToken();
+            const result = await fetch(`/api/assets/${record.id}/reprocess`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const data = await result.json();
+            
+            if (data.success) {
+                notify(`Reprocessing completed: ${data.message}`, { type: 'success' });
+                onReprocess(); // Refresh the data
+            } else {
+                notify(`Reprocessing failed: ${data.message}`, { type: 'error' });
+            }
+        } catch (error) {
+            notify('Reprocessing failed: Network error', { type: 'error' });
+            console.error('Reprocess error:', error);
+        } finally {
+            setIsReprocessing(false);
+        }
+    };
+
+    return (
         <Button
             size="small"
-            startIcon={<VisibilityIcon />}
-            onClick={() => onView(record)}
+            startIcon={isReprocessing ? <CircularProgress size={16} /> : <RefreshIcon />}
+            onClick={handleReprocess}
+            disabled={isReprocessing}
         >
-            Preview
+            {isReprocessing ? 'Reprocessing...' : 'Reprocess'}
         </Button>
     );
+};
+
+// Delete button component for assets
+const AssetDeleteButton = ({ record, onDelete }: { record: any; onDelete: () => void }) => {
+    const [isDeleting, setIsDeleting] = useState(false);
+    const dataProvider = useDataProvider();
+    const notify = useNotify();
+
+    const handleDelete = async () => {
+        if (!window.confirm(`Are you sure you want to delete "${record.original_filename}"?`)) {
+            return;
+        }
+
+        setIsDeleting(true);
+        try {
+            await dataProvider.delete('assets', { id: record.id });
+            notify('File deleted successfully', { type: 'success' });
+            onDelete();
+        } catch (error: any) {
+            console.error('Delete error:', error);
+            notify(`Failed to delete file: ${error.message || 'Unknown error'}`, { type: 'error' });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    return (
+        <Tooltip title="Delete file">
+            <IconButton
+                size="small"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                color="error"
+            >
+                {isDeleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+            </IconButton>
+        </Tooltip>
+    );
+};
+
+// Processing status/actions for tabular files (icons only)
+const ProcessingColumn = ({ record, onProcess }: { record: any; onProcess: () => void }) => {
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [isClearingResults, setIsClearingResults] = useState(false);
+    const dataProvider = useDataProvider();
+    const notify = useNotify();
+    const authProvider = useAuthProvider();
+
+    const isTabular = record.type === 'tabular';
+    const status = record.processing_status;
+    const hasProcessedData = status === 'completed';
+    
+    // Check if file is Excel format (.xlsx, .xls)
+    const filename = record.original_filename || '';
+    const fileExtension = filename.toLowerCase().split('.').pop() || '';
+    const isExcel = fileExtension === 'xlsx' || fileExtension === 'xls';
+    
+    if (!isTabular || !isExcel) {
+        return null;
+    }
+
+    const handleProcess = async () => {
+        setIsProcessing(true);
+        try {
+            // Call the dedicated processing endpoint directly
+            const token = await authProvider.getToken();
+            
+            const response = await fetch(`/api/experiments/${record.experiment_id}/process-asset`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    assetId: record.id
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    notify(`✅ ${result.message}`, { type: 'success' });
+                    onProcess(); // Refresh to show updated status
+                } else {
+                    throw new Error(result.message || 'Processing failed');
+                }
+            } else {
+                // Handle error responses - read once and try to parse as JSON
+                const responseText = await response.text();
+                let errorMessage = 'Processing failed';
+                
+                try {
+                    const errorResult = JSON.parse(responseText);
+                    errorMessage = errorResult.message || errorResult.error || 'Processing failed';
+                } catch {
+                    // If JSON parsing fails, use the plain text response
+                    errorMessage = responseText || 'Processing failed';
+                }
+                throw new Error(errorMessage);
+            }
+            
+        } catch (error: any) {
+            console.error('Processing error:', error);
+            notify(`❌ Processing failed: ${error.message || 'Unknown error'}`, { type: 'error' });
+            onProcess(); // Refresh to show error status
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleClearResults = async () => {
+        if (!window.confirm('Are you sure you want to clear all processed experiment data? This will remove temperature readings, well transitions, and results from the database.')) {
+            return;
+        }
+
+        setIsClearingResults(true);
+        try {
+            // Call the dedicated clear results endpoint directly
+            const token = await authProvider.getToken();
+            
+            const response = await fetch(`/api/experiments/${record.experiment_id}/clear-results`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    assetId: record.id
+                })
+            });
+            
+            if (response.ok) {
+                const result = await response.json();
+                if (result.success) {
+                    notify(`🗑️ ${result.message}`, { type: 'success' });
+                    onProcess(); // Refresh to show updated status
+                } else {
+                    throw new Error(result.message || 'Failed to clear data');
+                }
+            } else {
+                // Handle error responses - read once and try to parse as JSON
+                const responseText = await response.text();
+                let errorMessage = 'Failed to clear data';
+                
+                try {
+                    const errorResult = JSON.parse(responseText);
+                    errorMessage = errorResult.message || errorResult.error || 'Failed to clear data';
+                } catch {
+                    // If JSON parsing fails, use the plain text response
+                    errorMessage = responseText || 'Failed to clear data';
+                }
+                throw new Error(errorMessage);
+            }
+            
+        } catch (error: any) {
+            console.error('Clear results error:', error);
+            notify(`❌ Failed to clear data: ${error.message || 'Unknown error'}`, { type: 'error' });
+        } finally {
+            setIsClearingResults(false);
+        }
+    };
+
+    if (status === 'processing' || isProcessing) {
+        return (
+            <Tooltip title="Processing...">
+                <CircularProgress size={20} color="info" />
+            </Tooltip>
+        );
+    } else if (status === 'completed') {
+        return (
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <Tooltip title="Reprocess data">
+                    <IconButton
+                        size="small"
+                        onClick={handleProcess}
+                        disabled={isProcessing}
+                        color="success"
+                    >
+                        <ScienceIcon />
+                    </IconButton>
+                </Tooltip>
+                <Tooltip title="Clear processed data">
+                    <IconButton
+                        size="small"
+                        onClick={handleClearResults}
+                        disabled={isClearingResults}
+                        color="error"
+                    >
+                        {isClearingResults ? <CircularProgress size={16} /> : <CloseIcon />}
+                    </IconButton>
+                </Tooltip>
+            </div>
+        );
+    } else if (status === 'error') {
+        return (
+            <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                <Tooltip title="Retry processing">
+                    <IconButton
+                        size="small"
+                        onClick={handleProcess}
+                        disabled={isProcessing}
+                        color="error"
+                    >
+                        <ScienceIcon />
+                    </IconButton>
+                </Tooltip>
+            </div>
+        );
+    } else {
+        // No processing status - show process button
+        return (
+            <Tooltip title="Process experiment data">
+                <IconButton
+                    size="small"
+                    onClick={handleProcess}
+                    disabled={isProcessing}
+                    color="warning"
+                >
+                    {isProcessing ? <CircularProgress size={20} /> : <ScienceIcon />}
+                </IconButton>
+            </Tooltip>
+        );
+    }
 };
 
 const TabbedContent = () => {
@@ -483,12 +828,9 @@ const TabbedContent = () => {
                         hasResults={hasResults}
                     />
                     <Box sx={{ flex: 1 }}>
-                        <ThinLineUploader 
-                            title="Phase Change Data" 
-                            component={<OptimizedExcelUploader compact={true} onSuccess={refresh} />}
-                            icon={<DescriptionIcon />}
-                            color="primary"
-                        />
+                        <Typography variant="body2" color="text.secondary">
+                            Upload merged.xlsx files in the Assets tab for automatic processing
+                        </Typography>
                     </Box>
                 </Box>
                 <RegionsDisplay viewMode={viewMode} />
@@ -512,7 +854,7 @@ const TabbedContent = () => {
                     label="Tags"
                     pagination={<Pagination />}
                 >
-                    <Datagrid rowClick={false}>
+                    <Datagrid rowClick={false} bulkActionButtons={false}>
                         <TextField source="original_filename" />
                         <TextField source="type" />
                         <FunctionField
@@ -523,14 +865,21 @@ const TabbedContent = () => {
                                     : ""
                             }
                         />
-                        <DateField source="created_at" showTime />
+                        <DateField source="uploaded_at" showTime label="Uploaded At" />
                         <FunctionField
                             label="Actions"
                             render={record => (
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                     <AssetDownloadButton record={record} />
+                                    <AssetDeleteButton record={record} onDelete={refresh} />
                                     <AssetViewButton record={record} onView={handleAssetView} />
                                 </div>
+                            )}
+                        />
+                        <FunctionField
+                            label="Process"
+                            render={record => (
+                                <ProcessingColumn record={record} onProcess={refresh} />
                             )}
                         />
                     </Datagrid>

@@ -126,7 +126,7 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
             
             // Clear Uppy state but keep status message until next upload
             setTimeout(() => {
-                uppy.clearUploadedFiles();
+                uppy.cancelAll();
             }, 1000);
         };
 
@@ -148,7 +148,7 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
             
             // Clear Uppy state but keep status message until next upload
             setTimeout(() => {
-                uppy.clearUploadedFiles();
+                uppy.cancelAll();
             }, 1000);
         };
 
@@ -156,14 +156,17 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
             // Handle individual file upload errors - but don't immediately set status
             // Let the complete handler deal with final status based on overall results
             let errorMessage = 'Upload failed';
+            let isFileConflict = false;
             
             console.log('Upload error details:', { error, response, file: file.name });
             
-            // First, check if we have a custom error from onAfterResponse
+            // Check for file conflict (409 status)
             if (error?.isRequestError && error?.source?.status === 409) {
                 errorMessage = error.source.responseText || error.message;
+                isFileConflict = true;
             } else if (error?.message && error.message.includes('already exists in experiment')) {
                 errorMessage = error.message;
+                isFileConflict = true;
             } else if (response?.status === 409) {
                 // Try to get the actual server message for 409 conflicts
                 try {
@@ -172,10 +175,12 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
                     } else if (response.response) {
                         errorMessage = response.response;
                     } else {
-                        errorMessage = 'Duplicate file - already exists in experiment';
+                        errorMessage = `File '${file.name}' already exists in this experiment`;
                     }
+                    isFileConflict = true;
                 } catch (e) {
-                    errorMessage = 'Duplicate file - already exists in experiment';
+                    errorMessage = `File '${file.name}' already exists in this experiment`;
+                    isFileConflict = true;
                 }
             } else if (response?.body?.detail?.message) {
                 errorMessage = response.body.detail.message;
@@ -204,7 +209,8 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
                 // Fallback based on HTTP status code
                 switch (response.status) {
                     case 409:
-                        errorMessage = 'Duplicate file - already exists in experiment';
+                        errorMessage = `File '${file.name}' already exists in this experiment`;
+                        isFileConflict = true;
                         break;
                     case 413:
                         errorMessage = 'File too large';
@@ -218,6 +224,11 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
                     default:
                         errorMessage = `HTTP ${response.status} error`;
                 }
+            }
+            
+            // Show appropriate notification for file conflicts
+            if (isFileConflict) {
+                notify(`⚠️ ${errorMessage}. Delete the existing file first if you want to re-upload.`, { type: 'warning' });
             }
             
             // Store this error for the details
