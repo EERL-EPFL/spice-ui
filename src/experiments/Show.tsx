@@ -159,7 +159,7 @@ const RegionsResultsToggle = ({ viewMode, onViewModeChange, hasResults }: { view
 const RegionsDisplay = ({ viewMode }: { viewMode: string }) => {
     const record = useRecordContext();
     const { data: trayConfiguration, isLoading } = useGetOne(
-        'trays',
+        'tray_configurations',
         { id: record?.tray_configuration_id },
         { enabled: !!record?.tray_configuration_id }
     );
@@ -793,7 +793,7 @@ const TabbedContent = () => {
                             <BooleanField source="is_calibration" />
                         </Labeled>
                         <Labeled>
-                            <ReferenceField source="tray_configuration_id" reference="trays" link="show">
+                            <ReferenceField source="tray_configuration_id" reference="tray_configurations" link="show">
                                 <TextField source="name" />
                             </ReferenceField>
                         </Labeled>

@@ -22,7 +22,7 @@ import RegionInput from '../components/RegionInput';
  */
 const TrayConfigurationRegionInput: React.FC<{ trayConfigurationId?: any }> = React.memo(({ trayConfigurationId }) => {
     const { data: trayConfiguration, isLoading } = useGetOne(
-        'trays',
+        'tray_configurations',
         { id: trayConfigurationId },
         { enabled: !!trayConfigurationId }
     );
@@ -64,7 +64,7 @@ const EditComponent = () => {
 
                 <ReferenceInput
                     source="tray_configuration_id"
-                    reference="trays"
+                    reference="tray_configurations"
                     sort={{ field: 'experiment_default', order: 'ASC' }}
                     
                 >

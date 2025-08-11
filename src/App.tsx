@@ -21,7 +21,7 @@ import experiments from './experiments';
 import axios from 'axios';
 import Dashboard from './Dashboard';
 import './App.css';
-import trays from './trays';
+import tray_configurations from './tray_configurations';
 import treatments from './treatments';
 import phase_changes from './phase_changes';
 
@@ -96,14 +96,13 @@ const App = () => {
                 <>
                     {permissions ? (
                         <>
-                            <Resource name="trays" {...trays} />
+                            <Resource name="tray_configurations" {...tray_configurations} />
                             <Resource name="projects" {...projects} />
                             <Resource name="locations" {...locations} />
                             <Resource name="samples" {...samples} />
                             <Resource name="treatments" {...treatments} />
                             <Resource name="experiments" {...experiments} />
                             <Resource name="assets" {...assets} />
-                            <Resource name="phase_change_events" {...phase_changes} />
                         </>
                     ) : null}
                 </>

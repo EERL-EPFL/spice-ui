@@ -39,7 +39,7 @@ const InjectDefaultTray: React.FC<{ defaultTrayId?: any }> = ({ defaultTrayId })
  */
 const TrayConfigurationRegionInput: React.FC<{ trayConfigurationId?: any }> = React.memo(({ trayConfigurationId }) => {
     const { data: trayConfiguration, isLoading } = useGetOne(
-        'trays',
+        'tray_configurations',
         { id: trayConfigurationId },
         { enabled: !!trayConfigurationId }
     );
@@ -60,7 +60,7 @@ const TrayConfigurationRegionInput: React.FC<{ trayConfigurationId?: any }> = Re
 const CreateComponent: React.FC = () => {
     // load just the top‐ranked tray configuration
     const { data: trays } = useGetList(
-        'trays',
+        'tray_configurations',
         { pagination: { page: 1, perPage: 1 }, sort: { field: 'experiment_default', order: 'ASC' } }
     );
     const defaultTrayId = trays?.[0]?.id;
@@ -92,7 +92,7 @@ const CreateComponent: React.FC = () => {
 
                 <ReferenceInput
                     source="tray_configuration_id"
-                    reference="trays"
+                    reference="tray_configurations"
                     sort={{ field: 'experiment_default', order: 'ASC' }}
                     defaultValue={defaultTrayId}
                 >

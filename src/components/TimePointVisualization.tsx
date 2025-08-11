@@ -197,7 +197,7 @@ export const TimePointVisualization = () => {
 
     // Get tray configuration
     const { data: trayConfiguration, isLoading: trayLoading } = useGetOne(
-        'trays',
+        'tray_configurations',
         { id: record?.tray_configuration_id },
         { enabled: !!record?.tray_configuration_id }
     );
