@@ -62,6 +62,7 @@ export interface EnhancedTreatmentSelectorProps {
     existingRegionTreatments?: ExistingRegionTreatment[];
     currentRegionIndex?: number;
     currentRegionName?: string;
+    filteredTreatments?: Treatment[]; // Add option to provide pre-filtered treatments
 }
 
 export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps> = ({
@@ -73,7 +74,8 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
     compact = false,
     existingRegionTreatments = [],
     currentRegionIndex,
-    currentRegionName = 'this region'
+    currentRegionName = 'this region',
+    filteredTreatments
 }) => {
     const dataProvider = useDataProvider();
     const [open, setOpen] = useState(false);
@@ -261,6 +263,14 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
             setLoading(false);
         }
     }, [dataProvider]);
+
+    // Use filtered treatments if provided
+    useEffect(() => {
+        if (filteredTreatments && filteredTreatments.length > 0) {
+            setTreatmentOptions(filteredTreatments);
+            setMode('project'); // Set to project mode when using filtered treatments
+        }
+    }, [filteredTreatments]);
 
     // Event handlers
     const handleOpen = () => {
@@ -527,87 +537,107 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
                                 </Divider>
                             )}
 
-                            {/* Mode Toggle */}
-                            <Box>
-                                <Typography variant="h6" gutterBottom>
-                                    Select New Treatment
-                                </Typography>
-                                <Typography variant="subtitle2" gutterBottom>
-                                    Sample Type
-                                </Typography>
-                                <ToggleButtonGroup
-                                    value={mode}
-                                    exclusive
-                                    onChange={handleModeChange}
-                                    aria-label="sample type"
-                                    fullWidth
-                                >
-                                    <ToggleButton value="project" aria-label="project samples">
-                                        Project Samples
-                                    </ToggleButton>
-                                    <ToggleButton value="pure_water" aria-label="pure water samples">
-                                        Pure Water Samples
-                                    </ToggleButton>
-                                </ToggleButtonGroup>
-                            </Box>
+                            {/* Mode Toggle - Hide when using filtered treatments */}
+                            {!filteredTreatments && (
+                                <Box>
+                                    <Typography variant="h6" gutterBottom>
+                                        Select New Treatment
+                                    </Typography>
+                                    <Typography variant="subtitle2" gutterBottom>
+                                        Sample Type
+                                    </Typography>
+                                    <ToggleButtonGroup
+                                        value={mode}
+                                        exclusive
+                                        onChange={handleModeChange}
+                                        aria-label="sample type"
+                                        fullWidth
+                                    >
+                                        <ToggleButton value="project" aria-label="project samples">
+                                            Project Samples
+                                        </ToggleButton>
+                                        <ToggleButton value="pure_water" aria-label="pure water samples">
+                                            Pure Water Samples
+                                        </ToggleButton>
+                                    </ToggleButtonGroup>
+                                </Box>
+                            )}
+
+                            {/* Filtered treatments mode header */}
+                            {filteredTreatments && (
+                                <Box>
+                                    <Typography variant="h6" gutterBottom>
+                                        Select Treatment
+                                    </Typography>
+                                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                        Choose from available treatments
+                                    </Typography>
+                                </Box>
+                            )}
 
                             {mode === 'project' ? (
                                 <>
                                     {/* Project mode - Location -> Sample -> Treatment */}
-                                    <Box>
-                                        <Typography variant="subtitle2" gutterBottom>
-                                            1. Select Location
-                                        </Typography>
-                                        <FormControl fullWidth variant="outlined">
-                                            <InputLabel>Location</InputLabel>
-                                            <Select
-                                                value={locationId || ''}
-                                                onChange={handleLocationChange}
-                                                label="Location"
-                                                disabled={loading}
-                                            >
-                                                <MenuItem value="">
-                                                    <em>Select a location...</em>
-                                                </MenuItem>
-                                                {locationOptions.map(location => (
-                                                    <MenuItem key={location.id} value={location.id}>
-                                                        {location.name}
-                                                    </MenuItem>
-                                                ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Box>
-
-                                    {locationId && (
-                                        <Box>
-                                            <Typography variant="subtitle2" gutterBottom>
-                                                2. Select Sample
-                                            </Typography>
-                                            <FormControl fullWidth variant="outlined">
-                                                <InputLabel>Sample</InputLabel>
-                                                <Select
-                                                    value={sampleId || ''}
-                                                    onChange={handleSampleChange}
-                                                    label="Sample"
-                                                    disabled={loading || !locationId}
-                                                >
-                                                    <MenuItem value="">
-                                                        <em>Select a sample...</em>
-                                                    </MenuItem>
-                                                    {sampleOptions.map(sample => (
-                                                        <MenuItem key={sample.id} value={sample.id}>
-                                                            {sample.name}
+                                    {/* Skip location and sample selection when using filtered treatments */}
+                                    {!filteredTreatments && (
+                                        <>
+                                            <Box>
+                                                <Typography variant="subtitle2" gutterBottom>
+                                                    1. Select Location
+                                                </Typography>
+                                                <FormControl fullWidth variant="outlined">
+                                                    <InputLabel>Location</InputLabel>
+                                                    <Select
+                                                        value={locationId || ''}
+                                                        onChange={handleLocationChange}
+                                                        label="Location"
+                                                        disabled={loading}
+                                                    >
+                                                        <MenuItem value="">
+                                                            <em>Select a location...</em>
                                                         </MenuItem>
-                                                    ))}
-                                                </Select>
-                                            </FormControl>
-                                        </Box>
+                                                        {locationOptions.map(location => (
+                                                            <MenuItem key={location.id} value={location.id}>
+                                                                {location.name}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            </Box>
+
+                                            {locationId && (
+                                                <Box>
+                                                    <Typography variant="subtitle2" gutterBottom>
+                                                        2. Select Sample
+                                                    </Typography>
+                                                    <FormControl fullWidth variant="outlined">
+                                                        <InputLabel>Sample</InputLabel>
+                                                        <Select
+                                                            value={sampleId || ''}
+                                                            onChange={handleSampleChange}
+                                                            label="Sample"
+                                                            disabled={loading || !locationId}
+                                                        >
+                                                            <MenuItem value="">
+                                                                <em>Select a sample...</em>
+                                                            </MenuItem>
+                                                            {sampleOptions.map(sample => (
+                                                                <MenuItem key={sample.id} value={sample.id}>
+                                                                    {sample.name}
+                                                                </MenuItem>
+                                                            ))}
+                                                        </Select>
+                                                    </FormControl>
+                                                </Box>
+                                            )}
+                                        </>
                                     )}
 
-                                    {sampleId && (
+                                    {/* Treatment selection - works for both filtered and normal mode */}
+                                    {(sampleId || filteredTreatments) && (
                                         <Box>
                                             <Typography variant="subtitle2" gutterBottom>
-                                                3. Select Treatment
+                                                {filteredTreatments ? 'Select Treatment' : '3. Select Treatment'}
                                             </Typography>
                                             <FormControl fullWidth variant="outlined">
                                                 <InputLabel>Treatment</InputLabel>
@@ -615,7 +645,7 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
                                                     value={treatmentId || ''}
                                                     onChange={handleTreatmentChange}
                                                     label="Treatment"
-                                                    disabled={loading || !sampleId}
+                                                    disabled={loading || (!sampleId && !filteredTreatments)}
                                                 >
                                                     <MenuItem value="">
                                                         <em>Select a treatment...</em>

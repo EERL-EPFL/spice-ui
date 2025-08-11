@@ -495,6 +495,7 @@ export const RegionInput: React.FC<{
   showTimePointVisualization?: boolean; // Add option to show time point data
   viewMode?: "regions" | "results"; // External viewMode control
   hideInternalToggle?: boolean; // Option to hide the internal toggle
+  filteredTreatments?: any[]; // Add option to filter treatments for wizard mode
 }> = (props) => {
   const dataProvider = useDataProvider();
   const record = useRecordContext(); // Get the current experiment record for time point data
@@ -1597,6 +1598,7 @@ export const RegionInput: React.FC<{
                               value={r.treatment_id || ""}
                               label=""
                               disabled={readOnly}
+                              filteredTreatments={props.filteredTreatments}
                               onChange={(treatmentId) => {
                                 if (!readOnly) {
                                   handleRegionChange(
