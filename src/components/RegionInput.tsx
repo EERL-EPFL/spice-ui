@@ -171,15 +171,14 @@ interface SingleRegion {
   };
 }
 
+// Updated TrayConfig to match new API structure
 interface TrayConfig {
   order_sequence: number;
   rotation_degrees: number;
-  trays: Array<{
-    name: string;
-    qty_x_axis: number;
-    qty_y_axis: number;
-    well_relative_diameter?: string;
-  }>;
+  name?: string;
+  qty_x_axis?: number;
+  qty_y_axis?: number;
+  well_relative_diameter?: string;
 }
 
 // Colorblind‐safe palette (ColorBrewer "Dark2")
@@ -650,7 +649,7 @@ export const RegionInput: React.FC<{
       
       // Find the tray configuration for this region
       const trayInfo = flatTrays.find(
-        (t) => t.trayConfig.order_sequence === region.tray_sequence_id
+        (t) => t.tray.order_sequence === region.tray_sequence_id
       );
       
       // Check if this tray matches the well's tray name
@@ -969,15 +968,12 @@ export const RegionInput: React.FC<{
                   const color =
                     COLOR_PALETTE[colorIndex % COLOR_PALETTE.length];
 
-                  // Find the tray config by tray name to get its order_sequence (tray_sequence_id)
-                  const trayConfigInfo = trayConfiguration?.trays?.find((tc) =>
-                    tc.trays.some((t) => t.name === region.tray),
-                  );
-                  const trayInfo = trayConfigInfo?.trays.find(
+                  // Find the tray by name to get its order_sequence (tray_sequence_id)
+                  const trayInfo = trayConfiguration?.trays?.find(
                     (t) => t.name === region.tray,
                   );
 
-                  if (trayConfigInfo && trayInfo) {
+                  if (trayInfo) {
                     const upperLeftCell = parseCell(
                       region.upper_left,
                       trayInfo,
@@ -989,7 +985,7 @@ export const RegionInput: React.FC<{
 
                     importedRegions.push({
                       name: regionName,
-                      tray_sequence_id: trayConfigInfo.order_sequence, // Use the order_sequence as tray_sequence_id
+                      tray_sequence_id: trayInfo.order_sequence, // Use the order_sequence as tray_sequence_id
                       col_min: upperLeftCell.col,
                       col_max: lowerRightCell.col,
                       row_min: upperLeftCell.row,
@@ -1052,16 +1048,15 @@ export const RegionInput: React.FC<{
     }
 
     // Otherwise, process the tray configuration
+    // Note: With the new schema, trays are already flattened in trayConfiguration.trays
     const flattened = [];
-    for (const trayConfig of trayConfiguration.trays) {
-      for (const tray of trayConfig.trays) {
-        flattened.push({
-          trayConfig,
-          tray,
-          trayName: tray.name,
-          rotation: trayConfig.rotation_degrees,
-        });
-      }
+    for (const tray of trayConfiguration.trays) {
+      flattened.push({
+        trayConfig: trayConfiguration,
+        tray,
+        trayName: tray.name,
+        rotation: tray.rotation_degrees,
+      });
     }
     return [null, flattened];
   }, [trayConfiguration, props.label, props.source, isRequired]);
@@ -1125,7 +1120,7 @@ export const RegionInput: React.FC<{
 
       // Find the tray info by matching the order_sequence with the region's effective tray_sequence_id
       const trayInfo = flatTrays.find(
-        (t) => t.trayConfig.order_sequence === effectiveTrayId,
+        (t) => t.tray.order_sequence === effectiveTrayId,
       );
 
       if (trayInfo) {
@@ -1223,13 +1218,13 @@ export const RegionInput: React.FC<{
 
             // Check if this region's coordinates are within this tray's bounds
             if (
-              region.row_max < trayConfig.trays[0].qty_y_axis &&
-              region.col_max < trayConfig.trays[0].qty_x_axis
+              region.row_max < (trayConfig.tray.qty_y_axis || 0) &&
+              region.col_max < (trayConfig.tray.qty_x_axis || 0)
             ) {
               console.log(
-                `Migrating region "${region.name}" to tray_sequence_id: ${trayConfig.order_sequence}`,
+                `Migrating region "${region.name}" to tray_sequence_id: ${trayConfig.tray.order_sequence}`,
               );
-              return { ...region, tray_sequence_id: trayConfig.order_sequence };
+              return { ...region, tray_sequence_id: trayConfig.tray.order_sequence };
             }
           }
 
@@ -1320,7 +1315,7 @@ export const RegionInput: React.FC<{
                 ) {
                   return index === 0; // Show on first tray only
                 }
-                return r.tray_sequence_id === trayConfig.order_sequence;
+                return r.tray_sequence_id === tray.order_sequence;
               })
               .map((r) => {
                 // Create a display name that includes treatment and sample info
@@ -1357,7 +1352,7 @@ export const RegionInput: React.FC<{
                   textAlign="center"
                 >
                   {trayName} ({rotation}°)
-                  {trayTemperatures.has(trayConfig.order_sequence) && (
+                  {trayTemperatures.has(tray.order_sequence) && (
                     <span
                       style={{
                         display: "block",
@@ -1367,7 +1362,7 @@ export const RegionInput: React.FC<{
                     >
                       Avg:{" "}
                       {trayTemperatures
-                        .get(trayConfig.order_sequence)
+                        .get(tray.order_sequence)
                         ?.toFixed(1)}
                       °C
                     </span>
@@ -1387,7 +1382,7 @@ export const RegionInput: React.FC<{
                             upperLeft: regionObj.upperLeft,
                             lowerRight: regionObj.lowerRight,
                             trayConfig: tray,
-                            trayId: trayConfig.order_sequence,
+                            trayId: tray.order_sequence,
                           })
                   }
                   existingRegions={existingRegions}
@@ -1475,7 +1470,7 @@ export const RegionInput: React.FC<{
 
                     // Find the tray config and rotation for this region
                     const trayInfo = flatTrays.find(
-                      (t) => t.trayConfig.order_sequence === effectiveTrayId,
+                      (t) => t.tray.order_sequence === effectiveTrayId,
                     );
                     const trayConfig = trayInfo?.tray;
                     const rotation = trayInfo?.rotation || 0;

@@ -258,6 +258,30 @@ const dataProvider = (
             method: 'POST',
             body: formData,
         }).then(({ json }) => ({ data: json }));
+    },
+    loadAssetImage: async (assetId: string, authToken: string) => {
+        const url = `${apiUrl}/assets/${assetId}/view`;
+        
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to load asset: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+
+        return {
+            data: {
+                blobUrl,
+                contentType: response.headers.get('content-type'),
+            }
+        };
     }
 });
 

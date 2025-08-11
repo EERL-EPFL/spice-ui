@@ -18,7 +18,7 @@ import TrayDisplay from '../components/TrayDisplay';
 const TrayConfigurationDisplay = () => {
     const record = useRecordContext();
 
-    if (!record || !record.trays) {
+    if (!record || !record.trays || record.trays.length === 0) {
         return <Typography>No tray configuration data available</Typography>;
     }
 
@@ -28,28 +28,24 @@ const TrayConfigurationDisplay = () => {
                 Tray Configuration
             </Typography>
             <Grid container spacing={3}>
-                {record.trays.map((trayConfig: any, configIndex: number) => (
-                    <Grid item key={configIndex} xs={12}>
+                {record.trays.map((tray: any, index: number) => (
+                    <Grid item key={index} xs={12} md={6}>
                         <Typography
                             variant="subtitle1"
                             marginBottom={1}
                             align="center"
                         >
-                            Tray {trayConfig.order_sequence} - {trayConfig.rotation_degrees}° rotation
+                            Tray {tray.order_sequence} - {tray.rotation_degrees}° rotation
                         </Typography>
-                        <Grid container spacing={2}>
-                            {trayConfig.trays.map((tray: any, trayIndex: number) => (
-                                <Grid item key={trayIndex}>
-                                    <TrayDisplay
-                                        name={tray.name}
-                                        qtyXAxis={tray.qty_x_axis}
-                                        qtyYAxis={tray.qty_y_axis}
-                                        rotation={trayConfig.rotation_degrees}
-                                        wellDiameter={tray.well_relative_diameter}
-                                    />
-                                </Grid>
-                            ))}
-                        </Grid>
+                        <Box display="flex" justifyContent="center">
+                            <TrayDisplay
+                                name={tray.name}
+                                qtyXAxis={tray.qty_x_axis}
+                                qtyYAxis={tray.qty_y_axis}
+                                rotation={tray.rotation_degrees}
+                                wellDiameter={tray.well_relative_diameter}
+                            />
+                        </Box>
                     </Grid>
                 ))}
             </Grid>

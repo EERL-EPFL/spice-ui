@@ -18,6 +18,7 @@ import {
   Error as ErrorIcon,
   ExpandMore as ExpandMoreIcon,
   Description as DescriptionIcon,
+  CheckCircle as CheckCircleIcon,
 } from "@mui/icons-material";
 import { useDropzone } from "react-dropzone";
 import { useNotify, useDataProvider, useRecordContext } from "react-admin";

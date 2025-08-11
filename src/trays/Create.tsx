@@ -1,21 +1,17 @@
 import {
     Create,
     SimpleForm,
-    TextField,
     TextInput,
     required,
     NumberInput,
-    DateTimeInput,
-    ReferenceInput,
     SelectInput,
-    BooleanField,
     BooleanInput,
     ArrayInput,
     SimpleFormIterator,
     FormDataConsumer,
 } from 'react-admin';
 import { Box, Paper, Typography } from '@mui/material';
-import TrayDisplay from '../components/TrayDisplay'; // Adjust the import based on your file structure
+import TrayDisplay from '../components/TrayDisplay';
 
 const CreateComponent = () => {
     return (
@@ -33,7 +29,6 @@ const CreateComponent = () => {
         >
             <SimpleForm>
                 {/* Top section with basic tray info */}
-                <TextField source="id" />
                 <TextInput source="name" validate={[required()]} />
                 <BooleanInput source="experiment_default" />
                 <ArrayInput source="trays" label="Tray Configurations">
@@ -59,7 +54,7 @@ const CreateComponent = () => {
                                 {/* Left: Tray parameters (single column) */}
                                 <Box sx={{ minWidth: 260, maxWidth: 340, flex: '0 0 320px', display: 'flex', flexDirection: 'column', gap: 2 }}>
                                     <TextInput
-                                        source="trays[0].name"
+                                        source="name"
                                         label="Tray Name"
                                         validate={[required()]}
                                         fullWidth
@@ -75,43 +70,47 @@ const CreateComponent = () => {
                                         ]}
                                         validate={[required()]}
                                         fullWidth
+                                        defaultValue={0}
                                     />
                                     <NumberInput
-                                        source="trays[0].qty_x_axis"
+                                        source="qty_x_axis"
                                         label="Columns"
                                         validate={[required()]}
                                         min={1}
                                         max={50}
                                         fullWidth
+                                        defaultValue={12}
                                     />
                                     <NumberInput
-                                        source="trays[0].qty_y_axis"
+                                        source="qty_y_axis"
                                         label="Rows"
                                         validate={[required()]}
                                         min={1}
                                         max={50}
                                         fullWidth
+                                        defaultValue={8}
                                     />
-                                    <TextInput
-                                        source="trays[0].well_relative_diameter"
+                                    <NumberInput
+                                        source="well_relative_diameter"
                                         label="Well diameter"
                                         fullWidth
-                                        defaultValue={0.6}
+                                        defaultValue={2.5}
+                                        step={0.1}
+                                        min={0.1}
                                     />
                                 </Box>
                                 {/* Right: Tray preview (fixed width) */}
                                 <Box sx={{ minWidth: 370, maxWidth: 420, flex: '0 0 370px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <FormDataConsumer>
                                         {({ scopedFormData }) => {
-                                            const tray = scopedFormData?.trays?.[0] || {};
-                                            if (tray.name && tray.qty_x_axis && tray.qty_y_axis) {
+                                            if (scopedFormData?.name && scopedFormData?.qty_x_axis && scopedFormData?.qty_y_axis) {
                                                 return (
                                                     <TrayDisplay
-                                                        name={tray.name}
-                                                        qtyXAxis={parseInt(tray.qty_x_axis) || 8}
-                                                        qtyYAxis={parseInt(tray.qty_y_axis) || 12}
+                                                        name={scopedFormData.name}
+                                                        qtyXAxis={parseInt(scopedFormData.qty_x_axis) || 12}
+                                                        qtyYAxis={parseInt(scopedFormData.qty_y_axis) || 8}
                                                         rotation={parseInt(scopedFormData.rotation_degrees) || 0}
-                                                        wellDiameter={tray.well_relative_diameter}
+                                                        wellDiameter={scopedFormData.well_relative_diameter || 2.5}
                                                         maxWidth={350}
                                                         maxHeight={350}
                                                     />

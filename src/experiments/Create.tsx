@@ -58,7 +58,7 @@ const TrayConfigurationRegionInput: React.FC<{ trayConfigurationId?: any }> = Re
 });
 
 const CreateComponent: React.FC = () => {
-    // load just the top‐ranked tray
+    // load just the top‐ranked tray configuration
     const { data: trays } = useGetList(
         'trays',
         { pagination: { page: 1, perPage: 1 }, sort: { field: 'experiment_default', order: 'ASC' } }

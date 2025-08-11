@@ -19,14 +19,16 @@ import {
     Labeled,
     useGetOne,
     useRefresh,
+    useDataProvider,
 } from "react-admin";
 import React, { useEffect, useState } from "react";
-import { Button, Box, Card, CardContent, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup, Divider } from "@mui/material";
+import { Button, Box, Card, CardContent, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup, Divider, Dialog, DialogContent, DialogTitle, IconButton } from "@mui/material";
 import DownloadIcon from '@mui/icons-material/Download';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import ScienceIcon from '@mui/icons-material/Science';
+import { Close } from '@mui/icons-material';
 import { UppyUploader } from "../uploader/Uppy";
 import { PhaseChangeUploader } from "../uploader/PhaseChangeUploader";
 import OptimizedExcelUploader from "../uploader/OptimizedExcelUploader";
@@ -259,11 +261,139 @@ const ThinLineUploader: React.FC<{
     );
 };
 
+// Download function for individual assets
+const downloadAsset = async (record: any, authProvider: any) => {
+    try {
+        const token = await authProvider.getToken();
+        const response = await fetch(`/api/assets/${record.id}/download`, {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = record.original_filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        } else {
+            console.error("Failed to download asset");
+        }
+    } catch (error) {
+        console.error("Error during download:", error);
+    }
+};
+
+// Image viewer modal component
+const AssetImageViewer = ({ record, open, onClose }: { record: any; open: boolean; onClose: () => void }) => {
+    const authProvider = useAuthProvider();
+    const dataProvider = useDataProvider();
+    const [imageSrc, setImageSrc] = React.useState<string>('');
+    const [loading, setLoading] = React.useState(false);
+    
+    React.useEffect(() => {
+        if (!record || !open) return;
+        
+        const loadImage = async () => {
+            setLoading(true);
+            try {
+                const token = await authProvider.getToken();
+                const result = await dataProvider.loadAssetImage(record.id, token);
+                setImageSrc(result.data.blobUrl);
+            } catch (error) {
+                console.error("Error loading image:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadImage();
+    }, [record, open, authProvider, dataProvider]);
+
+    // Clean up the object URL when closing or changing record
+    React.useEffect(() => {
+        return () => {
+            if (imageSrc && imageSrc.startsWith('blob:')) {
+                window.URL.revokeObjectURL(imageSrc);
+            }
+        };
+    }, [imageSrc]);
+    
+    if (!record || !open) return null;
+    
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {record.original_filename}
+                <IconButton onClick={onClose}>
+                    <Close />
+                </IconButton>
+            </DialogTitle>
+            <DialogContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+                {loading ? (
+                    <Typography>Loading image...</Typography>
+                ) : imageSrc ? (
+                    <img
+                        src={imageSrc}
+                        alt={record.original_filename}
+                        style={{ width: '100%', height: 'auto', maxHeight: '80vh', objectFit: 'contain' }}
+                        onError={(e) => {
+                            console.error("Image failed to load:", e);
+                            setImageSrc('');
+                        }}
+                    />
+                ) : (
+                    <Typography color="error">Failed to load image</Typography>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+// Download button component for assets
+const AssetDownloadButton = ({ record }: { record: any }) => {
+    const authProvider = useAuthProvider();
+    
+    return (
+        <Button
+            size="small"
+            startIcon={<DownloadIcon />}
+            onClick={() => downloadAsset(record, authProvider)}
+            sx={{ mr: 1 }}
+        >
+            Download
+        </Button>
+    );
+};
+
+// View button component for images
+const AssetViewButton = ({ record, onView }: { record: any; onView: (record: any) => void }) => {
+    const isImage = record.type === 'image';
+    
+    if (!isImage) return null;
+    
+    return (
+        <Button
+            size="small"
+            startIcon={<VisibilityIcon />}
+            onClick={() => onView(record)}
+        >
+            Preview
+        </Button>
+    );
+};
+
 const TabbedContent = () => {
     const record = useRecordContext();
     const refresh = useRefresh();
     const [viewMode, setViewMode] = useState('regions');
     const [previousHasResults, setPreviousHasResults] = useState(false);
+    const [imageViewerOpen, setImageViewerOpen] = useState(false);
+    const [selectedAsset, setSelectedAsset] = useState(null);
     
     // Get asset count for tab label
     const assetCount = record?.assets?.length || 0;
@@ -284,9 +414,20 @@ const TabbedContent = () => {
         setViewMode(newViewMode);
     };
 
+    const handleAssetView = (asset: any) => {
+        setSelectedAsset(asset);
+        setImageViewerOpen(true);
+    };
+
+    const handleCloseImageViewer = () => {
+        setImageViewerOpen(false);
+        setSelectedAsset(null);
+    };
+
     return (
-        <TabbedShowLayout>
-            <TabbedShowLayout.Tab label="Details">
+        <>
+            <TabbedShowLayout>
+                <TabbedShowLayout.Tab label="Details">
                 <Box sx={{ mb: 3 }}>
                     {/* Top section with key info in 3 columns */}
                     <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={3} sx={{ mb: 3 }}>
@@ -383,10 +524,25 @@ const TabbedContent = () => {
                             }
                         />
                         <DateField source="created_at" showTime />
+                        <FunctionField
+                            label="Actions"
+                            render={record => (
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <AssetDownloadButton record={record} />
+                                    <AssetViewButton record={record} onView={handleAssetView} />
+                                </div>
+                            )}
+                        />
                     </Datagrid>
                 </ReferenceManyField>
-            </TabbedShowLayout.Tab>
-        </TabbedShowLayout>
+                </TabbedShowLayout.Tab>
+            </TabbedShowLayout>
+            <AssetImageViewer
+                record={selectedAsset}
+                open={imageViewerOpen}
+                onClose={handleCloseImageViewer}
+            />
+        </>
     );
 };
 
