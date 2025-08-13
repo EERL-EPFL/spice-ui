@@ -18,7 +18,13 @@ import '@uppy/drag-drop/dist/style.min.css';
 import '@uppy/status-bar/dist/style.min.css';
 import './UppyUploader.css'; // Import custom CSS
 
-export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) => {
+export const UppyUploader = ({ 
+    compact = false, 
+    allowOverwrite = false
+}: { 
+    compact?: boolean; 
+    allowOverwrite?: boolean;
+} = {}) => {
     const record = useRecordContext();
     if (!record) {
         return null;
@@ -28,43 +34,45 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
     const token = auth.getToken();
     const refresh = useRefresh();
     const notify = useNotify();
+    
     const [isDragActive, setIsDragActive] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
     const [uploadMessage, setUploadMessage] = useState('');
     const [uploadDetails, setUploadDetails] = useState<{successful: any[], failed: any[]}>({successful: [], failed: []});
+    const [refreshInterval, setRefreshInterval] = useState<NodeJS.Timeout | null>(null);
     
-    const headers = {
-        authorization: `Bearer ${token}`,
-    };
-
     const [uppy] = useState(() => new Uppy({
-        // Allow multiple files for general asset uploads
+        // Allow unlimited files for general asset uploads
         restrictions: { 
-            maxNumberOfFiles: 10,
-            maxFileSize: 50 * 1024 * 1024, // 50MB per file
+            maxFileSize: 50 * 1024 * 1024, // 50MB per file (keep this limit)
         },
         autoProceed: true, // Automatically upload files when they're added
+        onBeforeFileAdded: (currentFile, files) => {
+            // Check file size (no logging to avoid UI slowdown)
+            if (currentFile.size > 50 * 1024 * 1024) {
+                notify(`File ${currentFile.name} is too large (max 50MB)`, { type: 'error' });
+                return false;
+            }
+            return true;
+        },
     }).use(XHR, {
         endpoint: `/api/experiments/${id}/uploads`,
-        headers: headers,
-        limit: 25,
+        headers: {
+            authorization: `Bearer ${token}`,
+        },
+        limit: 5, // Balanced limit to handle many files without overwhelming server
         validateStatus: (statusCode: number) => {
             // Tell Uppy to treat 409 as a validation error rather than network error
             return statusCode >= 200 && statusCode < 300;
         },
         onAfterResponse: (response, retryCount, options) => {
-            console.log('onAfterResponse - full response object:', response);
-            console.log('onAfterResponse - response.response:', response.response);
-            console.log('onAfterResponse - response.status:', response.status);
-            
             if (response.status === 200) {
-                refresh();
+                // Don't refresh after each individual file - wait for batch completion
                 return response;
             } else if (response.status === 409) {
-                // For 409, we want to extract the actual server message
-                // and throw a more specific error that our error handler can catch
+                // For 409, extract the server message for duplicate files
                 let serverMessage = 'Duplicate file - already exists in experiment';
                 
                 // Server returns plain text for 409 errors
@@ -73,8 +81,6 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
                 } else if (response.responseText) {
                     serverMessage = response.responseText;
                 }
-                
-                console.log('Extracted server message for 409:', serverMessage);
                 
                 // Create a new error object that contains the server message
                 const error = new Error(serverMessage) as any;
@@ -87,6 +93,19 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
         }
     }));
 
+    // Update headers when allowOverwrite changes
+    useEffect(() => {
+        const xhr = uppy.getPlugin('XHRUpload');
+        if (xhr) {
+            xhr.setOptions({
+                headers: {
+                    authorization: `Bearer ${token}`,
+                    ...(allowOverwrite && { 'x-allow-overwrite': 'true' }),
+                },
+            });
+        }
+    }, [allowOverwrite, token, uppy]);
+
     // Set up Uppy event listeners
     useEffect(() => {
         const handleUploadStart = () => {
@@ -95,6 +114,22 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
             setUploadProgress(0);
             setUploadMessage('');
             setUploadDetails({successful: [], failed: []});
+            
+            // Start periodic refresh every 10 seconds during upload
+            const queuedFiles = uppy.getFiles().length;
+            if (queuedFiles > 50) { // Only for larger uploads
+                const interval = setInterval(() => {
+                    refresh();
+                }, 10000); // Refresh every 10 seconds
+                setRefreshInterval(interval);
+            }
+            
+            // Show notification for very large uploads
+            if (queuedFiles > 1000) {
+                notify(`📦 Starting bulk upload of ${queuedFiles} files. This may take several minutes...`, { 
+                    type: 'info' 
+                });
+            }
         };
 
         const handleProgress = (progress: number) => {
@@ -103,6 +138,12 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
 
         const handleComplete = (result: any) => {
             setIsUploading(false);
+            
+            // Clear periodic refresh interval
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                setRefreshInterval(null);
+            }
             
             // Store detailed results for tooltip
             setUploadDetails({
@@ -124,6 +165,11 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
                 setUploadMessage(`${result.successful.length} uploaded, ${result.failed.length} failed`);
             }
             
+            // Final refresh at the end if any files were successfully uploaded
+            if (result.successful.length > 0) {
+                refresh();
+            }
+            
             // Clear Uppy state but keep status message until next upload
             setTimeout(() => {
                 uppy.cancelAll();
@@ -133,6 +179,12 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
         const handleError = (error: any) => {
             setIsUploading(false);
             setUploadStatus('error');
+            
+            // Clear periodic refresh interval
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+                setRefreshInterval(null);
+            }
             
             // Try to extract a meaningful error message
             let errorMessage = 'Upload failed';
@@ -157,8 +209,6 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
             // Let the complete handler deal with final status based on overall results
             let errorMessage = 'Upload failed';
             let isFileConflict = false;
-            
-            console.log('Upload error details:', { error, response, file: file.name });
             
             // Check for file conflict (409 status)
             if (error?.isRequestError && error?.source?.status === 409) {
@@ -240,7 +290,7 @@ export const UppyUploader = ({ compact = false }: { compact?: boolean } = {}) =>
                 }]
             }));
             
-            console.error(`Upload error for ${file.name}:`, errorMessage);
+            // Error logged internally for debugging if needed
         };
 
         uppy.on('upload', handleUploadStart);

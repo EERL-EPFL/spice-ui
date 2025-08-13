@@ -6,7 +6,6 @@ import {
 import { CssBaseline, Typography } from '@mui/material';
 
 const MyAppBar = (props: any) => {
-    console.log("props", props)
     const appBarText = () => {
         if (props.deployment) {
             if (props.deployment == 'local') {
@@ -38,8 +37,6 @@ const MyAppBar = (props: any) => {
 
 
 const MyLayout = ({ children, deployment }: { children: any; deployment: any }) => {
-    console.log("MyLayout deployment", deployment)
-    console.log("MyLayout children", children)
     return (
         <>
             <CssBaseline />

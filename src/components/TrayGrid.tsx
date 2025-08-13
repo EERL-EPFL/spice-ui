@@ -67,6 +67,8 @@ export interface WellSummary {
         average: string;
     };
     final_state: string;
+    image_filename_at_freeze?: string | null; // Image filename at time of first phase change
+    image_asset_id?: string | null; // UUID of the S3 asset for freeze-time image
     sample_name: string | null;
     treatment_name: string | null;
     treatment_id?: string;

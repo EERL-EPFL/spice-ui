@@ -4,6 +4,7 @@ import {
     TopToolbar,
     EditButton,
     DeleteButton,
+    BulkDeleteButton,
     usePermissions,
     DateField,
     NumberField,
@@ -21,10 +22,12 @@ import {
     useRefresh,
     useDataProvider,
     useNotify,
+    useListContext,
 } from "react-admin";
 import React, { useEffect, useState } from "react";
-import { Button, Box, Card, CardContent, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup, Divider, Dialog, DialogContent, DialogTitle, IconButton, Chip, CircularProgress, Tooltip } from "@mui/material";
+import { Button, Box, Card, CardContent, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup, Divider, Dialog, DialogContent, DialogTitle, IconButton, Chip, CircularProgress, Tooltip, FormControl, InputLabel, Select, MenuItem, SelectChangeEvent, Switch, FormControlLabel, TextField as MuiTextField } from "@mui/material";
 import DownloadIcon from '@mui/icons-material/Download';
+import GetAppIcon from '@mui/icons-material/GetApp';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DescriptionIcon from '@mui/icons-material/Description';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -37,6 +40,34 @@ import CloseIcon from '@mui/icons-material/Close';
 import { UppyUploader } from "../uploader/Uppy";
 import { PhaseChangeUploader } from "../uploader/PhaseChangeUploader";
 import RegionInput from '../components/RegionInput';
+
+// Helper functions for asset display
+const formatRole = (role: string | null | undefined): string => {
+    if (!role) return 'unspecified';
+    return role.replace(/_/g, ' ')
+              .split(' ')
+              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(' ');
+};
+
+const getTypeColor = (type: string | null | undefined) => {
+    switch (type) {
+        case 'image': return 'info';
+        case 'tabular': return 'success';
+        case 'netcdf': return 'warning';
+        default: return 'default';
+    }
+};
+
+const getRoleColor = (role: string | null | undefined) => {
+    switch (role) {
+        case 'camera_image': return 'secondary';
+        case 'analysis_data': return 'primary';
+        case 'temperature_data': return 'info';
+        case 'configuration': return 'warning';
+        default: return 'default';
+    }
+};
 
 
 const ShowComponentActions = () => {
@@ -66,29 +97,34 @@ const DownloadAllButton = () => {
         setIsDownloading(true);
 
         try {
-            const token = await authProvider.getToken(); // Assuming getToken is available and retrieves the auth token
+            const token = await authProvider.getToken();
 
-            const response = await fetch(`/api/experiments/${record.id}/download`, {
-                method: "GET",
+            // Step 1: Request a download token from the API
+            const tokenResponse = await fetch(`/api/experiments/${record.id}/download-token`, {
+                method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
                 },
             });
 
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `experiment_${record.id}_assets.zip`;
-                a.click();
-                window.URL.revokeObjectURL(url);
-            } else {
-                console.error("Failed to download assets");
+            if (!tokenResponse.ok) {
+                const errorText = await tokenResponse.text();
+                throw new Error(errorText || `Failed to create download token: HTTP ${tokenResponse.status}`);
             }
+
+            const { download_url } = await tokenResponse.json();
+
+            // Step 2: Navigate browser directly to download URL
+            // This triggers immediate browser download with progress bar
+            window.location.href = download_url;
+
+            // Reset button after a short delay
+            setTimeout(() => {
+                setIsDownloading(false);
+            }, 1000);
         } catch (error) {
             console.error("Error during download:", error);
-        } finally {
             setIsDownloading(false);
         }
     };
@@ -100,7 +136,7 @@ const DownloadAllButton = () => {
             onClick={handleDownload}
             disabled={isDownloading}
         >
-            {isDownloading ? "Downloading..." : "Download all"}
+            {isDownloading ? "Preparing..." : "Download all"}
         </Button>
     );
 };
@@ -156,8 +192,96 @@ const RegionsResultsToggle = ({ viewMode, onViewModeChange, hasResults }: { view
     );
 };
 
+// Image viewer component for well freeze images  
+const WellImageViewer = ({ 
+    open, 
+    onClose, 
+    imageAssetId, 
+    wellCoordinate 
+}: { 
+    open: boolean; 
+    onClose: () => void; 
+    imageAssetId: string | null; 
+    wellCoordinate: string;
+}) => {
+    const authProvider = useAuthProvider();
+    const dataProvider = useDataProvider();
+    const [imageSrc, setImageSrc] = useState<string>('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    
+    useEffect(() => {
+        if (!imageAssetId || !open) {
+            setImageSrc('');
+            setError(null);
+            return;
+        }
+        
+        const loadImage = async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const token = await authProvider.getToken();
+                const result = await dataProvider.loadAssetImage(imageAssetId, token);
+                setImageSrc(result.data.blobUrl);
+            } catch (error) {
+                console.error('Error loading well image:', error);
+                setError('Failed to load image');
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        loadImage();
+    }, [imageAssetId, open, authProvider, dataProvider]);
+
+    if (!open || !imageAssetId) return null;
+    
+    return (
+        <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Well {wellCoordinate} at Freeze Time
+                <IconButton onClick={onClose}>
+                    <CloseIcon />
+                </IconButton>
+            </DialogTitle>
+            <DialogContent>
+                {loading && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
+                        <CircularProgress />
+                        <Typography variant="body2" sx={{ ml: 2 }}>Loading image...</Typography>
+                    </Box>
+                )}
+                {error && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
+                        <Typography variant="body2" color="error">{error}</Typography>
+                    </Box>
+                )}
+                {imageSrc && !loading && !error && (
+                    <>
+                        <img
+                            src={imageSrc}
+                            alt={`Well ${wellCoordinate} at freeze time`}
+                            style={{ width: '100%', height: 'auto', maxHeight: '80vh', objectFit: 'contain' }}
+                        />
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                            Well {wellCoordinate} freeze image
+                        </Typography>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 const RegionsDisplay = ({ viewMode }: { viewMode: string }) => {
     const record = useRecordContext();
+    const [imageViewerOpen, setImageViewerOpen] = useState(false);
+    const [selectedWellImage, setSelectedWellImage] = useState<{
+        imageAssetId: string | null;
+        wellCoordinate: string;
+    } | null>(null);
+    
     const { data: trayConfiguration, isLoading } = useGetOne(
         'tray_configurations',
         { id: record?.tray_configuration_id },
@@ -175,17 +299,42 @@ const RegionsDisplay = ({ viewMode }: { viewMode: string }) => {
     // Check if we have time point data to show visualization
     const hasTimePointData = record?.results_summary && record.results_summary.total_time_points > 0;
 
+    // Handler for when user clicks on well to view image
+    const handleWellImageClick = (wellSummary: any) => {
+        if (wellSummary.image_asset_id) {
+            setSelectedWellImage({
+                imageAssetId: wellSummary.image_asset_id,
+                wellCoordinate: wellSummary.coordinate
+            });
+            setImageViewerOpen(true);
+        }
+    };
+
+    const handleCloseImageViewer = () => {
+        setImageViewerOpen(false);
+        setSelectedWellImage(null);
+    };
+
     return (
-        <RegionInput
-            source="regions"
-            label=""
-            trayConfiguration={trayConfiguration}
-            readOnly={true}
-            value={record.regions}
-            showTimePointVisualization={hasTimePointData}
-            viewMode={viewMode as "regions" | "results"}
-            hideInternalToggle={true}
-        />
+        <>
+            <RegionInput
+                source="regions"
+                label=""
+                trayConfiguration={trayConfiguration}
+                readOnly={true}
+                value={record.regions}
+                showTimePointVisualization={hasTimePointData}
+                viewMode={viewMode as "regions" | "results"}
+                hideInternalToggle={true}
+                onWellClick={handleWellImageClick}
+            />
+            <WellImageViewer
+                open={imageViewerOpen}
+                onClose={handleCloseImageViewer}
+                imageAssetId={selectedWellImage?.imageAssetId || null}
+                wellCoordinate={selectedWellImage?.wellCoordinate || ''}
+            />
+        </>
     );
 };
 
@@ -235,32 +384,59 @@ const ThinLineUploader: React.FC<{
     component: React.ReactNode;
     icon: React.ReactNode;
     color: 'primary' | 'secondary';
-}> = ({ title, component, icon, color }) => {
+    allowOverwrite?: boolean;
+    onOverwriteChange?: (enabled: boolean) => void;
+}> = ({ title, component, icon, color, allowOverwrite, onOverwriteChange }) => {
     return (
-        <Box 
-            sx={{ 
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                p: 1,
-                border: `1px solid`,
-                borderColor: color === 'primary' ? 'primary.main' : 'secondary.main',
-                borderRadius: 1,
-                backgroundColor: 'background.paper',
-                minHeight: '40px'
-            }}
-        >
-            <Box display="flex" alignItems="center" gap={1} sx={{ minWidth: '150px' }}>
-                <Box sx={{ color: color === 'primary' ? 'primary.main' : 'secondary.main' }}>
-                    {icon}
+        <Box>
+            <Box 
+                sx={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    p: 1,
+                    border: `1px solid`,
+                    borderColor: color === 'primary' ? 'primary.main' : 'secondary.main',
+                    borderRadius: 1,
+                    backgroundColor: 'background.paper',
+                    minHeight: '40px'
+                }}
+            >
+                <Box display="flex" alignItems="center" gap={1} sx={{ minWidth: '150px' }}>
+                    <Box sx={{ color: color === 'primary' ? 'primary.main' : 'secondary.main' }}>
+                        {icon}
+                    </Box>
+                    <Typography variant="body2" fontWeight="500">
+                        {title}
+                    </Typography>
                 </Box>
-                <Typography variant="body2" fontWeight="500">
-                    {title}
-                </Typography>
+                <Box sx={{ flex: 1, '& > *': { transform: 'scale(0.8)', transformOrigin: 'left center' } }}>
+                    {component}
+                </Box>
             </Box>
-            <Box sx={{ flex: 1, '& > *': { transform: 'scale(0.8)', transformOrigin: 'left center' } }}>
-                {component}
-            </Box>
+            
+            {/* Overwrite switch underneath the uploader boundary box */}
+            {onOverwriteChange && (
+                <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={allowOverwrite || false}
+                                onChange={(e) => onOverwriteChange(e.target.checked)}
+                                size="medium"
+                                color="primary"
+                            />
+                        }
+                        label="Allow overwrite existing files"
+                        sx={{ 
+                            '& .MuiFormControlLabel-label': {
+                                fontSize: '0.875rem',
+                                color: 'text.secondary'
+                            }
+                        }}
+                    />
+                </Box>
+            )}
         </Box>
     );
 };
@@ -334,7 +510,7 @@ const AssetImageViewer = ({ record, open, onClose }: { record: any; open: boolea
             <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 {record.original_filename}
                 <IconButton onClick={onClose}>
-                    <Close />
+                    <CloseIcon />
                 </IconButton>
             </DialogTitle>
             <DialogContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
@@ -547,6 +723,92 @@ const AssetDeleteButton = ({ record, onDelete }: { record: any; onDelete: () => 
     );
 };
 
+// React-admin bulk action components for assets
+const AssetBulkDeleteButton = () => {
+    const [isDeleting, setIsDeleting] = useState(false);
+    const dataProvider = useDataProvider();
+    const notify = useNotify();
+    const refresh = useRefresh();
+    
+    return (
+        <BulkDeleteButton
+            mutationMode="pessimistic"
+            confirmTitle="Delete Assets"
+            confirmContent="Are you sure you want to delete the selected assets? This action cannot be undone."
+        />
+    );
+};
+
+const AssetBulkDownloadButton = () => {
+    const [isDownloading, setIsDownloading] = useState(false);
+    const { selectedIds } = useListContext();
+    const notify = useNotify();
+    const authProvider = useAuthProvider();
+    
+    if (selectedIds.length === 0) return null;
+    
+    return (
+        <Button
+            variant="contained"
+            color="primary"
+            startIcon={isDownloading ? <CircularProgress size={16} /> : <GetAppIcon />}
+            onClick={async () => {
+                setIsDownloading(true);
+                try {
+                    const token = await authProvider.getToken();
+                    
+                    // Step 1: Request a download token from the API
+                    const tokenResponse = await fetch('/api/assets/bulk-download-token', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            asset_ids: selectedIds
+                        })
+                    });
+                    
+                    if (!tokenResponse.ok) {
+                        const errorText = await tokenResponse.text();
+                        throw new Error(errorText || `Failed to create download token: HTTP ${tokenResponse.status}`);
+                    }
+                    
+                    const { download_url } = await tokenResponse.json();
+                    
+                    // Step 2: Navigate browser directly to download URL
+                    // This triggers immediate browser download with progress bar
+                    window.location.href = download_url;
+                    
+                    // Show notification after a short delay
+                    setTimeout(() => {
+                        notify(`Downloading ${selectedIds.length} selected files...`, { type: 'info' });
+                        setIsDownloading(false);
+                    }, 500);
+                } catch (error: any) {
+                    console.error('Bulk download error:', error);
+                    notify(`Failed to download files: ${error.message || 'Unknown error'}`, { type: 'error' });
+                } finally {
+                    setIsDownloading(false);
+                }
+            }}
+            disabled={isDownloading}
+            size="small"
+            sx={{ mr: 1 }}
+        >
+            {isDownloading ? 'Preparing...' : 'Download Selected'}
+        </Button>
+    );
+};
+
+// Combined bulk actions component
+const AssetBulkActions = () => (
+    <Box sx={{ display: 'flex', gap: 1 }}>
+        <AssetBulkDownloadButton />
+        <AssetBulkDeleteButton />
+    </Box>
+);
+
 // Processing status/actions for tabular files (icons only)
 const ProcessingColumn = ({ record, onProcess }: { record: any; onProcess: () => void }) => {
     const [isProcessing, setIsProcessing] = useState(false);
@@ -732,6 +994,60 @@ const ProcessingColumn = ({ record, onProcess }: { record: any; onProcess: () =>
     }
 };
 
+// Condensed experiment details component
+const ExperimentDetailsHeader = () => {
+    const record = useRecordContext();
+    
+    return (
+        <Card sx={{ mb: 2 }}>
+            <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+                {/* Compact 2-row layout with essential info only */}
+                <Box display="grid" gridTemplateColumns="2fr 1fr 1fr 1fr" gap={2} sx={{ mb: 1 }}>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary">Name</Typography>
+                        <Typography variant="body2" fontWeight="medium">{record?.name}</Typography>
+                    </Box>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary">Date</Typography>
+                        <Typography variant="body2"><DateField source="performed_at" showTime /></Typography>
+                    </Box>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary">User</Typography>
+                        <Typography variant="body2">{record?.username}</Typography>
+                    </Box>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary">Calibration</Typography>
+                        <Typography variant="body2"><BooleanField source="is_calibration" /></Typography>
+                    </Box>
+                </Box>
+                
+                <Box display="grid" gridTemplateColumns="2fr 1fr 1fr 1fr" gap={2}>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary">Tray Configuration</Typography>
+                        <Typography variant="body2">
+                            <ReferenceField source="tray_configuration_id" reference="tray_configurations" link="show">
+                                <TextField source="name" />
+                            </ReferenceField>
+                        </Typography>
+                    </Box>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary">Start Temp</Typography>
+                        <Typography variant="body2"><NumberField source="temperature_start" />°C</Typography>
+                    </Box>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary">End Temp</Typography>
+                        <Typography variant="body2"><NumberField source="temperature_end" />°C</Typography>
+                    </Box>
+                    <Box>
+                        <Typography variant="caption" color="text.secondary">Ramp Rate</Typography>
+                        <Typography variant="body2"><NumberField source="temperature_ramp" />°C/min</Typography>
+                    </Box>
+                </Box>
+            </CardContent>
+        </Card>
+    );
+};
+
 const TabbedContent = () => {
     const record = useRecordContext();
     const refresh = useRefresh();
@@ -739,6 +1055,10 @@ const TabbedContent = () => {
     const [previousHasResults, setPreviousHasResults] = useState(false);
     const [imageViewerOpen, setImageViewerOpen] = useState(false);
     const [selectedAsset, setSelectedAsset] = useState(null);
+    const [assetTypeFilter, setAssetTypeFilter] = useState('all');
+    const [assetRoleFilter, setAssetRoleFilter] = useState('all');
+    const [filenameFilter, setFilenameFilter] = useState('');
+    const [allowOverwrite, setAllowOverwrite] = useState(false);
     
     // Get asset count for tab label
     const assetCount = record?.assets?.length || 0;
@@ -771,56 +1091,11 @@ const TabbedContent = () => {
 
     return (
         <>
-            <TabbedShowLayout>
-                <TabbedShowLayout.Tab label="Details">
-                <Box sx={{ mb: 3 }}>
-                    {/* Top section with key info in 3 columns */}
-                    <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={3} sx={{ mb: 3 }}>
-                        <Labeled>
-                            <TextField source="id" />
-                        </Labeled>
-                        <Labeled>
-                            <TextField source="name" />
-                        </Labeled>
-                        <Labeled>
-                            <DateField source="performed_at" showTime label="Date" />
-                        </Labeled>
-                    </Box>
-                    
-                    {/* General details section */}
-                    <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2} sx={{ mb: 3 }}>
-                        <Labeled>
-                            <BooleanField source="is_calibration" />
-                        </Labeled>
-                        <Labeled>
-                            <ReferenceField source="tray_configuration_id" reference="tray_configurations" link="show">
-                                <TextField source="name" />
-                            </ReferenceField>
-                        </Labeled>
-                        <Labeled>
-                            <TextField source="username" />
-                        </Labeled>
-                    </Box>
-                    
-                    {/* Divider between general info and temperature settings */}
-                    <Divider sx={{ mb: 3 }} />
-                    
-                    {/* Temperature settings section */}
-                    <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2} sx={{ mb: 3 }}>
-                        <Labeled>
-                            <NumberField source="temperature_ramp" />
-                        </Labeled>
-                        <Labeled>
-                            <NumberField source="temperature_start" />
-                        </Labeled>
-                        <Labeled>
-                            <NumberField source="temperature_end" />
-                        </Labeled>
-                    </Box>
-                </Box>
-            </TabbedShowLayout.Tab>
+            {/* Always visible experiment details at the top */}
+            <ExperimentDetailsHeader />
             
-            <TabbedShowLayout.Tab label="Regions & Results">
+            <TabbedShowLayout>
+                <TabbedShowLayout.Tab label="Regions & Results">
                 <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
                     <RegionsResultsToggle 
                         viewMode={viewMode}
@@ -842,21 +1117,191 @@ const TabbedContent = () => {
                     <Box sx={{ flex: 1 }}>
                         <ThinLineUploader 
                             title="Related Assets" 
-                            component={<UppyUploader compact={true} />}
+                            component={
+                                <UppyUploader 
+                                    compact={true} 
+                                    allowOverwrite={allowOverwrite}
+                                />
+                            }
                             icon={<CloudUploadIcon />}
                             color="secondary"
+                            allowOverwrite={allowOverwrite}
+                            onOverwriteChange={setAllowOverwrite}
                         />
                     </Box>
+                </Box>
+                
+                {/* Tabular Data Section */}
+                <Box sx={{ mb: 3 }}>
+                    <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <DescriptionIcon color="primary" />
+                        Data Processing Files
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Tabular data for experiment data processing - always visible for easy access. Select one to process results from.
+                    </Typography>
+                    <ReferenceManyField
+                        reference="assets"
+                        target="experiment_id"
+                        label="Data Files"
+                        filter={{ type: 'tabular' }}
+                    >
+                        <Box>
+                            {record?.assets?.filter((asset: any) => asset.type === 'tabular').map((asset: any, index: number) => (
+                                <Card key={asset.id} variant="outlined" sx={{ mb: 1, p: 1.5 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Box sx={{ flex: 1 }}>
+                                            <Typography variant="body2" fontWeight="medium">
+                                                {asset.original_filename}
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                                <Chip 
+                                                    label={formatRole(asset.role)} 
+                                                    size="small" 
+                                                    color={getRoleColor(asset.role)}
+                                                />
+                                                {asset.size_bytes && (
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {(asset.size_bytes / 1024 / 1024).toFixed(2)} MB
+                                                    </Typography>
+                                                )}
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Uploaded: {new Date(asset.uploaded_at).toLocaleDateString()}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                        
+                                        {/* Actions section */}
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <ProcessingColumn record={asset} onProcess={refresh} />
+                                            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+                                            <AssetDownloadButton record={asset} />
+                                            <AssetDeleteButton record={asset} onDelete={refresh} />
+                                        </Box>
+                                    </Box>
+                                </Card>
+                            ))}
+                            {(!record?.assets?.some((asset: any) => asset.type === 'tabular')) && (
+                                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
+                                    No data files uploaded yet. Upload Excel files (.xlsx) to process experiment data.
+                                </Typography>
+                            )}
+                        </Box>
+                    </ReferenceManyField>
+                </Box>
+
+                {/* Asset Filters */}
+                <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                        Filter:
+                    </Typography>
+                    <MuiTextField
+                        size="small"
+                        label="Filename"
+                        value={filenameFilter}
+                        onChange={(e) => setFilenameFilter(e.target.value)}
+                        sx={{ minWidth: 160 }}
+                        placeholder="Search by filename..."
+                    />
+                    <FormControl size="small" sx={{ minWidth: 100 }}>
+                        <InputLabel>Type</InputLabel>
+                        <Select
+                            value={assetTypeFilter}
+                            label="Type"
+                            onChange={(e: SelectChangeEvent) => setAssetTypeFilter(e.target.value)}
+                        >
+                            <MenuItem value="all">All</MenuItem>
+                            <MenuItem value="image">Images</MenuItem>
+                            <MenuItem value="tabular">Tabular</MenuItem>
+                            <MenuItem value="netcdf">NetCDF</MenuItem>
+                            <MenuItem value="unknown">Other</MenuItem>
+                        </Select>
+                    </FormControl>
+                    <FormControl size="small" sx={{ minWidth: 100 }}>
+                        <InputLabel>Role</InputLabel>
+                        <Select
+                            value={assetRoleFilter}
+                            label="Role"
+                            onChange={(e: SelectChangeEvent) => setAssetRoleFilter(e.target.value)}
+                        >
+                            <MenuItem value="all">All</MenuItem>
+                            <MenuItem value="camera_image">Camera</MenuItem>
+                            <MenuItem value="analysis_data">Analysis</MenuItem>
+                            <MenuItem value="temperature_data">Temperature</MenuItem>
+                            <MenuItem value="configuration">Config</MenuItem>
+                        </Select>
+                    </FormControl>
+                    {(assetTypeFilter !== 'all' || assetRoleFilter !== 'all' || filenameFilter.trim()) && (
+                        <Button 
+                            variant="text" 
+                            size="small" 
+                            onClick={() => {
+                                setAssetTypeFilter('all');
+                                setAssetRoleFilter('all');
+                                setFilenameFilter('');
+                            }}
+                            sx={{ whiteSpace: 'nowrap' }}
+                        >
+                            Clear
+                        </Button>
+                    )}
                 </Box>
                 <ReferenceManyField
                     reference="assets"
                     target="experiment_id"
                     label="Tags"
-                    pagination={<Pagination />}
+                    pagination={<Pagination rowsPerPageOptions={[10, 25, 50, 100, 250]} />}
+                    filter={{
+                        ...(assetTypeFilter !== 'all' && { type: assetTypeFilter }),
+                        ...(assetRoleFilter !== 'all' && { role: assetRoleFilter }),
+                        ...(filenameFilter.trim() && { original_filename: filenameFilter.trim() })
+                    }}
                 >
-                    <Datagrid rowClick={false} bulkActionButtons={false}>
+                    <Datagrid 
+                        rowClick={false} 
+                        bulkActionButtons={<AssetBulkActions />}
+                        isRowSelectable={() => true}
+                        size="small"
+                        sx={{
+                            '& .MuiTableCell-root': {
+                                padding: '4px 8px', // Reduce cell padding
+                                fontSize: '0.75rem', // Smaller font size
+                            },
+                            '& .MuiTableRow-root': {
+                                minHeight: '32px', // Reduce row height
+                            },
+                            '& .MuiChip-root': {
+                                height: '20px', // Smaller chips
+                                fontSize: '0.65rem',
+                                '& .MuiChip-label': {
+                                    paddingLeft: '6px',
+                                    paddingRight: '6px',
+                                }
+                            }
+                        }}
+                    >
                         <TextField source="original_filename" />
-                        <TextField source="type" />
+                        <FunctionField
+                            label="Type"
+                            render={record => (
+                                <Chip 
+                                    label={record.type || 'unknown'} 
+                                    size="small" 
+                                    color={getTypeColor(record.type)}
+                                    variant="outlined"
+                                />
+                            )}
+                        />
+                        <FunctionField
+                            label="Role"
+                            render={record => (
+                                <Chip 
+                                    label={formatRole(record.role)} 
+                                    size="small" 
+                                    color={getRoleColor(record.role)}
+                                />
+                            )}
+                        />
                         <FunctionField
                             source="size_bytes"
                             render={(record) =>
@@ -874,12 +1319,6 @@ const TabbedContent = () => {
                                     <AssetDeleteButton record={record} onDelete={refresh} />
                                     <AssetViewButton record={record} onView={handleAssetView} />
                                 </div>
-                            )}
-                        />
-                        <FunctionField
-                            label="Process"
-                            render={record => (
-                                <ProcessingColumn record={record} onProcess={refresh} />
                             )}
                         />
                     </Datagrid>

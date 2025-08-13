@@ -35,6 +35,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import DownloadIcon from "@mui/icons-material/Download";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import ScienceIcon from "@mui/icons-material/Science";
 import { scaleSequential } from "d3-scale";
 import { interpolateBlues } from "d3-scale-chromatic";
@@ -96,9 +97,6 @@ const parseCell = (s: string, trayConfig?: any): Cell => {
       col < 0 ||
       col >= trayConfig.qty_x_axis
     ) {
-      console.warn(
-        `Invalid cell coordinates: ${s} for tray with ${trayConfig.qty_y_axis} rows and ${trayConfig.qty_x_axis} cols`,
-      );
       return { row: 0, col: 0 };
     }
 
@@ -117,9 +115,6 @@ const cellToString = (cell: Cell, trayConfig: any): string => {
     cell.col < 0 ||
     cell.col >= trayConfig.qty_x_axis
   ) {
-    console.warn(
-      `Invalid cell coordinates: row ${cell.row}, col ${cell.col} for tray with ${trayConfig.qty_y_axis} rows and ${trayConfig.qty_x_axis} cols`,
-    );
     return "A1"; // Return safe default
   }
 
@@ -242,7 +237,8 @@ const parseYAML = (yamlText: string, trayConfigs: TrayConfig[]): any => {
 const WellDetailsDisplay: React.FC<{
   well: WellSummary;
   formatSeconds: (seconds: number) => string;
-}> = ({ well, formatSeconds }) => {
+  onViewImage?: (well: WellSummary) => void;
+}> = ({ well, formatSeconds, onViewImage }) => {
   const redirect = useRedirect();
 
   const handleTreatmentClick = () => {
@@ -259,16 +255,6 @@ const WellDetailsDisplay: React.FC<{
     }
   };
 
-  // Debug logging
-  console.log('WellDetailsDisplay - well data:', {
-    coordinate: well.coordinate,
-    sampleName: well.sample?.name,
-    treatmentSampleName: well.treatment?.sample?.name,
-    treatmentName: well.treatment?.name,
-    treatmentId: well.treatment?.id,
-    sampleId: well.sample?.id,
-    treatmentSampleId: well.treatment?.sample?.id
-  });
 
   return (
     <Box
@@ -401,6 +387,39 @@ const WellDetailsDisplay: React.FC<{
           <strong>Dilution:</strong> {well.dilution_factor}
         </Typography>
       )}
+      {well.image_filename_at_freeze && (
+        <Box mt={1} display="flex" alignItems="center">
+          <Typography variant="body2" color="text.secondary" mr={1}>
+            <strong>Image:</strong>
+            <span style={{ marginLeft: 4 }}>
+              {well.image_filename_at_freeze}
+            </span>
+          </Typography>
+          {well.image_asset_id ? (
+            <Tooltip title="View freeze image">
+              <IconButton 
+                size="small" 
+                onClick={() => onViewImage?.(well)}
+                sx={{ ml: 0.5 }}
+              >
+                <VisibilityIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <Tooltip title="Image asset doesn't exist in the experiment">
+              <span>
+                <IconButton 
+                  size="small" 
+                  disabled
+                  sx={{ ml: 0.5, color: 'text.disabled' }}
+                >
+                  <VisibilityOffIcon fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+          )}
+        </Box>
+      )}
     </Box>
   );
 };
@@ -496,6 +515,7 @@ export const RegionInput: React.FC<{
   viewMode?: "regions" | "results"; // External viewMode control
   hideInternalToggle?: boolean; // Option to hide the internal toggle
   filteredTreatments?: any[]; // Add option to filter treatments for wizard mode
+  onWellClick?: (wellSummary: any) => void; // External well click handler for image preview
 }> = (props) => {
   const dataProvider = useDataProvider();
   const record = useRecordContext(); // Get the current experiment record for time point data
@@ -1114,9 +1134,6 @@ export const RegionInput: React.FC<{
       let effectiveTrayId = region.tray_sequence_id;
       if (effectiveTrayId === undefined || effectiveTrayId === null) {
         effectiveTrayId = 1; // Default to first tray configuration
-        console.warn(
-          `Region "${region.name}" has no tray_sequence_id, defaulting to 1 for export`,
-        );
       }
 
       // Find the tray info by matching the order_sequence with the region's effective tray_sequence_id
@@ -1147,9 +1164,6 @@ export const RegionInput: React.FC<{
         });
       } else {
         // Fallback if tray info not found
-        console.warn(
-          `Tray info not found for effective tray_sequence_id: ${effectiveTrayId}`,
-        );
 
         const upperLeftStr = `${String.fromCharCode(65 + region.col_min)}${region.row_min + 1}`;
         const lowerRightStr = `${String.fromCharCode(65 + region.col_max)}${region.row_max + 1}`;
@@ -1222,17 +1236,11 @@ export const RegionInput: React.FC<{
               region.row_max < (trayConfig.tray.qty_y_axis || 0) &&
               region.col_max < (trayConfig.tray.qty_x_axis || 0)
             ) {
-              console.log(
-                `Migrating region "${region.name}" to tray_sequence_id: ${trayConfig.tray.order_sequence}`,
-              );
               return { ...region, tray_sequence_id: trayConfig.tray.order_sequence };
             }
           }
 
           // Fallback: assign to first tray
-          console.log(
-            `Fallback: Migrating region "${region.name}" to tray_sequence_id: 1`,
-          );
           return { ...region, tray_sequence_id: 1 };
         }
         return region;
@@ -1244,7 +1252,6 @@ export const RegionInput: React.FC<{
           (r, idx) => r.tray_sequence_id !== regions[idx].tray_sequence_id,
         )
       ) {
-        console.log("Applying migration fix for tray_sequence_id...");
         onChange(updatedRegions);
       }
     }
@@ -1464,9 +1471,6 @@ export const RegionInput: React.FC<{
                       // For existing regions without tray_sequence_id, we need to make an educated guess
                       // Based on the console logs, assign to first tray as fallback
                       effectiveTrayId = 1;
-                      console.warn(
-                        `Region "${r.name}" has no tray_sequence_id, defaulting to 1 in display`,
-                      );
                     }
 
                     // Find the tray config and rotation for this region
@@ -1874,6 +1878,7 @@ export const RegionInput: React.FC<{
                       <WellDetailsDisplay
                         well={selectedWell}
                         formatSeconds={formatSeconds}
+                        onViewImage={props.onWellClick}
                       />
                     )}
                   </Box>

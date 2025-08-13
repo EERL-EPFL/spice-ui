@@ -39,7 +39,6 @@ export const keycloakAuthProvider = (
   },
   async checkAuth() {
     try {
-      console.log("Checking authentication...");
       if (!client.authenticated || !client.token) {
         throw new Error("Authentication failed.");
       }
