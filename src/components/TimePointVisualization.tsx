@@ -85,7 +85,7 @@ const TrayWellGrid: React.FC<{
     });
 
     const getTooltipText = (well: WellSummary | undefined, row: number, col: number) => {
-        const coordinate = `${String.fromCharCode(64 + row)}${col}`;
+        const coordinate = `${String.fromCharCode(65 + row)}${col + 1}`;
         if (!well) return `${coordinate}: No data`;
         
         const phaseText = well.final_state === 'frozen' ? 'Frozen' : 'Liquid';
@@ -111,7 +111,7 @@ const TrayWellGrid: React.FC<{
         for (let col = 1; col <= maxCols; col++) {
             const key = `${row}-${col}`;
             const well = wellMap[key];
-            const coordinate = `${String.fromCharCode(64 + row)}${col}`;
+            const coordinate = `${String.fromCharCode(65 + row)}${col + 1}`;
             
             const backgroundColor = well?.first_phase_change_seconds !== null 
                 ? colorScale(well.first_phase_change_seconds)
@@ -152,7 +152,7 @@ const TrayWellGrid: React.FC<{
         grid.push(
             <Box key={`row-${row}`} display="flex" gap={0.5}>
                 <Box sx={{ width: 25, fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {String.fromCharCode(64 + row)}
+                    {String.fromCharCode(65 + row)}
                 </Box>
                 {rowCells}
             </Box>

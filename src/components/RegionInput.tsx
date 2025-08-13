@@ -80,15 +80,15 @@ const letterToColIndex = (letter: string, maxCols: number): number => {
 const numberToRowIndex = (num: number): number => num - 1;
 
 // Parse cell string with dynamic tray dimensions
-// Format: Letter (column) + Number (row), e.g., "A1", "D5"
+// Format: Letter (row) + Number (column), e.g., "A1", "D5"
 const parseCell = (s: string, trayConfig?: any): Cell => {
   if (!trayConfig) return { row: 0, col: 0 };
 
   const match = s.match(/^([A-Za-z])(\d{1,2})$/);
   if (match) {
-    const col = letterToColIndex(match[1], trayConfig.qty_x_axis); // Letter = column (X-axis)
+    const col = letterToColIndex(match[1], trayConfig.qty_x_axis); // Letter maps to row index (but stored in col variable for grid positioning)
     const rowNumber = parseInt(match[2], 10);
-    let row = numberToRowIndex(rowNumber); // Number = row (Y-axis)
+    let row = numberToRowIndex(rowNumber); // Number maps to column index (but stored in row variable for grid positioning)
 
     // Validate bounds to prevent invalid coordinates
     if (
@@ -106,7 +106,7 @@ const parseCell = (s: string, trayConfig?: any): Cell => {
 };
 
 // Convert Cell back to string with dynamic tray dimensions
-// Format: Letter (column) + Number (row), e.g., "A1", "D5"
+// Format: Letter (row) + Number (column), e.g., "A1", "D5"
 const cellToString = (cell: Cell, trayConfig: any): string => {
   // Validate bounds before converting
   if (
@@ -118,8 +118,8 @@ const cellToString = (cell: Cell, trayConfig: any): string => {
     return "A1"; // Return safe default
   }
 
-  const letter = colIndexToLetter(cell.col, trayConfig.qty_x_axis); // Column = letter (X-axis)
-  const rowNumber = cell.row + 1; // Row = number (Y-axis)
+  const letter = colIndexToLetter(cell.col, trayConfig.qty_x_axis); // Grid col index maps to letter (row in microplate notation)
+  const rowNumber = cell.row + 1; // Grid row index maps to number (column in microplate notation)
   return `${letter}${rowNumber}`;
 };
 

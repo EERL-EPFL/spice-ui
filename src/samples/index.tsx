@@ -16,6 +16,5 @@ export default {
 export const sampleType = {
     'bulk': 'Bulk',
     'filter': 'Filter',
-    'procedural_blank': 'ProceduralBlank',
-    'pure_water': 'PureWater'
+    'procedural_blank': 'Procedural Blank'
 };

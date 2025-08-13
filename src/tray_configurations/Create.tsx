@@ -30,7 +30,7 @@ const CreateComponent = () => {
             <SimpleForm>
                 {/* Top section with basic tray info */}
                 <TextInput source="name" validate={[required()]} />
-                <BooleanInput source="experiment_default" />
+                <BooleanInput source="experiment_default" defaultValue={true} />
                 <ArrayInput source="trays" label="Tray Configurations">
                     <SimpleFormIterator>
                         <Paper
@@ -107,8 +107,8 @@ const CreateComponent = () => {
                                                 return (
                                                     <TrayDisplay
                                                         name={scopedFormData.name}
-                                                        qtyXAxis={parseInt(scopedFormData.qty_x_axis) || 12}
-                                                        qtyYAxis={parseInt(scopedFormData.qty_y_axis) || 8}
+                                                        qtyXAxis={parseInt(scopedFormData.qty_x_axis) || 8}
+                                                        qtyYAxis={parseInt(scopedFormData.qty_y_axis) || 12}
                                                         rotation={parseInt(scopedFormData.rotation_degrees) || 0}
                                                         wellDiameter={scopedFormData.well_relative_diameter || 2.5}
                                                         maxWidth={350}

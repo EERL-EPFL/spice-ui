@@ -28,7 +28,7 @@ export const TreatmentSelector = (props: {
     const dataProvider = useDataProvider();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [mode, setMode] = useState<'project' | 'pure_water'>('project');
+    const [mode, setMode] = useState<'project' | 'procedural_blank'>('project');
     const [locationId, setLocationId] = useState<string | null>(null);
     const [sampleId, setSampleId] = useState<string | null>(null);
     const [treatmentId, setTreatmentId] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export const TreatmentSelector = (props: {
     const [locationOptions, setLocationOptions] = useState<Array<{ id: string, name: string }>>([]);
     const [sampleOptions, setSampleOptions] = useState<Array<{ id: string, name: string }>>([]);
     const [treatmentOptions, setTreatmentOptions] = useState<Array<{ id: string, name: string }>>([]);
-    const [pureWaterSampleOptions, setPureWaterSampleOptions] = useState<Array<{ id: string, name: string }>>([]);
+    const [proceduralBlankSampleOptions, setProceduralBlankSampleOptions] = useState<Array<{ id: string, name: string }>>([]);
 
     // Load locations when dialog opens
     const loadLocations = useCallback(async () => {
@@ -57,19 +57,19 @@ export const TreatmentSelector = (props: {
         }
     }, [dataProvider]);
 
-    // Load pure water samples
-    const loadPureWaterSamples = useCallback(async () => {
+    // Load procedural blank samples
+    const loadProceduralBlankSamples = useCallback(async () => {
         setLoading(true);
         try {
             const { data } = await dataProvider.getList('samples', {
                 pagination: { page: 1, perPage: 500 },
                 sort: { field: 'name', order: 'ASC' },
-                filter: { type: 'pure_water' }
+                filter: { type: 'procedural_blank' }
             });
-            setPureWaterSampleOptions(data);
+            setProceduralBlankSampleOptions(data);
         } catch (error) {
-            console.error('Error loading pure water samples:', error);
-            setPureWaterSampleOptions([]);
+            console.error('Error loading procedural blank samples:', error);
+            setProceduralBlankSampleOptions([]);
         } finally {
             setLoading(false);
         }
@@ -122,7 +122,7 @@ export const TreatmentSelector = (props: {
     }, [dataProvider]);
 
     // Handle mode change
-    const handleModeChange = useCallback((event: React.MouseEvent<HTMLElement>, newMode: 'project' | 'pure_water') => {
+    const handleModeChange = useCallback((event: React.MouseEvent<HTMLElement>, newMode: 'project' | 'procedural_blank') => {
         if (newMode !== null) {
             setMode(newMode);
             // Reset all selections when mode changes
@@ -132,16 +132,16 @@ export const TreatmentSelector = (props: {
             setLocationOptions([]);
             setSampleOptions([]);
             setTreatmentOptions([]);
-            setPureWaterSampleOptions([]);
+            setProceduralBlankSampleOptions([]);
 
             // Load appropriate data based on mode
             if (newMode === 'project') {
                 loadLocations();
             } else {
-                loadPureWaterSamples();
+                loadProceduralBlankSamples();
             }
         }
-    }, [loadLocations, loadPureWaterSamples]);
+    }, [loadLocations, loadProceduralBlankSamples]);
 
     // Handle location selection
     const handleLocationChange = useCallback((event: SelectChangeEvent<string>) => {
@@ -192,7 +192,7 @@ export const TreatmentSelector = (props: {
             const { data: sample } = await dataProvider.getOne('samples', { id: treatment.sample_id });
             if (!sample) return { location: '', sample: '', treatment: treatment.name, sampleType: '' };
 
-            // Get the location for this sample (if not pure water)
+            // Get the location for this sample (if not procedural blank)
             let locationName = '';
             if (sample.location_id) {
                 try {
@@ -233,14 +233,14 @@ export const TreatmentSelector = (props: {
         setLocationOptions([]);
         setSampleOptions([]);
         setTreatmentOptions([]);
-        setPureWaterSampleOptions([]);
+        setProceduralBlankSampleOptions([]);
         setOpen(true);
         
         // Load initial data based on current mode
         if (mode === 'project') {
             loadLocations();
         } else {
-            loadPureWaterSamples();
+            loadProceduralBlankSamples();
         }
     };
 
@@ -268,7 +268,7 @@ export const TreatmentSelector = (props: {
                 >
                     {displayValue.treatment ? (
                         <>
-                            {displayValue.sampleType === 'pure_water' ? (
+                            {displayValue.sampleType === 'procedural_blank' ? (
                                 <>
                                     <Typography
                                         variant="caption"
@@ -279,7 +279,7 @@ export const TreatmentSelector = (props: {
                                             marginBottom: '2px'
                                         }}
                                     >
-                                        Pure Water
+                                        Procedural Blank
                                     </Typography>
                                     <Typography
                                         variant="body2"
@@ -368,10 +368,10 @@ export const TreatmentSelector = (props: {
                     </Typography>
                     {displayValue.treatment ? (
                         <Box>
-                            {displayValue.sampleType === 'pure_water' ? (
+                            {displayValue.sampleType === 'procedural_blank' ? (
                                 <>
                                     <Typography variant="body2" color="primary.main">
-                                        Type: Pure Water
+                                        Type: Procedural Blank
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
                                         Sample: {displayValue.sample}
@@ -421,8 +421,8 @@ export const TreatmentSelector = (props: {
                                 <ToggleButton value="project" aria-label="project samples">
                                     Project Samples
                                 </ToggleButton>
-                                <ToggleButton value="pure_water" aria-label="pure water samples">
-                                    Pure Water Samples
+                                <ToggleButton value="procedural_blank" aria-label="procedural blank samples">
+                                    Procedural Blank Samples
                                 </ToggleButton>
                             </ToggleButtonGroup>
                         </Box>
@@ -508,23 +508,23 @@ export const TreatmentSelector = (props: {
                             </>
                         ) : (
                             <>
-                                {/* Pure Water mode - Sample -> Treatment */}
+                                {/* Procedural Blank mode - Sample -> Treatment */}
                                 <Box>
                                     <Typography variant="subtitle2" gutterBottom>
-                                        1. Select Pure Water Sample
+                                        1. Select procedural blank sample
                                     </Typography>
                                     <FormControl fullWidth variant="outlined">
-                                        <InputLabel>Pure Water Sample</InputLabel>
+                                        <InputLabel>Procedural blank sample</InputLabel>
                                         <Select
                                             value={sampleId || ''}
                                             onChange={handleSampleChange}
-                                            label="Pure Water Sample"
+                                            label="Procedural blank sample"
                                             disabled={loading}
                                         >
                                             <MenuItem value="">
-                                                <em>Select a pure water sample...</em>
+                                                <em>Select a procedural blank sample...</em>
                                             </MenuItem>
-                                            {pureWaterSampleOptions.map(sample => (
+                                            {proceduralBlankSampleOptions.map(sample => (
                                                 <MenuItem key={sample.id} value={sample.id}>
                                                     {sample.name}
                                                 </MenuItem>

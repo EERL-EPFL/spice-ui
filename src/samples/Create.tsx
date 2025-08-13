@@ -1,142 +1,116 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
     Create,
-    useCreate,
-    useNotify,
-    useRedirect
+    SimpleForm,
+    TextInput,
+    SelectInput,
+    ReferenceInput,
+    DateTimeInput,
+    NumberInput,
+    required,
+    FormDataConsumer,
+    ArrayInput,
+    SimpleFormIterator
 } from 'react-admin';
-import {
-    Box,
-    Button,
-    Typography,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem
-} from '@mui/material';
-import { Save } from '@mui/icons-material';
-import SampleForm from '../components/SampleForm';
-import { useGetList } from 'react-admin';
+import { Box, Typography, Divider } from '@mui/material';
 
-const CreateComponent = () => {
-    const [create] = useCreate();
-    const [createTreatment] = useCreate();
-    const notify = useNotify();
-    const redirect = useRedirect();
-    const [formData, setFormData] = useState<any>(null);
-    const [isValid, setIsValid] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [selectedLocationId, setSelectedLocationId] = useState('');
-    
-    const { data: locations } = useGetList('locations');
-
-    const handleFormDataChange = (data: any) => {
-        setFormData(data);
-        // Validate required fields
-        const isFormValid = data.material?.trim() && 
-                           data.suspension_volume_ml && 
-                           data.collected_at &&
-                           data.treatments?.length > 0 &&
-                           selectedLocationId;
-        setIsValid(isFormValid);
-    };
-
-    const handleSave = async () => {
-        if (!isValid || !formData || !selectedLocationId) return;
-        
-        setLoading(true);
-        try {
-            // Extract treatments from form data
-            const { treatments, ...sampleData } = formData;
-            
-            // Map form data to database field names
-            const createData = {
-                name: sampleData.material,
-                material_description: sampleData.material,
-                type: sampleData.type,
-                location_id: selectedLocationId,
-                suspension_volume_litres: sampleData.suspension_volume_ml / 1000,
-                start_time: sampleData.collected_at,
-                stop_time: sampleData.stoptime,
-                remarks: sampleData.comment,
+const CreateComponent = () => (
+    <Create redirect="show">
+        <SimpleForm>
+            <Box sx={{ width: '100%' }}>
+                <Typography variant="h6" gutterBottom>
+                    Sample Information
+                </Typography>
                 
-                // Filter-specific fields
-                flow_litres_per_minute: sampleData.flow,
-                total_volume: sampleData.total_volume,
-                filter_fraction: sampleData.filterfrac,
-                source: sampleData.source,
-                
-                // Bulk-specific fields
-                latitude: sampleData.latitude,
-                longitude: sampleData.longitude,
-                bulk_mass_mg: sampleData.bulkmass_mg,
-            };
-            
-            // Create the sample first
-            const sampleResult = await create('samples', { data: createData });
-            
-            // Create treatment records for each selected treatment
-            const treatmentPromises = treatments.map(async (treatmentName: string) => {
-                const treatmentData = {
-                    name: treatmentName,
-                    sample_id: sampleResult.data.id,
-                };
-                return createTreatment('treatments', { data: treatmentData });
-            });
-            
-            await Promise.all(treatmentPromises);
-            
-            notify('Sample and treatments created successfully', { type: 'success' });
-            redirect('show', 'samples', sampleResult.data.id);
-        } catch (error) {
-            console.error('Error creating sample:', error);
-            notify('Failed to create sample', { type: 'error' });
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <Create redirect={false} actions={false}>
-            <Box sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="h5">
-                        Create New Sample
-                    </Typography>
-                    <Button
-                        variant="contained"
-                        startIcon={<Save />}
-                        onClick={handleSave}
-                        disabled={!isValid || loading}
-                    >
-                        {loading ? 'Creating...' : 'Create Sample'}
-                    </Button>
-                </Box>
-                
-                {/* Location Selection */}
-                <FormControl fullWidth sx={{ mb: 3 }}>
-                    <InputLabel>Location *</InputLabel>
-                    <Select
-                        value={selectedLocationId}
-                        label="Location *"
-                        onChange={(e) => setSelectedLocationId(e.target.value)}
-                        required
-                    >
-                        {locations?.map((location: any) => (
-                            <MenuItem key={location.id} value={location.id}>
-                                {location.name}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-                
-                <SampleForm
-                    onDataChange={handleFormDataChange}
-                    compact={false}
+                <SelectInput 
+                    source="type" 
+                    choices={[
+                        { id: 'bulk', name: 'Bulk' },
+                        { id: 'filter', name: 'Filter' },
+                        { id: 'procedural_blank', name: 'Procedural Blank' }
+                    ]}
+                    validate={required()}
+                    defaultValue="bulk"
+                    fullWidth
                 />
+                
+                <FormDataConsumer>
+                    {({ formData }) => (
+                        <>
+                            {/* Location - hidden for procedural blank */}
+                            {formData.type !== 'procedural_blank' && (
+                                <ReferenceInput source="location_id" reference="locations">
+                                    <SelectInput optionText="name" validate={required()} fullWidth />
+                                </ReferenceInput>
+                            )}
+                            
+                            <TextInput source="name" label="Material/Name" validate={required()} fullWidth />
+                            
+                            {/* Volume and date fields - only for bulk and filter */}
+                            {(formData.type === 'bulk' || formData.type === 'filter') && (
+                                <>
+                                    <NumberInput source="suspension_volume_litres" label="Suspension Volume (L)" fullWidth />
+                                    <DateTimeInput source="start_time" label="Collection Date & Time" fullWidth />
+                                </>
+                            )}
+                            
+                            {/* Filter-specific fields */}
+                            {formData.type === 'filter' && (
+                                <>
+                                    <Divider sx={{ my: 2 }} />
+                                    <Typography variant="h6" gutterBottom>
+                                        Filter Sample Details
+                                    </Typography>
+                                    <NumberInput source="flow_litres_per_minute" label="Airflow (L/min)" fullWidth />
+                                    <NumberInput source="total_volume" label="Total Volume (L)" fullWidth />
+                                    <NumberInput source="filter_fraction" label="Filter Fraction" fullWidth />
+                                    <TextInput source="source" label="Source Information" fullWidth />
+                                </>
+                            )}
+                            
+                            {/* Bulk-specific fields */}
+                            {formData.type === 'bulk' && (
+                                <>
+                                    <Divider sx={{ my: 2 }} />
+                                    <Typography variant="h6" gutterBottom>
+                                        Bulk Sample Details
+                                    </Typography>
+                                    <NumberInput source="latitude" label="Latitude" fullWidth />
+                                    <NumberInput source="longitude" label="Longitude" fullWidth />
+                                    <NumberInput source="bulk_mass_mg" label="Bulk Mass (mg)" fullWidth />
+                                    <TextInput source="source" label="Source Information" fullWidth />
+                                </>
+                            )}
+                            
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="h6" gutterBottom>
+                                Treatments
+                            </Typography>
+                            <ArrayInput source="treatments" defaultValue={[{ name: 'none' }]}>
+                                <SimpleFormIterator inline>
+                                    <SelectInput 
+                                        source="name" 
+                                        choices={[
+                                            { id: 'none', name: 'None (No treatment)' },
+                                            { id: 'heat', name: 'Heat Treatment' },
+                                            { id: 'h2o2', name: 'H₂O₂ Treatment' }
+                                        ]}
+                                        validate={required()}
+                                        sx={{ minWidth: 200 }}
+                                    />
+                                    <TextInput source="notes" label="Notes" sx={{ minWidth: 200 }} />
+                                    <NumberInput source="enzyme_volume_litres" label="Enzyme Volume (L)" sx={{ minWidth: 150 }} />
+                                </SimpleFormIterator>
+                            </ArrayInput>
+                            
+                            <Divider sx={{ my: 2 }} />
+                            <TextInput source="remarks" label="Comments" multiline rows={3} fullWidth />
+                        </>
+                    )}
+                </FormDataConsumer>
             </Box>
-        </Create>
-    );
-};
+        </SimpleForm>
+    </Create>
+);
 
 export default CreateComponent;

@@ -8,7 +8,7 @@ import SaveIcon from '@mui/icons-material/Save';
 export default {
     create: CreateComponent,
     edit: EditComponent,
-    list: ListComponent,
+    // list: ListComponent,
     show: ShowComponent,
     icon: SaveIcon,
     options: {

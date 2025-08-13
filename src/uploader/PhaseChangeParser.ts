@@ -634,15 +634,15 @@ export class PhaseChangeParser {
         const letters = match[1];
         const numbers = parseInt(match[2]);
         
-        // Convert letters to column number (A=1, B=2, etc.)
-        let col = 0;
+        // Convert letters to row number (A=1, B=2, etc.)
+        let row = 0;
         for (let i = 0; i < letters.length; i++) {
-            col = col * 26 + (letters.charCodeAt(i) - 64);
+            row = row * 26 + (letters.charCodeAt(i) - 64);
         }
         
         return {
-            row: numbers,
-            col: col
+            row: row,
+            col: numbers
         };
     }
 }

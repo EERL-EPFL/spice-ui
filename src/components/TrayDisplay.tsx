@@ -72,28 +72,78 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
         }
     };
 
-    // Generate all label positions (no overlap with wells)
+    // Generate all label positions (no overlap with wells) - ALL 4 SIDES
     const getLabels = () => {
         const topLabels = [];
         const leftLabels = [];
+        const bottomLabels = [];
+        const rightLabels = [];
 
-        // Standard convention: columns are always letters (top), rows are always numbers (left)
-        // X-axis (columns): letters A, B, C...
-        for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
-            const letter = String.fromCharCode(65 + colIdx);
-            const { xIndex } = getDisplayIndices(0, colIdx);
-            const cx = LABEL_MARGIN + xIndex * SPACING;
-            topLabels.push({ x: cx, y: TITLE_HEIGHT + LABEL_MARGIN / 2, label: letter });
+        // ENHANCED: Labels on all 4 edges for maximum clarity
+        // Calculate what each display position represents based on rotation
+        
+        // Helper function to get label for a display column
+        const getColumnLabel = (displayCol: number) => {
+            switch (rotation) {
+                case 0: return String(displayCol + 1);  // 1,2,3...
+                case 90: return String.fromCharCode(65 + (qtyYAxis - 1 - displayCol));  // H,G,F... (corrected)
+                case 180: return String(qtyXAxis - displayCol);  // 12,11,10...
+                case 270: return String.fromCharCode(65 + displayCol);  // A,B,C... (corrected)
+            }
+        };
+        
+        // Helper function to get label for a display row
+        const getRowLabel = (displayRow: number) => {
+            switch (rotation) {
+                case 0: return String.fromCharCode(65 + displayRow);  // A,B,C...
+                case 90: return String(displayRow + 1);  // 1,2,3... (corrected)
+                case 180: return String.fromCharCode(65 + (qtyYAxis - 1 - displayRow));  // H,G,F...
+                case 270: return String(qtyXAxis - displayRow);  // 12,11,10... (corrected)
+            }
+        };
+        
+        // Generate labels for all 4 edges with consistent spacing
+        const LABEL_DISTANCE = 18 * scale; // Consistent distance from wells for all sides
+        
+        for (let displayCol = 0; displayCol < displayCols; displayCol++) {
+            const label = getColumnLabel(displayCol);
+            const cx = LABEL_MARGIN + displayCol * SPACING;
+            
+            // Top labels - consistent distance above wells
+            topLabels.push({ 
+                x: cx, 
+                y: TITLE_HEIGHT + LABEL_MARGIN - CIRCLE_RADIUS - LABEL_DISTANCE,
+                label: label
+            });
+            
+            // Bottom labels - consistent distance below wells (fixed calculation)
+            bottomLabels.push({ 
+                x: cx, 
+                y: TITLE_HEIGHT + LABEL_MARGIN + (displayRows - 1) * SPACING + CIRCLE_RADIUS + LABEL_DISTANCE + (15 * scale),
+                label: label
+            });
         }
-        // Y-axis (rows): numbers 1, 2, 3...
-        for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
-            const number = rowIdx + 1;
-            const { yIndex } = getDisplayIndices(rowIdx, 0);
-            const cy = TITLE_HEIGHT + LABEL_MARGIN + yIndex * SPACING;
-            leftLabels.push({ x: LABEL_MARGIN / 2, y: cy, label: number });
+        
+        for (let displayRow = 0; displayRow < displayRows; displayRow++) {
+            const label = getRowLabel(displayRow);
+            const cy = TITLE_HEIGHT + LABEL_MARGIN + displayRow * SPACING;
+            
+            // Left labels - consistent distance left of wells
+            leftLabels.push({ 
+                x: LABEL_MARGIN - CIRCLE_RADIUS - LABEL_DISTANCE,
+                y: cy + (4 * scale),
+                label: label
+            });
+            
+            // Right labels - consistent distance right of wells
+            rightLabels.push({ 
+                x: LABEL_MARGIN + (displayCols - 1) * SPACING + CIRCLE_RADIUS + LABEL_DISTANCE,
+                y: cy + (4 * scale),
+                label: label
+            });
         }
 
-        return { topLabels, leftLabels };
+        return { topLabels, leftLabels, bottomLabels, rightLabels };
     };
 
     const wellPositions = (() => {
@@ -109,7 +159,7 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
         }
         return positions;
     })();
-    const { topLabels, leftLabels } = getLabels();
+    const { topLabels, leftLabels, bottomLabels, rightLabels } = getLabels();
 
     return (
         <Box sx={{
@@ -146,7 +196,7 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
                 >
                     {qtyXAxis} × {qtyYAxis} wells
                 </text>
-                {/* Top labels (letters) */}
+                {/* Top labels */}
                 {topLabels.map((label, idx) => (
                     <text
                         key={`top-${idx}`}
@@ -160,10 +210,38 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
                         {label.label}
                     </text>
                 ))}
-                {/* Left labels (numbers) */}
+                {/* Left labels */}
                 {leftLabels.map((label, idx) => (
                     <text
                         key={`left-${idx}`}
+                        x={label.x}
+                        y={label.y + 5 * scale}
+                        textAnchor="middle"
+                        fontSize={15 * scale}
+                        fill="#333"
+                        fontWeight="bold"
+                    >
+                        {label.label}
+                    </text>
+                ))}
+                {/* Bottom labels */}
+                {bottomLabels.map((label, idx) => (
+                    <text
+                        key={`bottom-${idx}`}
+                        x={label.x}
+                        y={label.y}
+                        textAnchor="middle"
+                        fontSize={15 * scale}
+                        fill="#333"
+                        fontWeight="bold"
+                    >
+                        {label.label}
+                    </text>
+                ))}
+                {/* Right labels */}
+                {rightLabels.map((label, idx) => (
+                    <text
+                        key={`right-${idx}`}
                         x={label.x}
                         y={label.y + 5 * scale}
                         textAnchor="middle"

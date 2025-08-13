@@ -81,11 +81,139 @@ const CreateTreatmentButton = () => {
   return <Button label="Create Treatment" onClick={handleClick} />;
 };
 
+const SampleDetailsContent = () => {
+  const record = useRecordContext();
+  
+  if (!record) return null;
+
+  return (
+    <Box display="flex" flexDirection="column" gap={2}>
+      {/* Header Section */}
+      <Paper sx={{ p: 2 }}>
+        <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))" gap={2}>
+          <Labeled>
+            <TextField source="name" />
+          </Labeled>
+          <Labeled>
+            <FunctionField
+              source="type"
+              label="Sample Type"
+              render={(record) => (
+                <Chip 
+                  label={sampleType[record.type] || record.type}
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                />
+              )}
+            />
+          </Labeled>
+          <Labeled>
+            <TextField source="id" label="Sample ID" />
+          </Labeled>
+        </Box>
+      </Paper>
+
+      {/* Sample Details - Multi-line organized sections */}
+      {(record.type === 'bulk' || record.type === 'filter') && (
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
+            Sample Details
+          </Typography>
+          
+          {/* Collection Info Row */}
+          <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))" gap={2} sx={{ mb: 1 }}>
+            <Labeled>
+              <ReferenceField
+                source="location_id"
+                reference="locations"
+                link="show"
+              >
+                <TextField source="name" label="Collection Location" />
+              </ReferenceField>
+            </Labeled>
+            <Labeled>
+              <DateField source="start_time" label="Collection Date" showTime />
+            </Labeled>
+            <Labeled>
+              <NumberField
+                source="suspension_volume_litres"
+                label="Suspension Volume (L)"
+              />
+            </Labeled>
+          </Box>
+          
+          {/* Type-specific measurements row */}
+          {record.type === 'filter' && (
+            <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(150px, 1fr))" gap={2} sx={{ mb: 1 }}>
+              <Labeled>
+                <NumberField
+                  source="flow_litres_per_minute"
+                  label="Airflow (L/min)"
+                />
+              </Labeled>
+              <Labeled>
+                <NumberField source="total_volume" label="Total Volume (L)" />
+              </Labeled>
+              <Labeled>
+                <NumberField source="filter_fraction" label="Filter Fraction" />
+              </Labeled>
+            </Box>
+          )}
+          
+          {record.type === 'bulk' && (
+            <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(150px, 1fr))" gap={2} sx={{ mb: 1 }}>
+              <Labeled>
+                <NumberField source="latitude" label="Latitude (°)" />
+              </Labeled>
+              <Labeled>
+                <NumberField source="longitude" label="Longitude (°)" />
+              </Labeled>
+              <Labeled>
+                <NumberField source="bulk_mass_mg" label="Sample Mass (mg)" />
+              </Labeled>
+            </Box>
+          )}
+          
+          {/* Source information row */}
+          {record.source && (
+            <Box sx={{ mt: 1 }}>
+              <Labeled>
+                <TextField source="source" label="Source Information" />
+              </Labeled>
+            </Box>
+          )}
+        </Paper>
+      )}
+
+      {/* Comments and Timestamps - Combined compact section */}
+      <Paper sx={{ p: 2 }}>
+        <Box display="flex" flexDirection="column" gap={1}>
+          {record.remarks && (
+            <Labeled>
+              <TextField source="remarks" label="Comments" />
+            </Labeled>
+          )}
+          <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
+            <Labeled>
+              <DateField source="created_at" label="Created" showTime />
+            </Labeled>
+            <Labeled>
+              <DateField source="last_updated" label="Last Modified" showTime />
+            </Labeled>
+          </Box>
+        </Box>
+      </Paper>
+    </Box>
+  );
+};
+
 const ExperimentalResultsTable = () => {
   const record = useRecordContext();
   const redirect = useRedirect();
   const [frozenFilter, setFrozenFilter] = React.useState("all");
   const [experimentFilter, setExperimentFilter] = React.useState("all");
+  const [treatmentFilter, setTreatmentFilter] = React.useState("all");
 
   if (
     !record ||
@@ -136,7 +264,22 @@ const ExperimentalResultsTable = () => {
     })
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Filter results based on category and experiment
+  // Get unique treatments for dropdown
+  const uniqueTreatments = Array.from(
+    new Set(record.experimental_results.map((result) => result.treatment_id).filter(Boolean)),
+  )
+    .map((treatmentId) => {
+      const result = record.experimental_results.find(
+        (r) => r.treatment_id === treatmentId,
+      );
+      return {
+        id: treatmentId,
+        name: result?.treatment_name || treatmentId,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Filter results based on category, experiment, and treatment
   const filteredResults = record.experimental_results.filter((result) => {
     // Apply frozen state filter
     if (frozenFilter !== "all" && categorizeResult(result) !== frozenFilter) {
@@ -151,6 +294,14 @@ const ExperimentalResultsTable = () => {
       return false;
     }
 
+    // Apply treatment filter
+    if (
+      treatmentFilter !== "all" &&
+      result.treatment_id !== treatmentFilter
+    ) {
+      return false;
+    }
+
     return true;
   });
 
@@ -160,6 +311,10 @@ const ExperimentalResultsTable = () => {
 
   const handleExperimentFilterChange = (event) => {
     setExperimentFilter(event.target.value);
+  };
+
+  const handleTreatmentFilterChange = (event) => {
+    setTreatmentFilter(event.target.value);
   };
 
   const frozenCount = record.experimental_results.filter(
@@ -206,7 +361,7 @@ const ExperimentalResultsTable = () => {
   const listContext = useList({
     data: resultsWithId,
     isPending: false,
-    perPage: 10,
+    perPage: 25,
   });
 
   return (
@@ -221,29 +376,19 @@ const ExperimentalResultsTable = () => {
           flexWrap: "wrap",
         }}
       >
-        <ToggleButtonGroup
-          value={frozenFilter}
-          exclusive
-          onChange={(_, newFilter) => {
-            if (newFilter) {
-              handleFilterChange(newFilter);
-            }
-          }}
-          size="small"
-        >
-          <ToggleButton value="all">All ({totalCount})</ToggleButton>
-          <ToggleButton value="frozen">
-            <CheckCircle sx={{ mr: 0.5, fontSize: "1rem" }} />
-            Frozen ({frozenCount})
-          </ToggleButton>
-          <ToggleButton value="liquid">
-            <Cancel sx={{ mr: 0.5, fontSize: "1rem" }} />
-            Liquid ({liquidCount})
-          </ToggleButton>
-          <ToggleButton value="no_result">
-            No Result ({noResultCount})
-          </ToggleButton>
-        </ToggleButtonGroup>
+        <FormControl size="small" sx={{ minWidth: 150 }}>
+          <InputLabel>Filter by State</InputLabel>
+          <Select
+            value={frozenFilter}
+            onChange={(event) => handleFilterChange(event.target.value)}
+            label="Filter by State"
+          >
+            <MenuItem value="all">All ({totalCount})</MenuItem>
+            <MenuItem value="frozen">Frozen ({frozenCount})</MenuItem>
+            <MenuItem value="liquid">Liquid ({liquidCount})</MenuItem>
+            <MenuItem value="no_result">No Result ({noResultCount})</MenuItem>
+          </Select>
+        </FormControl>
 
         <FormControl size="small" sx={{ minWidth: 200 }}>
           <InputLabel>Filter by Experiment</InputLabel>
@@ -258,6 +403,24 @@ const ExperimentalResultsTable = () => {
             {uniqueExperiments.map((experiment) => (
               <MenuItem key={experiment.id} value={experiment.id}>
                 {experiment.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl size="small" sx={{ minWidth: 200 }}>
+          <InputLabel>Filter by Treatment</InputLabel>
+          <Select
+            value={treatmentFilter}
+            onChange={handleTreatmentFilterChange}
+            label="Filter by Treatment"
+          >
+            <MenuItem value="all">
+              All Treatments ({uniqueTreatments.length})
+            </MenuItem>
+            {uniqueTreatments.map((treatment) => (
+              <MenuItem key={treatment.id} value={treatment.id}>
+                {treatment.name}
               </MenuItem>
             ))}
           </Select>
@@ -393,122 +556,12 @@ const TabbedContentWithCounts = () => {
   return (
     <TabbedShowLayout>
       <TabbedShowLayout.Tab label="Sample Details">
-        <Box display="flex" flexDirection="column" gap={2}>
-          <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2}>
-            <Labeled>
-              <TextField source="id" />
-            </Labeled>
-            <Labeled>
-              <TextField source="name" />
-            </Labeled>
-            <Labeled>
-              <ReferenceField
-                source="location_id"
-                reference="locations"
-                link="show"
-              >
-                <TextField source="name" />
-              </ReferenceField>
-            </Labeled>
-          </Box>
-
-          <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2}>
-            <Labeled>
-              <FunctionField
-                source="type"
-                label="Type"
-                render={(record) => {
-                  return sampleType[record.type] || record.type;
-                }}
-              />
-            </Labeled>
-            <Labeled>
-              <NumberField source="latitude" label="Latitude (°)" />
-            </Labeled>
-            <Labeled>
-              <NumberField source="longitude" label="Longitude (°)" />
-            </Labeled>
-          </Box>
-
-          <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
-            <Labeled>
-              <DateField source="start_time" label="Start Time" showTime />
-            </Labeled>
-            <Labeled>
-              <DateField source="stop_time" label="Stop Time" showTime />
-            </Labeled>
-          </Box>
-
-          <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2}>
-            <Labeled>
-              <NumberField
-                source="flow_litres_per_minute"
-                label="Flow Rate (L/min)"
-              />
-            </Labeled>
-            <Labeled>
-              <NumberField source="total_volume" label="Total Volume (L)" />
-            </Labeled>
-            <Labeled>
-              <TextField source="material_description" />
-            </Labeled>
-          </Box>
-
-          <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2}>
-            <Labeled>
-              <TextField source="extraction_procedure" />
-            </Labeled>
-            <Labeled>
-              <TextField source="filter_substrate" />
-            </Labeled>
-            <Labeled>
-              <NumberField
-                source="suspension_volume_litres"
-                label="Suspension Volume (L)"
-              />
-            </Labeled>
-          </Box>
-
-          <Box display="grid" gridTemplateColumns="1fr 1fr 1fr" gap={2}>
-            <Labeled>
-              <NumberField source="air_volume_litres" label="Air Volume (L)" />
-            </Labeled>
-            <Labeled>
-              <NumberField
-                source="water_volume_litres"
-                label="Water Volume (L)"
-              />
-            </Labeled>
-            <Labeled>
-              <NumberField source="initial_concentration_gram_l" />
-            </Labeled>
-          </Box>
-
-          <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
-            <Labeled>
-              <NumberField
-                source="well_volume_litres"
-                label="Well Volume (L)"
-              />
-            </Labeled>
-            <Labeled>
-              <TextField source="remarks" />
-            </Labeled>
-          </Box>
-
-          <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
-            <Labeled>
-              <DateField source="created_at" showTime />
-            </Labeled>
-            <Labeled>
-              <DateField source="last_updated" showTime />
-            </Labeled>
-          </Box>
-        </Box>
+        <SampleDetailsContent />
       </TabbedShowLayout.Tab>
 
-      <TabbedShowLayout.Tab label="Treatments">
-        <ReferenceManyField reference="treatments" target="sample_id" label="">
+      <ReferenceManyField reference="treatments" target="sample_id" label="">
+        {({ data, total }) => (
+          <TabbedShowLayout.Tab label={`Treatments (${total || 0})`}>
           <>
             <TopToolbar>
               <CreateTreatmentButton />
@@ -526,8 +579,9 @@ const TabbedContentWithCounts = () => {
               <DateField source="last_updated" showTime />
             </Datagrid>
           </>
-        </ReferenceManyField>
-      </TabbedShowLayout.Tab>
+          </TabbedShowLayout.Tab>
+        )}
+      </ReferenceManyField>
 
       <TabbedShowLayout.Tab
         label={`Associated Experiments (${experimentCount})`}

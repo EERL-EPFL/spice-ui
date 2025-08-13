@@ -7,7 +7,7 @@ import ColorizeIcon from '@mui/icons-material/Colorize';
 export default {
     create: CreateComponent,
     edit: EditComponent,
-    list: ListComponent,
+    // list: ListComponent,
     show: ShowComponent,
     recordRepresentation: (record) => `${treatmentName[record.name] || record.name} (${record.id.slice(0, 8)}...)`,
     icon: ColorizeIcon,

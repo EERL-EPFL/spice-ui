@@ -151,7 +151,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     const getWellSummary = (row: number, col: number): WellSummary | undefined => {
         if (!showTimePointVisualization || !wellSummaryMap) return undefined;
         // Convert grid coordinates to well coordinate string (e.g., "A6")
-        const coordinate = `${String.fromCharCode(65 + col)}${row + 1}`;
+        // Standard notation: row index -> letter (A,B,C), column index -> number (1,2,3)
+        const coordinate = `${String.fromCharCode(65 + row)}${col + 1}`;
         const well = wellSummaryMap.get(coordinate);
         
         
@@ -161,7 +162,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     // Helper function to get tooltip text for a well
     const getTooltipText = (row: number, col: number): string => {
         const well = getWellSummary(row, col);
-        const coordinate = `${String.fromCharCode(65 + col)}${row + 1}`;
+        const coordinate = `${String.fromCharCode(65 + row)}${col + 1}`;
         
         if (!well) return `${coordinate}: No data`;
         
@@ -310,24 +311,40 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     const svgWidth = displayCols * SPACING + SPACING;
     const svgHeight = displayRows * SPACING + SPACING + 30;
 
-    // Generate all label positions based on orientation
+    // Generate all label positions based on orientation  
     const getLabels = () => {
         const topLabels = [];
         const leftLabels = [];
 
-        // Always: top = letters (columns), left = numbers (rows)
-        for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
-            const letter = columnLetters[colIdx] || String.fromCharCode(65 + colIdx);
-            const { xIndex } = getDisplayIndices(0, colIdx);
-            const cx = SPACING + xIndex * SPACING;
-            topLabels.push({ x: cx, y: 12, label: letter });
-        }
+        // CORRECTED: Default 0° should be letters on LEFT, numbers on TOP
+        // User wants to start with this layout then use 90°/270° rotation to adjust
+
+        // At 0° orientation: 
+        // - Letters (A,B,C...) should be on LEFT side (leftLabels)
+        // - Numbers (1,2,3...) should be on TOP (topLabels)
+
+        // LEFT LABELS: Letters A-H for rows
         for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
-            const number = rowIdx + 1;
-            const { yIndex } = getDisplayIndices(rowIdx, 0);
-            const cy = SPACING + yIndex * SPACING;
-            leftLabels.push({ x: 8, y: cy + 5, label: number });
+            const letter = String.fromCharCode(65 + rowIdx);
+            const { xIndex, yIndex } = getDisplayIndices(rowIdx, 0);
+            
+            // Position letters on the left side at the vertical position of each row
+            const labelX = 8;
+            const labelY = SPACING + yIndex * SPACING + 5;
+            leftLabels.push({ x: labelX, y: labelY, label: letter });
         }
+
+        // TOP LABELS: Numbers 1-12 for columns  
+        for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
+            const number = colIdx + 1;
+            const { xIndex, yIndex } = getDisplayIndices(0, colIdx);
+            
+            // Position numbers on the top at the horizontal position of each column
+            const labelX = SPACING + xIndex * SPACING;
+            const labelY = 12;
+            topLabels.push({ x: labelX, y: labelY, label: number });
+        }
+        
         return { topLabels, leftLabels };
     };
 
@@ -346,7 +363,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
 
             const fillColor = getWellColor(rowIdx, colIdx, selected, hovered, covered);
 
-            const coordinate = `${String.fromCharCode(65 + colIdx)}${rowIdx + 1}`;
+            const coordinate = `${String.fromCharCode(65 + rowIdx)}${colIdx + 1}`;
             // Capture well data at render time to prevent race conditions
             const currentWell = well;
             const tooltipContent = currentWell && showTimePointVisualization ? (

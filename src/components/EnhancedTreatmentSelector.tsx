@@ -80,7 +80,7 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
     const dataProvider = useDataProvider();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [mode, setMode] = useState<'project' | 'pure_water'>('project');
+    const [mode, setMode] = useState<'project' | 'procedural_blank'>('project');
     const [locationId, setLocationId] = useState<string | null>(null);
     const [sampleId, setSampleId] = useState<string | null>(null);
     const [treatmentId, setTreatmentId] = useState<string | null>(null);
@@ -90,7 +90,7 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
     const [locationOptions, setLocationOptions] = useState<Array<{ id: string, name: string }>>([]);
     const [sampleOptions, setSampleOptions] = useState<Array<{ id: string, name: string }>>([]);
     const [treatmentOptions, setTreatmentOptions] = useState<Array<Treatment>>([]);
-    const [pureWaterSampleOptions, setPureWaterSampleOptions] = useState<Array<{ id: string, name: string }>>([]);
+    const [proceduralBlankSampleOptions, setProceduralBlankSampleOptions] = useState<Array<{ id: string, name: string }>>([]);
 
     // Get unique existing treatments (excluding current region)
     const uniqueExistingTreatments = existingRegionTreatments
@@ -134,7 +134,7 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
             const { data: sample } = await dataProvider.getOne('samples', { id: treatment.sample_id });
             if (!sample) return { location: '', sample: '', treatment: treatment.name, sampleType: '' };
 
-            // Get the location for this sample (if not pure water)
+            // Get the location for this sample (if not procedural blank)
             let locationName = '';
             if (sample.location_id) {
                 try {
@@ -186,18 +186,18 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
         }
     }, [dataProvider]);
 
-    const loadPureWaterSamples = useCallback(async () => {
+    const loadProceduralBlankSamples = useCallback(async () => {
         setLoading(true);
         try {
             const { data } = await dataProvider.getList('samples', {
                 pagination: { page: 1, perPage: 500 },
                 sort: { field: 'name', order: 'ASC' },
-                filter: { type: 'pure_water' }
+                filter: { type: 'procedural_blank' }
             });
-            setPureWaterSampleOptions(data);
+            setProceduralBlankSampleOptions(data);
         } catch (error) {
-            console.error('Error loading pure water samples:', error);
-            setPureWaterSampleOptions([]);
+            console.error('Error loading procedural blank samples:', error);
+            setProceduralBlankSampleOptions([]);
         } finally {
             setLoading(false);
         }
@@ -278,13 +278,13 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
         if (mode === 'project') {
             loadLocations();
         } else {
-            loadPureWaterSamples();
+            loadProceduralBlankSamples();
         }
     };
 
     const handleModeChange = (event: React.MouseEvent<HTMLElement>, newMode: string | null) => {
         if (newMode !== null) {
-            setMode(newMode as 'project' | 'pure_water');
+            setMode(newMode as 'project' | 'procedural_blank');
             // Reset selections when mode changes
             setLocationId(null);
             setSampleId(null);
@@ -294,7 +294,7 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
             if (newMode === 'project') {
                 loadLocations();
             } else {
-                loadPureWaterSamples();
+                loadProceduralBlankSamples();
             }
         }
     };
@@ -395,7 +395,7 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
                 >
                     {displayValue.treatment ? (
                         <>
-                            {displayValue.sampleType === 'pure_water' ? (
+                            {displayValue.sampleType === 'procedural_blank' ? (
                                 <>
                                     <Typography
                                         variant="caption"
@@ -406,7 +406,7 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
                                             marginBottom: '2px'
                                         }}
                                     >
-                                        Pure Water
+                                        Procedural Blank
                                     </Typography>
                                     <Typography
                                         variant="body2"
@@ -556,8 +556,8 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
                                         <ToggleButton value="project" aria-label="project samples">
                                             Project Samples
                                         </ToggleButton>
-                                        <ToggleButton value="pure_water" aria-label="pure water samples">
-                                            Pure Water Samples
+                                        <ToggleButton value="procedural_blank" aria-label="procedural blank samples">
+                                            Procedural blank samples
                                         </ToggleButton>
                                     </ToggleButtonGroup>
                                 </Box>
@@ -662,23 +662,23 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
                                 </>
                             ) : (
                                 <>
-                                    {/* Pure Water mode - Sample -> Treatment */}
+                                    {/* Procedural Blank mode - Sample -> Treatment */}
                                     <Box>
                                         <Typography variant="subtitle2" gutterBottom>
-                                            1. Select Pure Water Sample
+                                            1. Select procedural blank sample
                                         </Typography>
                                         <FormControl fullWidth variant="outlined">
-                                            <InputLabel>Pure Water Sample</InputLabel>
+                                            <InputLabel>Procedural blank sample</InputLabel>
                                             <Select
                                                 value={sampleId || ''}
                                                 onChange={handleSampleChange}
-                                                label="Pure Water Sample"
+                                                label="Procedural blank sample"
                                                 disabled={loading}
                                             >
                                                 <MenuItem value="">
-                                                    <em>Select a pure water sample...</em>
+                                                    <em>Select a procedural blank sample...</em>
                                                 </MenuItem>
-                                                {pureWaterSampleOptions.map(sample => (
+                                                {proceduralBlankSampleOptions.map(sample => (
                                                     <MenuItem key={sample.id} value={sample.id}>
                                                         {sample.name}
                                                     </MenuItem>
@@ -786,10 +786,10 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
                 </Typography>
                 {displayValue.treatment ? (
                     <Box>
-                        {displayValue.sampleType === 'pure_water' ? (
+                        {displayValue.sampleType === 'procedural_blank' ? (
                             <>
                                 <Typography variant="body2" color="primary.main">
-                                    Type: Pure Water
+                                    Type: Procedural Blank
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
                                     Sample: {displayValue.sample}
