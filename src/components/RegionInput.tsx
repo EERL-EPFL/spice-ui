@@ -7,6 +7,7 @@ import {
   useDataProvider,
   useRecordContext,
   useRedirect,
+  useNotify,
 } from "react-admin";
 import TrayGrid, { Cell, ExistingRegion, Orientation } from "./TrayGrid";
 import { EnhancedTreatmentSelector } from "./EnhancedTreatmentSelector";
@@ -28,6 +29,7 @@ import {
   Tabs,
   Tab,
   ToggleButton,
+  MenuItem,
   ToggleButtonGroup,
   Link as MuiLink,
 } from "@mui/material";
@@ -175,7 +177,7 @@ const cellToStringWithRotation = (
   const number = visualRow + 1;
   
   const result = `${letter}${number}`;
-  console.log(`COORD: ${cell.row},${cell.col} @${rotation}° -> ${result}`);
+  // console.log(`COORD: ${cell.row},${cell.col} @${rotation}° -> ${result}`);
   
   return result;
 };
@@ -561,6 +563,8 @@ export const RegionInput: React.FC<{
 }> = (props) => {
   const dataProvider = useDataProvider();
   const record = useRecordContext(); // Get the current experiment record for time point data
+  const notify = useNotify();
+  const [availableTreatments, setAvailableTreatments] = useState<any[]>([]);
   // Always call useInput to maintain consistent hook order, but handle errors gracefully
   let inputResult;
   try {
@@ -808,6 +812,30 @@ export const RegionInput: React.FC<{
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
 
+    // Generate a unique default name for a region using display coordinates
+  const generateDefaultRegionName = useCallback(
+    (trayName: string, startCoord: string, endCoord: string): string => {
+      // Base name format: TrayStartEnd or TrayStart if single cell
+      let baseName: string;
+      if (startCoord === endCoord) {
+        baseName = `${trayName}${startCoord}`;
+      } else {
+        baseName = `${trayName}${startCoord}${endCoord}`;
+      }
+      
+      // Check for duplicates and add suffix if needed
+      let finalName = baseName;
+      let counter = 1;
+      while (regions.some(r => r.name === finalName)) {
+        finalName = `${baseName}_${counter}`;
+        counter++;
+      }
+      
+      return finalName;
+    },
+    [regions]
+  );
+
   const handleNewRegion = useCallback(
     (regionObj: {
       trayName: string;
@@ -815,6 +843,7 @@ export const RegionInput: React.FC<{
       lowerRight: Cell;
       trayConfig: any;
       trayId: number;
+      hasOverlap?: boolean;
     }) => {
       const { trayName, upperLeft, lowerRight, trayConfig, trayId } = regionObj;
 
@@ -828,11 +857,20 @@ export const RegionInput: React.FC<{
         const overlapInCols =
           upperLeft.col <= r.col_max && lowerRight.col >= r.col_min;
         if (overlapInRows && overlapInCols) {
-          window.alert("Cannot create overlapping regions.");
+          notify("Cannot create overlapping regions. Please select a different area.", { type: 'error' });
           return;
         }
       }
 
+      // Use the same coordinate display logic that works everywhere else
+      const ulCell: Cell = { row: upperLeft.row, col: upperLeft.col };
+      const lrCell: Cell = { row: lowerRight.row, col: lowerRight.col };
+      const startCoord = cellToStringWithRotation(ulCell, trayConfig, trayConfig.rotation_degrees);
+      const endCoord = cellToStringWithRotation(lrCell, trayConfig, trayConfig.rotation_degrees);
+      
+      // Generate unique default name using display coordinates
+      const defaultName = generateDefaultRegionName(trayName, startCoord, endCoord);
+      
       // Pick a color
       const color = COLOR_PALETTE[regions.length % COLOR_PALETTE.length];
 
@@ -840,7 +878,7 @@ export const RegionInput: React.FC<{
       const updated: SingleRegion[] = [
         ...regions,
         {
-          name: "",
+          name: defaultName,
           tray_sequence_id: trayId,
           col_min: upperLeft.col,
           col_max: lowerRight.col,
@@ -854,7 +892,7 @@ export const RegionInput: React.FC<{
       ];
       onChange(updated);
     },
-    [onChange, regions],
+    [onChange, regions, generateDefaultRegionName],
   );
 
   const handleRemove = useCallback(
@@ -867,6 +905,15 @@ export const RegionInput: React.FC<{
 
   const handleRegionChange = useCallback(
     (idx: number, field: string, newValue: string | boolean) => {
+      // Check for duplicate names when changing name field
+      if (field === 'name' && typeof newValue === 'string') {
+        const isDuplicate = regions.some((r, i) => i !== idx && r.name === newValue);
+        if (isDuplicate && newValue.trim() !== '') {
+          notify(`Name "${newValue}" already exists. Please choose a different name.`, { type: 'error' });
+          return; // Don't update if it would create a duplicate
+        }
+      }
+      
       // Get current focused element to restore focus after state update
       const activeElement = document.activeElement as HTMLElement;
       const activeId = activeElement?.id;
@@ -886,7 +933,7 @@ export const RegionInput: React.FC<{
         }
       }, 0);
     },
-    [onChange, regions],
+    [onChange, regions, notify],
   );
 
   // Validation function to check for duplicate names
@@ -1433,6 +1480,7 @@ export const RegionInput: React.FC<{
                             lowerRight: regionObj.lowerRight,
                             trayConfig: tray,
                             trayId: tray.order_sequence,
+                            hasOverlap: regionObj.hasOverlap,
                           })
                   }
                   existingRegions={existingRegions}
@@ -1457,7 +1505,7 @@ export const RegionInput: React.FC<{
         {(regions.length > 0 ||
           (showTimePointVisualization && resultsSummary)) && (
           <Card
-            sx={{ flex: "0 0 auto", width: "380px", height: "fit-content" }}
+            sx={{ flex: "0 0 auto", width: "480px", height: "fit-content" }}
           >
             <CardContent>
               <Box
@@ -1531,7 +1579,7 @@ export const RegionInput: React.FC<{
                     if (trayInfo && trayConfig) {
                       const ulCell: Cell = { row: r.row_min, col: r.col_min };
                       const lrCell: Cell = { row: r.row_max, col: r.col_max };
-                      console.log(`REGION: ${trayConfig.name} @${rotation}° [${r.row_min},${r.col_min} to ${r.row_max},${r.col_max}]`);
+                      // console.log(`REGION: ${trayConfig.name} @${rotation}° [${r.row_min},${r.col_min} to ${r.row_max},${r.col_max}]);
                       ulStr = cellToStringWithRotation(
                         ulCell,
                         trayConfig,
@@ -1551,16 +1599,15 @@ export const RegionInput: React.FC<{
                     return (
                       <Box
                         key={`region-list-${idx}`}
-                        display="flex"
-                        alignItems="center"
-                        gap={1}
                         marginBottom={0.5}
                         padding={1}
+                        paddingTop={1.5}
                         border={`1px solid ${r.color}`}
                         borderRadius={1}
                         sx={{
                           backgroundColor: `${r.color}08`,
                           position: "relative",
+                          minWidth: 380,
                         }}
                       >
                         {/* Color indicator and region label */}
@@ -1571,7 +1618,7 @@ export const RegionInput: React.FC<{
                             left: 8,
                             backgroundColor: "background.paper",
                             paddingX: 0.5,
-                            fontSize: "0.75rem",
+                            fontSize: "0.875rem",
                             fontWeight: "medium",
                             color: r.color,
                           }}
@@ -1579,193 +1626,181 @@ export const RegionInput: React.FC<{
                           {trayName}: {ulStr}–{lrStr}
                         </Box>
 
-                        <TextField
-                          id={`region-${idx}-name`}
-                          placeholder="Name*"
-                          size="small"
-                          value={r.name}
-                          onChange={
-                            readOnly
-                              ? undefined
-                              : (e) =>
-                                  handleRegionChange(
-                                    idx,
-                                    "name",
-                                    e.target.value,
-                                  )
-                          }
-                          variant="standard"
-                          disabled={readOnly}
-                          required
-                          error={
-                            (!r.name && !readOnly) || duplicateIndices.has(idx)
-                          }
-                          helperText={
-                            duplicateIndices.has(idx)
-                              ? "Duplicate name"
-                              : undefined
-                          }
-                          sx={{ width: 90 }}
-                          inputRef={inputRefs.current[`region-${idx}-name`]}
-                          InputProps={{
-                            disableUnderline: true,
-                            sx: {
-                              fontSize: "0.8rem",
-                              "& .MuiInputBase-input": {
-                                borderBottom: duplicateIndices.has(idx)
-                                  ? "2px solid #f44336"
-                                  : undefined,
+                        {/* Single compact row with all fields */}
+                        <Box
+                          display="flex"
+                          alignItems="flex-start"
+                          gap={1}
+                          flexWrap="wrap"
+                        >
+                          <TextField
+                            id={`region-${idx}-name`}
+                            placeholder="Name*"
+                            size="small"
+                            value={r.name}
+                            onChange={
+                              readOnly
+                                ? undefined
+                                : (e) =>
+                                    handleRegionChange(
+                                      idx,
+                                      "name",
+                                      e.target.value,
+                                    )
+                            }
+                            variant="standard"
+                            disabled={readOnly}
+                            required
+                            error={
+                              (!r.name && !readOnly) || duplicateIndices.has(idx)
+                            }
+                            helperText={
+                              duplicateIndices.has(idx)
+                                ? "Duplicate"
+                                : undefined
+                            }
+                            sx={{ width: 100 }}
+                            inputRef={inputRefs.current[`region-${idx}-name`]}
+                            InputProps={{
+                              sx: { fontSize: "0.875rem", paddingY: 0 },
+                              endAdornment: duplicateIndices.has(idx) ? (
+                                <CloseIcon
+                                  sx={{
+                                    fontSize: "0.8rem",
+                                    color: "error.main",
+                                    marginLeft: 0.5,
+                                  }}
+                                />
+                              ) : undefined,
+                            }}
+                            FormHelperTextProps={{
+                              sx: {
+                                fontSize: "0.75rem",
+                                marginTop: 0,
                               },
-                            },
-                            endAdornment: duplicateIndices.has(idx) ? (
-                              <CloseIcon
-                                sx={{
-                                  fontSize: "0.8rem",
-                                  color: "error.main",
-                                  marginLeft: 0.5,
+                            }}
+                          />
+
+                          <TextField
+                            id={`region-${idx}-dilution`}
+                            placeholder="Dilution*"
+                            size="small"
+                            value={r.dilution || ""}
+                            onChange={
+                              readOnly
+                                ? undefined
+                                : (e) =>
+                                    handleRegionChange(
+                                      idx,
+                                      "dilution",
+                                      e.target.value,
+                                    )
+                            }
+                            variant="standard"
+                            disabled={readOnly}
+                            required
+                            error={!r.dilution && !readOnly}
+                            sx={{ width: 80 }}
+                            inputRef={inputRefs.current[`region-${idx}-dilution`]}
+                            InputProps={{
+                              sx: { fontSize: "0.875rem", paddingY: 0 },
+                            }}
+                          />
+
+                          <Box sx={{ width: 140 }}>
+                            {readOnly ? (
+                              <TreatmentDisplay
+                                treatmentId={r.treatment_id || ""}
+                                treatmentData={r.treatment}
+                              />
+                            ) : (
+                              <EnhancedTreatmentSelector
+                                value={r.treatment_id || ""}
+                                label=""
+                                placeholder="Treatment"
+                                disabled={readOnly}
+                                size="small"
+                                compact={true}
+                                filteredTreatments={props.filteredTreatments}
+                                onChange={(treatmentId) => {
+                                  if (!readOnly) {
+                                    handleRegionChange(
+                                      idx,
+                                      "treatment_id",
+                                      treatmentId,
+                                    );
+                                  }
+                                }}
+                                onApplyToAll={(treatmentId) => {
+                                  if (!readOnly) {
+                                    const updatedRegions = regions.map(
+                                      (region) => ({
+                                        ...region,
+                                        treatment_id: treatmentId,
+                                      }),
+                                    );
+                                    onChange(updatedRegions);
+                                  }
                                 }}
                               />
-                            ) : undefined,
-                          }}
-                          FormHelperTextProps={{
-                            sx: {
-                              fontSize: "0.6rem",
-                              marginTop: 0.25,
-                              color: "error.main",
-                            },
-                          }}
-                        />
+                            )}
+                          </Box>
 
-                        <Box sx={{ width: 120 }}>
-                          {readOnly ? (
-                            <TreatmentDisplay
-                              treatmentId={r.treatment_id || ""}
-                              treatmentData={r.treatment}
-                            />
-                          ) : (
-                            <EnhancedTreatmentSelector
-                              value={r.treatment_id || ""}
-                              label=""
-                              disabled={readOnly}
-                              filteredTreatments={props.filteredTreatments}
-                              onChange={(treatmentId) => {
-                                if (!readOnly) {
-                                  handleRegionChange(
-                                    idx,
-                                    "treatment_id",
-                                    treatmentId,
-                                  );
+                          <Tooltip title="Background key" placement="top">
+                            <Box display="flex" alignItems="center" gap={0.5}>
+                              <Checkbox
+                                checked={r.is_background_key || false}
+                                onChange={
+                                  readOnly
+                                    ? undefined
+                                    : (e) =>
+                                        handleRegionChange(
+                                          idx,
+                                          "is_background_key",
+                                          e.target.checked,
+                                        )
                                 }
-                              }}
-                              onApplyToAll={(treatmentId) => {
-                                if (!readOnly) {
-                                  // Apply the treatment to all regions
-                                  const updatedRegions = regions.map(
-                                    (region) => ({
-                                      ...region,
-                                      treatment_id: treatmentId,
-                                    }),
-                                  );
-                                  onChange(updatedRegions);
-                                }
-                              }}
-                              compact={true}
-                              existingRegionTreatments={enhancedRegions
-                                .map((region, index) => ({
-                                  regionName:
-                                    region.name || `Region ${index + 1}`,
-                                  regionIndex: index,
-                                  treatment: region.treatment || {
-                                    id: region.treatment_id || "",
-                                    name: "Unknown",
-                                  },
-                                  dilution: region.dilution,
-                                }))
-                                .filter(
-                                  (rt) =>
-                                    rt.treatment.id && rt.regionIndex !== idx,
-                                )}
-                              currentRegionIndex={idx}
-                              currentRegionName={r.name || `Region ${idx + 1}`}
-                            />
-                          )}
+                                disabled={readOnly}
+                                size="small"
+                                sx={{ padding: 0.5 }}
+                              />
+                              <Typography 
+                                variant="caption" 
+                                sx={{ 
+                                  fontSize: "0.75rem", 
+                                  whiteSpace: "nowrap",
+                                  fontWeight: r.is_background_key ? 600 : 400,
+                                  color: r.is_background_key ? "primary.main" : "text.secondary"
+                                }}
+                              >
+                                BG Key
+                              </Typography>
+                            </Box>
+                          </Tooltip>
+
                         </Box>
 
-                        <TextField
-                          id={`region-${idx}-dilution`}
-                          placeholder="Dilution Factor*"
-                          size="small"
-                          value={r.dilution || ""}
-                          onChange={
-                            readOnly
-                              ? undefined
-                              : (e) =>
-                                  handleRegionChange(
-                                    idx,
-                                    "dilution",
-                                    e.target.value,
-                                  )
-                          }
-                          variant="standard"
-                          disabled={readOnly}
-                          required
-                          error={!r.dilution && !readOnly}
-                          sx={{ width: 100 }}
-                          inputRef={inputRefs.current[`region-${idx}-dilution`]}
-                          InputProps={{
-                            disableUnderline: true,
-                            sx: { fontSize: "0.8rem" },
-                          }}
-                        />
-
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={r.is_background_key || false}
-                              onChange={
-                                readOnly
-                                  ? undefined
-                                  : (e) =>
-                                      handleRegionChange(
-                                        idx,
-                                        "is_background_key",
-                                        e.target.checked,
-                                      )
-                              }
-                              disabled={readOnly}
-                              size="small"
-                              color="primary"
-                              sx={{
-                                padding: "4px",
-                                "&.Mui-checked": {
-                                  color: "primary.main",
-                                },
-                                "& .MuiSvgIcon-root": {
-                                  fontSize: "1.2rem",
-                                },
-                              }}
-                            />
-                          }
-                          label="Background key"
-                          sx={{
-                            margin: 0,
-                            minWidth: 90,
-                            "& .MuiFormControlLabel-label": {
-                              fontSize: "0.75rem",
-                              fontWeight: 500,
-                              color: "text.primary",
-                            },
-                          }}
-                        />
-
+                        {/* Delete button overlapping the corner */}
                         {!readOnly && (
                           <IconButton
                             size="small"
-                            color="error"
                             onClick={() => handleRemove(idx)}
-                            sx={{ padding: 0.25 }}
+                            sx={{ 
+                              position: "absolute",
+                              top: -8,
+                              right: -8,
+                              backgroundColor: "background.paper",
+                              border: `2px solid ${r.color}`,
+                              padding: 0.25,
+                              "&:hover": {
+                                backgroundColor: r.color,
+                                "& .MuiSvgIcon-root": {
+                                  color: "white",
+                                },
+                              },
+                            }}
                           >
-                            <CloseIcon sx={{ fontSize: "1rem" }} />
+                            <CloseIcon sx={{ fontSize: "0.9rem", color: r.color }} />
                           </IconButton>
                         )}
                       </Box>

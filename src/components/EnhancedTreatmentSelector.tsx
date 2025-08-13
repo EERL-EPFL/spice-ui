@@ -379,92 +379,50 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
                     onClick={disabled ? undefined : handleOpen}
                     sx={{
                         cursor: disabled ? 'default' : 'pointer',
-                        padding: '6px 12px',
+                        padding: '4px 8px',
                         borderRadius: 1,
                         backgroundColor: disabled ? 'action.disabledBackground' : 'transparent',
                         '&:hover': disabled ? {} : {
                             backgroundColor: 'action.hover'
                         },
-                        minHeight: '48px',
+                        minHeight: '32px',
                         display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
+                        alignItems: 'center',
                         border: '1px solid',
-                        borderColor: 'divider'
+                        borderColor: 'divider',
+                        position: 'relative'
                     }}
                 >
+                    {/* Location label on border edge */}
+                    {displayValue.location && (
+                        <Box
+                            sx={{
+                                position: 'absolute',
+                                top: -8,
+                                left: 6,
+                                backgroundColor: 'background.paper',
+                                paddingX: 0.5,
+                                fontSize: '0.65rem',
+                                fontWeight: 'medium',
+                                color: 'text.secondary',
+                                lineHeight: 1
+                            }}
+                        >
+                            {displayValue.location}
+                        </Box>
+                    )}
                     {displayValue.treatment ? (
-                        <>
-                            {displayValue.sampleType === 'procedural_blank' ? (
-                                <>
-                                    <Typography
-                                        variant="caption"
-                                        sx={{
-                                            fontSize: '0.65rem',
-                                            color: 'primary.main',
-                                            lineHeight: 1.2,
-                                            marginBottom: '2px'
-                                        }}
-                                    >
-                                        Procedural Blank
-                                    </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        sx={{
-                                            fontSize: '0.8rem',
-                                            lineHeight: 1.2,
-                                            marginBottom: '1px'
-                                        }}
-                                    >
-                                        {displayValue.sample}
-                                    </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        sx={{
-                                            fontSize: '0.75rem',
-                                            fontWeight: 'bold',
-                                            lineHeight: 1.2
-                                        }}
-                                    >
-                                        {displayValue.treatment}
-                                    </Typography>
-                                </>
-                            ) : (
-                                <>
-                                    <Typography
-                                        variant="caption"
-                                        sx={{
-                                            fontSize: '0.65rem',
-                                            color: 'text.secondary',
-                                            lineHeight: 1.2,
-                                            marginBottom: '2px'
-                                        }}
-                                    >
-                                        {displayValue.location}
-                                    </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        sx={{
-                                            fontSize: '0.8rem',
-                                            lineHeight: 1.2,
-                                            marginBottom: '1px'
-                                        }}
-                                    >
-                                        {displayValue.sample}
-                                    </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        sx={{
-                                            fontSize: '0.75rem',
-                                            fontWeight: 'bold',
-                                            lineHeight: 1.2
-                                        }}
-                                    >
-                                        {displayValue.treatment}
-                                    </Typography>
-                                </>
-                            )}
-                        </>
+                        <Typography
+                            variant="body2"
+                            sx={{
+                                fontSize: '0.75rem',
+                                lineHeight: 1.2,
+                                textAlign: 'left',
+                                width: '100%'
+                            }}
+                        >
+                            <span style={{ fontWeight: 'bold' }}>{displayValue.sample}</span>: {displayValue.treatment}
+                        </Typography>
                     ) : (
                         <Typography
                             variant="body2"
@@ -473,7 +431,7 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
                                 fontStyle: 'italic'
                             }}
                         >
-                            {disabled ? 'No treatment selected' : 'Click to select treatment'}
+                            {disabled ? 'No treatment' : 'Select treatment'}
                         </Typography>
                     )}
                 </Box>
@@ -814,7 +772,7 @@ export const EnhancedTreatmentSelector: React.FC<EnhancedTreatmentSelectorProps>
                     </Box>
                 ) : (
                     <Typography variant="body2" color="text.secondary" fontStyle="italic">
-                        {disabled ? 'No treatment selected' : 'Click to select a treatment'}
+                        {disabled ? 'No treatment' : 'Select treatment'}
                     </Typography>
                 )}
             </Paper>

@@ -26,6 +26,7 @@ const generateColumnLetters = (maxCols: number): string[] => {
     return letters;
 };
 
+
 const CIRCLE_RADIUS = 12;
 const SPACING = 30;
 
@@ -103,7 +104,7 @@ export interface TrayGridProps {
     qtyXAxis: number;
     qtyYAxis: number;
     orientation: Orientation;
-    onRegionSelect: (region: { tray: string; upperLeft: Cell; lowerRight: Cell }) => void;
+    onRegionSelect: (region: { tray: string; upperLeft: Cell; lowerRight: Cell; hasOverlap?: boolean }) => void;
     existingRegions?: ExistingRegion[];
     readOnly?: boolean; // Add explicit readOnly prop
     // Time point visualization props
@@ -182,10 +183,58 @@ const TrayGrid: React.FC<TrayGridProps> = ({
         return tooltip;
     };
 
+    // Check if a cell would cause overlap if selected
+    const wouldCauseOverlap = (row: number, col: number) => {
+        if (!startCell || !endCell) return false;
+        
+        // Check if this cell is in current selection
+        const minRow = Math.min(startCell.row, endCell.row);
+        const maxRow = Math.max(startCell.row, endCell.row);
+        const minCol = Math.min(startCell.col, endCell.col);
+        const maxCol = Math.max(startCell.col, endCell.col);
+        const inSelection = row >= minRow && row <= maxRow && col >= minCol && col <= maxCol;
+        
+        if (!inSelection) return false;
+        
+        // Convert to storage coordinates to check overlap (same logic as handleMouseUp)
+        const { xIndex, yIndex } = getDisplayIndices(row, col);
+        let storageRow: number;
+        let storageCol: number;
+        
+        switch (orientation) {
+            case 90:
+                storageRow = xIndex;
+                storageCol = yIndex;
+                break;
+            case 270:
+                storageRow = xIndex;
+                storageCol = qtyXAxis - 1 - yIndex;
+                break;
+            case 180:
+                storageRow = qtyYAxis - 1 - yIndex;
+                storageCol = qtyXAxis - 1 - xIndex;
+                break;
+            default: // 0°
+                storageRow = yIndex;
+                storageCol = xIndex;
+                break;
+        }
+        
+        // Check if storage coordinates overlap with existing regions
+        return existingRegions.some(region => {
+            const { upperLeft, lowerRight } = region;
+            return storageRow >= upperLeft.row && storageRow <= lowerRight.row &&
+                storageCol >= upperLeft.col && storageCol <= lowerRight.col;
+        });
+    };
+
     // Helper function to get well background color
     const getWellColor = (row: number, col: number, selected: boolean, hovered: boolean): string => {
-        if (selected) {
-            return 'rgba(0,128,255,0.6)'; // Slightly more visible selection
+        // Check for overlap during selection - show red for invalid overlap
+        if (selected && wouldCauseOverlap(row, col)) {
+            return 'rgba(220,38,38,0.7)'; // Red for overlap conflict
+        } else if (selected) {
+            return 'rgba(0,128,255,0.6)'; // Blue for normal selection
         } else if (hovered) {
             return 'rgba(0,128,255,0.3)'; // More visible hover
         } else if (showTimePointVisualization && colorScale) {
@@ -237,7 +286,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
         }
 
         // Allow selection even on covered cells - users can overlap regions if needed
-        console.log(`CLICK: ${row},${col} on tray @${orientation}°`);
+        // console.log(`CLICK: ${row},${col} on tray @${orientation}°`);
         
         // The row, col passed here are logical coordinates from the well rendering loops
         // These should be stored directly as they represent the actual well positions
@@ -263,7 +312,24 @@ const TrayGrid: React.FC<TrayGridProps> = ({
 
     const handleMouseUp = () => {
         if (startCell && endCell) {
-            console.log(`SELECTION: ${startCell.row},${startCell.col} to ${endCell.row},${endCell.col}`);
+            // console.log(`SELECTION: ${startCell.row},${startCell.col} to ${endCell.row},${endCell.col}`);
+            
+            // Check for overlap in the current selection
+            let hasOverlap = false;
+            const minRow = Math.min(startCell.row, endCell.row);
+            const maxRow = Math.max(startCell.row, endCell.row);
+            const minCol = Math.min(startCell.col, endCell.col);
+            const maxCol = Math.max(startCell.col, endCell.col);
+            
+            for (let row = minRow; row <= maxRow; row++) {
+                for (let col = minCol; col <= maxCol; col++) {
+                    if (isCellCovered(row, col)) {
+                        hasOverlap = true;
+                        break;
+                    }
+                }
+                if (hasOverlap) break;
+            }
             
             // RESTORE: Convert coordinates back to correct storage coordinates  
             const convertToStorageCoords = (cell: Cell): Cell => {
@@ -310,8 +376,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 col: Math.max(convertedStart.col, convertedEnd.col),
             };
             
-            console.log(`SENDING: ${upperLeft.row},${upperLeft.col} to ${lowerRight.row},${lowerRight.col}`);
-            onRegionSelect({ tray, upperLeft, lowerRight });
+            // console.log(`SENDING: ${upperLeft.row},${upperLeft.col} to ${lowerRight.row},${lowerRight.col}`);
+            onRegionSelect({ tray, upperLeft, lowerRight, hasOverlap });
         }
         setIsDragging(false);
         setStartCell(null);
@@ -319,11 +385,10 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     };
 
     const handleMouseLeave = () => {
-        if (isDragging) {
-            setIsDragging(false);
-            setStartCell(null);
-            setEndCell(null);
-        }
+        // Always reset drag state when leaving the SVG area
+        setIsDragging(false);
+        setStartCell(null);
+        setEndCell(null);
         setHoveredCell(null);
     };
 
@@ -474,7 +539,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                             style={{
                                 cursor: isDisplayMode ? 
                                     (showTimePointVisualization && well ? 'pointer' : 'default') : 
-                                    'crosshair'
+                                    'crosshair',
+                                pointerEvents: 'all' // Ensure pointer events are enabled
                             }}
                             onMouseDown={isDisplayMode ? 
                                 (showTimePointVisualization ? () => handleMouseDown(rowIdx, colIdx) : undefined) : 
@@ -533,6 +599,14 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             style={{ border: '1px solid #ccc', background: '#fafafa' }}
             onMouseUp={isDisplayMode ? undefined : handleMouseUp}
             onMouseLeave={isDisplayMode ? undefined : handleMouseLeave}
+            onMouseDown={isDisplayMode ? undefined : (e) => {
+                // If clicking on SVG background (not a well), clear any selection
+                if (e.target === e.currentTarget) {
+                    setIsDragging(false);
+                    setStartCell(null);
+                    setEndCell(null);
+                }
+            }}
         >
             {/* 1) Draw wells first (they will be under regions if not in time point mode) */}
             {!showTimePointVisualization && renderWells(false)}
@@ -547,6 +621,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     fontSize="12"
                     fill="#333"
                     fontWeight="bold"
+                    style={{ userSelect: 'none' }}
                 >
                     {label.label}
                 </text>
@@ -562,6 +637,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     fontSize="12"
                     fill="#333"
                     fontWeight="bold"
+                    style={{ userSelect: 'none' }}
                 >
                     {label.label}
                 </text>
@@ -577,6 +653,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     fontSize="12"
                     fill="#333"
                     fontWeight="bold"
+                    style={{ userSelect: 'none' }}
                 >
                     {label.label}
                 </text>
@@ -592,6 +669,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     fontSize="12"
                     fill="#333"
                     fontWeight="bold"
+                    style={{ userSelect: 'none' }}
                 >
                     {label.label}
                 </text>
@@ -688,7 +766,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                                 strokeWidth="2"
                                 strokeOpacity={1.0}
                                 paintOrder="stroke fill"
-                                style={{ pointerEvents: 'none' }} // Allow clicks to pass through to wells
+                                style={{ pointerEvents: 'none', userSelect: 'none' }} // Prevent text selection
                             >
                                 {(region.name || 'Unnamed').split('\n').map((line, index, lines) => (
                                     <tspan
