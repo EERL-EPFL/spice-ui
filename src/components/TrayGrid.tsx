@@ -183,23 +183,19 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     };
 
     // Helper function to get well background color
-    const getWellColor = (row: number, col: number, selected: boolean, hovered: boolean, covered: boolean): string => {
+    const getWellColor = (row: number, col: number, selected: boolean, hovered: boolean): string => {
         if (selected) {
-            return 'rgba(0,128,255,0.5)';
+            return 'rgba(0,128,255,0.6)'; // Slightly more visible selection
         } else if (hovered) {
-            return 'rgba(0,128,255,0.2)';
+            return 'rgba(0,128,255,0.3)'; // More visible hover
         } else if (showTimePointVisualization && colorScale) {
             const well = getWellSummary(row, col);
             if (well?.first_phase_change_seconds !== null && well?.first_phase_change_seconds !== undefined) {
                 return colorScale(well.first_phase_change_seconds);
             }
             return '#ffcccc';
-        } else if (covered && viewMode === 'regions') {
-            return 'rgba(245,245,245,0.3)'; // More transparent in regions mode
-        } else if (covered) {
-            return '#f5f5f5';
         }
-        return viewMode === 'regions' ? 'rgba(255,255,255,0.7)' : '#fff'; // Slightly transparent wells in regions mode
+        return viewMode === 'regions' ? 'rgba(255,255,255,0.9)' : '#fff'; // Slightly transparent wells in regions mode
     };
 
     // Calculate display dimensions based on orientation
@@ -240,9 +236,11 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             }
         }
 
-        // Don't allow selection on covered cells
-        if (isCellCovered(row, col)) return;
-
+        // Allow selection even on covered cells - users can overlap regions if needed
+        console.log(`CLICK: ${row},${col} on tray @${orientation}°`);
+        
+        // The row, col passed here are logical coordinates from the well rendering loops
+        // These should be stored directly as they represent the actual well positions
         setStartCell({ row, col });
         setEndCell({ row, col });
         setIsDragging(true);
@@ -253,9 +251,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             setHoveredCell({ row, col });
             return;
         }
-        // Don't extend selection over covered cells
-        if (isCellCovered(row, col)) return;
-
+        // Allow extending selection over any cells for more fluid experience
         setEndCell({ row, col });
     };
 
@@ -267,14 +263,54 @@ const TrayGrid: React.FC<TrayGridProps> = ({
 
     const handleMouseUp = () => {
         if (startCell && endCell) {
+            console.log(`SELECTION: ${startCell.row},${startCell.col} to ${endCell.row},${endCell.col}`);
+            
+            // RESTORE: Convert coordinates back to correct storage coordinates  
+            const convertToStorageCoords = (cell: Cell): Cell => {
+                const { xIndex, yIndex } = getDisplayIndices(cell.row, cell.col);
+                let storageRow: number;
+                let storageCol: number;
+                
+                switch (orientation) {
+                    case 90:
+                        // This was WORKING for P1 - restore it
+                        storageRow = xIndex;
+                        storageCol = yIndex;
+                        break;
+                    case 270:
+                        // For 270° rotation: the tray is rotated clockwise 270°
+                        // What appears at top-left visually was originally at top-right
+                        // Click position (row=1,col=0) with display indices (xIndex=6,yIndex=0)
+                        // Should map to storage that represents G12 (row=6,col=11)
+                        storageRow = xIndex;
+                        storageCol = qtyXAxis - 1 - yIndex;
+                        break;
+                    case 180:
+                        storageRow = qtyYAxis - 1 - yIndex;
+                        storageCol = qtyXAxis - 1 - xIndex;
+                        break;
+                    default: // 0°
+                        storageRow = yIndex;
+                        storageCol = xIndex;
+                        break;
+                }
+                
+                return { row: storageRow, col: storageCol };
+            };
+            
+            const convertedStart = convertToStorageCoords(startCell);
+            const convertedEnd = convertToStorageCoords(endCell);
+            
             const upperLeft: Cell = {
-                row: Math.min(startCell.row, endCell.row),
-                col: Math.min(startCell.col, endCell.col),
+                row: Math.min(convertedStart.row, convertedEnd.row),
+                col: Math.min(convertedStart.col, convertedEnd.col),
             };
             const lowerRight: Cell = {
-                row: Math.max(startCell.row, endCell.row),
-                col: Math.max(startCell.col, endCell.col),
+                row: Math.max(convertedStart.row, convertedEnd.row),
+                col: Math.max(convertedStart.col, convertedEnd.col),
             };
+            
+            console.log(`SENDING: ${upperLeft.row},${upperLeft.col} to ${lowerRight.row},${lowerRight.col}`);
             onRegionSelect({ tray, upperLeft, lowerRight });
         }
         setIsDragging(false);
@@ -303,65 +339,105 @@ const TrayGrid: React.FC<TrayGridProps> = ({
 
     // True if this cell should show hover effect
     const isCellHovered = (row: number, col: number) => {
-        return hoveredCell?.row === row && hoveredCell?.col === col &&
-            !isCellCovered(row, col) && !isDragging;
+        return hoveredCell?.row === row && hoveredCell?.col === col && !isDragging;
     };
 
-    // SVG size: width = (num displayed columns × SPACING + margin), height = (num displayed rows × SPACING + margin + 30 for labels)
-    const svgWidth = displayCols * SPACING + SPACING;
-    const svgHeight = displayRows * SPACING + SPACING + 30;
+    // SVG size: asymmetric margins for visual centering
+    const LABEL_DISTANCE = 18;
+    const leftMargin = LABEL_DISTANCE + 25; // Good left spacing
+    const topMargin = leftMargin + 10; // Extra top margin to match left margin visually
+    const rightMargin = LABEL_DISTANCE + 10; // Reduced right margin
+    const bottomMargin = LABEL_DISTANCE + 10; // Reduced bottom margin
+    const svgWidth = displayCols * SPACING + leftMargin + rightMargin;
+    const svgHeight = displayRows * SPACING + topMargin + bottomMargin;
 
-    // Generate all label positions based on orientation  
+    // Generate all label positions (ALL 4 SIDES) with correct rotation handling (same as TrayDisplay)
     const getLabels = () => {
         const topLabels = [];
         const leftLabels = [];
+        const bottomLabels = [];
+        const rightLabels = [];
 
-        // CORRECTED: Default 0° should be letters on LEFT, numbers on TOP
-        // User wants to start with this layout then use 90°/270° rotation to adjust
+        // Use consistent label distance from wells (same as TrayDisplay component)
+        const LABEL_DISTANCE = 18; // Consistent distance from wells for all sides
 
-        // At 0° orientation: 
-        // - Letters (A,B,C...) should be on LEFT side (leftLabels)
-        // - Numbers (1,2,3...) should be on TOP (topLabels)
+        // Helper function to get label for a display column - EXACT SAME LOGIC as TrayDisplay
+        const getColumnLabel = (displayCol: number) => {
+            switch (orientation) {
+                case 0: return String(displayCol + 1);  // 1,2,3...
+                case 90: return String.fromCharCode(65 + (qtyYAxis - 1 - displayCol));  // H,G,F...
+                case 180: return String(qtyXAxis - displayCol);  // 12,11,10...
+                case 270: return String.fromCharCode(65 + displayCol);  // A,B,C...
+                default: return String(displayCol + 1);
+            }
+        };
+        
+        // Helper function to get label for a display row - EXACT SAME LOGIC as TrayDisplay
+        const getRowLabel = (displayRow: number) => {
+            switch (orientation) {
+                case 0: return String.fromCharCode(65 + displayRow);  // A,B,C...
+                case 90: return String(displayRow + 1);  // 1,2,3...
+                case 180: return String.fromCharCode(65 + (qtyYAxis - 1 - displayRow));  // H,G,F...
+                case 270: return String(qtyXAxis - displayRow);  // 12,11,10...
+                default: return String.fromCharCode(65 + displayRow);
+            }
+        };
 
-        // LEFT LABELS: Letters A-H for rows
-        for (let rowIdx = 0; rowIdx < qtyYAxis; rowIdx++) {
-            const letter = String.fromCharCode(65 + rowIdx);
-            const { xIndex, yIndex } = getDisplayIndices(rowIdx, 0);
+        // Generate labels for ALL 4 EDGES with consistent spacing
+        for (let displayCol = 0; displayCol < displayCols; displayCol++) {
+            const label = getColumnLabel(displayCol);
+            const cx = leftMargin + displayCol * SPACING;
             
-            // Position letters on the left side at the vertical position of each row
-            const labelX = 8;
-            const labelY = SPACING + yIndex * SPACING + 5;
-            leftLabels.push({ x: labelX, y: labelY, label: letter });
-        }
-
-        // TOP LABELS: Numbers 1-12 for columns  
-        for (let colIdx = 0; colIdx < qtyXAxis; colIdx++) {
-            const number = colIdx + 1;
-            const { xIndex, yIndex } = getDisplayIndices(0, colIdx);
+            // Top labels - consistent distance above wells with extra top margin
+            topLabels.push({ 
+                x: cx, 
+                y: topMargin - CIRCLE_RADIUS - LABEL_DISTANCE,
+                label: label
+            });
             
-            // Position numbers on the top at the horizontal position of each column
-            const labelX = SPACING + xIndex * SPACING;
-            const labelY = 12;
-            topLabels.push({ x: labelX, y: labelY, label: number });
+            // Bottom labels - consistent distance below wells
+            bottomLabels.push({ 
+                x: cx, 
+                y: topMargin + (displayRows - 1) * SPACING + CIRCLE_RADIUS + LABEL_DISTANCE + 15,
+                label: label
+            });
         }
         
-        return { topLabels, leftLabels };
+        for (let displayRow = 0; displayRow < displayRows; displayRow++) {
+            const label = getRowLabel(displayRow);
+            const cy = topMargin + displayRow * SPACING;
+            
+            // Left labels - consistent distance left of wells
+            leftLabels.push({ 
+                x: leftMargin - CIRCLE_RADIUS - LABEL_DISTANCE,
+                y: cy + 4, // Small adjustment for centering
+                label: label
+            });
+            
+            // Right labels - consistent distance right of wells
+            rightLabels.push({ 
+                x: leftMargin + (displayCols - 1) * SPACING + CIRCLE_RADIUS + LABEL_DISTANCE,
+                y: cy + 4, // Small adjustment for centering
+                label: label
+            });
+        }
+        
+        return { topLabels, leftLabels, bottomLabels, rightLabels };
     };
 
-    const { topLabels, leftLabels } = getLabels();
+    const { topLabels, leftLabels, bottomLabels, rightLabels } = getLabels();
 
     // Create wells render function to use in two places
     const renderWells = (onTop = false) => Array.from({ length: qtyYAxis }).map((_, rowIdx) =>
         Array.from({ length: qtyXAxis }).map((_, colIdx) => {
             const { xIndex, yIndex } = getDisplayIndices(rowIdx, colIdx);
-            const cx = SPACING + xIndex * SPACING;
-            const cy = SPACING + yIndex * SPACING;
+            const cx = leftMargin + xIndex * SPACING;
+            const cy = topMargin + yIndex * SPACING;
             const selected = !isDisplayMode && isCellInSelection(rowIdx, colIdx);
             const hovered = !isDisplayMode && isCellHovered(rowIdx, colIdx);
-            const covered = isCellCovered(rowIdx, colIdx);
             const well = getWellSummary(rowIdx, colIdx);
 
-            const fillColor = getWellColor(rowIdx, colIdx, selected, hovered, covered);
+            const fillColor = getWellColor(rowIdx, colIdx, selected, hovered);
 
             const coordinate = `${String.fromCharCode(65 + rowIdx)}${colIdx + 1}`;
             // Capture well data at render time to prevent race conditions
@@ -387,46 +463,64 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     followCursor
                     disableHoverListener={!tooltipContent}
                 >
-                    <circle
-                        cx={cx}
-                        cy={cy}
-                        r={CIRCLE_RADIUS}
-                        fill={fillColor}
-                        stroke={(() => {
-                            // Check if this well is selected for highlighting
-                            // Match by coordinate AND ensure it's from the same tray
-                            const isSelected = selectedWell && well && 
-                                selectedWell.coordinate === well.coordinate && 
-                                selectedWell.tray_name === tray; // Only highlight in the matching tray
-                            
-                            if (isSelected) {
-                                return "#ff6b35"; // Bold orange border for selected well
-                            }
-                            return showTimePointVisualization && well ? "#666" : "#333";
-                        })()}
-                        strokeWidth={(() => {
-                            // Check if this well is selected for highlighting
-                            // Match by coordinate AND ensure it's from the same tray
-                            const isSelected = selectedWell && well && 
-                                selectedWell.coordinate === well.coordinate && 
-                                selectedWell.tray_name === tray; // Only highlight in the matching tray
-                            
-                            if (isSelected) {
-                                return 4; // Bold border width for selected well
-                            }
-                            return showTimePointVisualization && well ? 2 : 1;
-                        })()}
-                        style={{
-                            cursor: isDisplayMode ? 
-                                (showTimePointVisualization && well ? 'pointer' : 'default') : 
-                                (covered ? 'not-allowed' : 'pointer')
-                        }}
-                        onMouseDown={isDisplayMode ? 
-                            (showTimePointVisualization ? () => handleMouseDown(rowIdx, colIdx) : undefined) : 
-                            () => handleMouseDown(rowIdx, colIdx)}
-                        onMouseEnter={isDisplayMode ? undefined : () => handleMouseEnter(rowIdx, colIdx)}
-                        onMouseLeave={isDisplayMode ? undefined : handleMouseLeaveCell}
-                    />
+                    <g>
+                        {/* Invisible square hit box for easier selection */}
+                        <rect
+                            x={cx - SPACING/2}
+                            y={cy - SPACING/2}
+                            width={SPACING}
+                            height={SPACING}
+                            fill="transparent"
+                            style={{
+                                cursor: isDisplayMode ? 
+                                    (showTimePointVisualization && well ? 'pointer' : 'default') : 
+                                    'crosshair'
+                            }}
+                            onMouseDown={isDisplayMode ? 
+                                (showTimePointVisualization ? () => handleMouseDown(rowIdx, colIdx) : undefined) : 
+                                () => handleMouseDown(rowIdx, colIdx)}
+                            onMouseEnter={isDisplayMode ? undefined : () => handleMouseEnter(rowIdx, colIdx)}
+                            onMouseLeave={isDisplayMode ? undefined : handleMouseLeaveCell}
+                        />
+                        {/* Visible circle well */}
+                        <circle
+                            cx={cx}
+                            cy={cy}
+                            r={CIRCLE_RADIUS}
+                            fill={fillColor}
+                            stroke={(() => {
+                                // Check if this well is selected for highlighting
+                                // Match by coordinate AND ensure it's from the same tray
+                                const isSelected = selectedWell && well && 
+                                    selectedWell.coordinate === well.coordinate && 
+                                    selectedWell.tray_name === tray; // Only highlight in the matching tray
+                                
+                                if (isSelected) {
+                                    return "#ff6b35"; // Bold orange border for selected well
+                                }
+                                if (selected || hovered) {
+                                    return "#0080ff"; // Blue border for selection/hover
+                                }
+                                return showTimePointVisualization && well ? "#666" : "#333";
+                            })()}
+                            strokeWidth={(() => {
+                                // Check if this well is selected for highlighting
+                                // Match by coordinate AND ensure it's from the same tray
+                                const isSelected = selectedWell && well && 
+                                    selectedWell.coordinate === well.coordinate && 
+                                    selectedWell.tray_name === tray; // Only highlight in the matching tray
+                                
+                                if (isSelected) {
+                                    return 4; // Bold border width for selected well
+                                }
+                                if (selected) {
+                                    return 2; // Thicker border for selection
+                                }
+                                return showTimePointVisualization && well ? 2 : 1;
+                            })()}
+                            style={{ pointerEvents: 'none' }} // Let the rect handle all mouse events
+                        />
+                    </g>
                 </Tooltip>
             );
         })
@@ -451,7 +545,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     y={label.y}
                     textAnchor="middle"
                     fontSize="12"
-                    fill="#000"
+                    fill="#333"
                     fontWeight="bold"
                 >
                     {label.label}
@@ -466,18 +560,86 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     y={label.y}
                     textAnchor="middle"
                     fontSize="12"
-                    fill="#000"
+                    fill="#333"
                     fontWeight="bold"
                 >
                     {label.label}
                 </text>
             ))}
 
-            {/* 4) Existing Region Overlays */}
+            {/* 4) Bottom Labels */}
+            {bottomLabels.map((label, idx) => (
+                <text
+                    key={`bottom-label-${idx}`}
+                    x={label.x}
+                    y={label.y}
+                    textAnchor="middle"
+                    fontSize="12"
+                    fill="#333"
+                    fontWeight="bold"
+                >
+                    {label.label}
+                </text>
+            ))}
+
+            {/* 5) Right Labels */}
+            {rightLabels.map((label, idx) => (
+                <text
+                    key={`right-label-${idx}`}
+                    x={label.x}
+                    y={label.y}
+                    textAnchor="middle"
+                    fontSize="12"
+                    fill="#333"
+                    fontWeight="bold"
+                >
+                    {label.label}
+                </text>
+            ))}
+
+            {/* 6) Existing Region Overlays */}
             {existingRegions.map((region, idx) => {
                 const { upperLeft, lowerRight } = region;
-                const { xIndex: x1, yIndex: y1 } = getDisplayIndices(upperLeft.row, upperLeft.col);
-                const { xIndex: x2, yIndex: y2 } = getDisplayIndices(lowerRight.row, lowerRight.col);
+                
+                // Since we now store corrected coordinates, we need to reverse-engineer the display positions
+                // The stored coordinates are already in the "storage" coordinate system that we designed
+                // We need to convert them directly to display positions without using getDisplayIndices
+                
+                // For regions created with the new coordinate system, the stored coordinates
+                // represent the logical positions that should map directly to display positions
+                let x1: number, y1: number, x2: number, y2: number;
+                
+                switch (orientation) {
+                    case 90:
+                        // For 90°: storage row maps to display xIndex, storage col maps to display yIndex  
+                        x1 = upperLeft.row;
+                        y1 = upperLeft.col;
+                        x2 = lowerRight.row;
+                        y2 = lowerRight.col;
+                        break;
+                    case 270:
+                        // For 270°: When storing, we used: storageRow = xIndex, storageCol = qtyXAxis - 1 - yIndex
+                        // To draw stored coordinates back:
+                        // xIndex = storageRow, yIndex = qtyXAxis - 1 - storageCol
+                        x1 = upperLeft.row;
+                        y1 = qtyXAxis - 1 - upperLeft.col;
+                        x2 = lowerRight.row;
+                        y2 = qtyXAxis - 1 - lowerRight.col;
+                        break;
+                    case 180:
+                        x1 = qtyXAxis - 1 - upperLeft.col;
+                        y1 = qtyYAxis - 1 - upperLeft.row;
+                        x2 = qtyXAxis - 1 - lowerRight.col;
+                        y2 = qtyYAxis - 1 - lowerRight.row;
+                        break;
+                    default: // 0°
+                        x1 = upperLeft.col;
+                        y1 = upperLeft.row;
+                        x2 = lowerRight.col;
+                        y2 = lowerRight.row;
+                        break;
+                }
+                
 
                 // Calculate exact boundaries to hug only the selected wells
                 const minX = Math.min(x1, x2);
@@ -486,8 +648,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 const maxY = Math.max(y1, y2);
 
                 // Position rectangle to hug the wells more tightly
-                const rectX = SPACING + minX * SPACING - CIRCLE_RADIUS;
-                const rectY = SPACING + minY * SPACING - CIRCLE_RADIUS;
+                const rectX = leftMargin + minX * SPACING - CIRCLE_RADIUS;
+                const rectY = topMargin + minY * SPACING - CIRCLE_RADIUS;
                 const rectW = (maxX - minX) * SPACING + 2 * CIRCLE_RADIUS;
                 const rectH = (maxY - minY) * SPACING + 2 * CIRCLE_RADIUS;
 
@@ -581,7 +743,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 );
             })}
 
-            {/* 5) Draw wells on top when in time point mode */}
+            {/* 7) Draw wells on top when in time point mode */}
             {showTimePointVisualization && renderWells(true)}
         </svg>
     );

@@ -129,12 +129,54 @@ const cellToStringWithRotation = (
   trayConfig: any,
   rotation: number,
 ): string => {
-  // Don't apply any rotation transformation - the cell coordinates should already be correct
-  // The TrayGrid handles the visual rotation, so we just need to convert the logical coordinates
-  const letter = colIndexToLetter(cell.col, trayConfig.qty_x_axis);
-  const rowNumber = cell.row + 1;
-  const result = `${letter}${rowNumber}`;
-
+  
+  // The cell coordinates come from TrayGrid which are already in logical coordinates
+  // We need to convert these logical coordinates to visual microplate coordinates
+  // based on how the user sees the rotated tray
+  
+  // In microplate notation: Letter = Column (A,B,C...), Number = Row (1,2,3...)
+  // Standard microplate: A1 is top-left, H12 is bottom-right for 8x12 plate
+  
+  // For rotated trays, we need to map the logical coordinates to what the user visually sees
+  let visualRow: number;
+  let visualCol: number;
+  
+  switch (rotation) {
+    case 0:
+      // No rotation: logical coordinates match visual coordinates
+      visualRow = cell.row;
+      visualCol = cell.col;
+      break;
+    case 90:
+      // 90° clockwise: visual row comes from logical col, visual col comes from logical row (reversed)
+      visualRow = cell.col;
+      visualCol = trayConfig.qty_y_axis - 1 - cell.row;
+      break;
+    case 180:
+      // 180°: both axes are reversed
+      visualRow = trayConfig.qty_y_axis - 1 - cell.row;
+      visualCol = trayConfig.qty_x_axis - 1 - cell.col;
+      break;
+    case 270:
+      // For 270° rotation: inverse of the storage transformation
+      // Storage: storageRow = xIndex, storageCol = qtyXAxis - 1 - yIndex
+      // To display storage(6,11) as G12: visualCol=6 (G), visualRow=11 (12)
+      visualRow = cell.col;
+      visualCol = cell.row;
+      break;
+    default:
+      visualRow = cell.row;
+      visualCol = cell.col;
+      break;
+  }
+  
+  // Convert to microplate notation: visualCol determines letter, visualRow determines number
+  const letter = String.fromCharCode(65 + visualCol);
+  const number = visualRow + 1;
+  
+  const result = `${letter}${number}`;
+  console.log(`COORD: ${cell.row},${cell.col} @${rotation}° -> ${result}`);
+  
   return result;
 };
 
@@ -1460,6 +1502,8 @@ export const RegionInput: React.FC<{
                   )}
 
                   {regions.map((r, idx) => {
+                    // Removed debug logging
+                    
                     // MIGRATION LOGIC: Handle old regions that don't have tray_sequence_id set
                     let effectiveTrayId = r.tray_sequence_id;
 
@@ -1487,6 +1531,7 @@ export const RegionInput: React.FC<{
                     if (trayInfo && trayConfig) {
                       const ulCell: Cell = { row: r.row_min, col: r.col_min };
                       const lrCell: Cell = { row: r.row_max, col: r.col_max };
+                      console.log(`REGION: ${trayConfig.name} @${rotation}° [${r.row_min},${r.col_min} to ${r.row_max},${r.col_max}]`);
                       ulStr = cellToStringWithRotation(
                         ulCell,
                         trayConfig,

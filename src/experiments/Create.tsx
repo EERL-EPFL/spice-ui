@@ -58,10 +58,14 @@ const TrayConfigurationRegionInput: React.FC<{ trayConfigurationId?: any }> = Re
 });
 
 const CreateComponent: React.FC = () => {
-    // load just the top‐ranked tray configuration
+    // Load the tray configuration marked as experiment_default = true
     const { data: trays } = useGetList(
         'tray_configurations',
-        { pagination: { page: 1, perPage: 1 }, sort: { field: 'experiment_default', order: 'ASC' } }
+        { 
+            pagination: { page: 1, perPage: 1 },
+            sort: { field: 'experiment_default', order: 'DESC' }, // DESC to get true values first
+            filter: { experiment_default: true } // Only get configurations marked as default
+        }
     );
     const defaultTrayId = trays?.[0]?.id;
 
@@ -93,7 +97,7 @@ const CreateComponent: React.FC = () => {
                 <ReferenceInput
                     source="tray_configuration_id"
                     reference="tray_configurations"
-                    sort={{ field: 'experiment_default', order: 'ASC' }}
+                    sort={{ field: 'experiment_default', order: 'DESC' }} // Show defaults first
                     defaultValue={defaultTrayId}
                 >
                     <SelectInput
