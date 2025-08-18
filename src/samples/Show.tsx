@@ -3,50 +3,33 @@ import {
   Show,
   SimpleShowLayout,
   TextField,
+  DateField,
+  NumberField,
+  ReferenceField,
+  useRecordContext,
+  FunctionField,
+  ChipField,
+  Datagrid,
+  ArrayField,
+  SingleFieldList,
+  ShowButton,
   TopToolbar,
   EditButton,
   DeleteButton,
   usePermissions,
-  DateField,
-  NumberField,
-  ReferenceField,
-  ReferenceManyField,
-  Datagrid,
-  useRecordContext,
-  useRedirect,
-  Button,
-  Labeled,
-  FunctionField,
   ListContextProvider,
-  ChipField,
-  TabbedShowLayout,
-  Pagination,
   useList,
+  Pagination,
+  BooleanField,
+  Labeled,
+  WithRecord,
 } from "react-admin";
-import {
-  Box,
-  Typography,
-  ToggleButton,
-  ToggleButtonGroup,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  TablePagination,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-} from "@mui/material";
-import { CheckCircle, Cancel } from "@mui/icons-material";
+import { Card, CardContent, Typography, Accordion, AccordionSummary, AccordionDetails, Box, Chip } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { sampleType } from ".";
 import { treatmentName } from "../treatments";
 
-const ShowComponentActions = () => {
+const ShowActions = () => {
   const { permissions } = usePermissions();
   return (
     <TopToolbar>
@@ -60,542 +43,277 @@ const ShowComponentActions = () => {
   );
 };
 
-const CreateTreatmentButton = () => {
-  const { permissions } = usePermissions();
-  const record = useRecordContext();
-  const redirect = useRedirect();
-
-  if (permissions !== "admin") return null;
-  if (!record) return null;
-
-  const handleClick = () => {
-    redirect(
-      "create",
-      "treatments",
-      undefined,
-      {},
-      { record: { sample_id: record.id } },
-    );
-  };
-
-  return <Button label="Create Treatment" onClick={handleClick} />;
-};
-
-const SampleDetailsContent = () => {
+// Component to display treatment details with proper react-admin patterns
+const TreatmentsList = () => {
   const record = useRecordContext();
   
-  if (!record) return null;
+  if (!record?.treatments || record.treatments.length === 0) {
+    return <Typography>No treatments available</Typography>;
+  }
 
   return (
-    <Box display="flex" flexDirection="column" gap={2}>
-      {/* Header Section */}
-      <Paper sx={{ p: 2 }}>
-        <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))" gap={2}>
-          <Labeled>
-            <TextField source="name" />
-          </Labeled>
-          <Labeled>
-            <FunctionField
-              source="type"
-              label="Sample Type"
-              render={(record) => (
-                <Chip 
-                  label={sampleType[record.type] || record.type}
-                  color="primary"
-                  variant="outlined"
-                  size="small"
-                />
-              )}
-            />
-          </Labeled>
-          <Labeled>
-            <TextField source="id" label="Sample ID" />
-          </Labeled>
-        </Box>
-      </Paper>
-
-      {/* Sample Details - Multi-line organized sections */}
-      {(record.type === 'bulk' || record.type === 'filter') && (
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 'bold' }}>
-            Sample Details
-          </Typography>
-          
-          {/* Collection Info Row */}
-          <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(200px, 1fr))" gap={2} sx={{ mb: 1 }}>
-            <Labeled>
-              <ReferenceField
-                source="location_id"
-                reference="locations"
-                link="show"
-              >
-                <TextField source="name" label="Collection Location" />
-              </ReferenceField>
-            </Labeled>
-            <Labeled>
-              <DateField source="start_time" label="Collection Date" showTime />
-            </Labeled>
-            <Labeled>
-              <NumberField
-                source="suspension_volume_litres"
-                label="Suspension Volume (L)"
-              />
-            </Labeled>
-          </Box>
-          
-          {/* Type-specific measurements row */}
-          {record.type === 'filter' && (
-            <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(150px, 1fr))" gap={2} sx={{ mb: 1 }}>
-              <Labeled>
-                <NumberField
-                  source="flow_litres_per_minute"
-                  label="Airflow (L/min)"
-                />
-              </Labeled>
-              <Labeled>
-                <NumberField source="total_volume" label="Total Volume (L)" />
-              </Labeled>
-              <Labeled>
-                <NumberField source="filter_fraction" label="Filter Fraction" />
-              </Labeled>
-            </Box>
-          )}
-          
-          {record.type === 'bulk' && (
-            <Box display="grid" gridTemplateColumns="repeat(auto-fit, minmax(150px, 1fr))" gap={2} sx={{ mb: 1 }}>
-              <Labeled>
-                <NumberField source="latitude" label="Latitude (°)" />
-              </Labeled>
-              <Labeled>
-                <NumberField source="longitude" label="Longitude (°)" />
-              </Labeled>
-              <Labeled>
-                <NumberField source="bulk_mass_mg" label="Sample Mass (mg)" />
-              </Labeled>
-            </Box>
-          )}
-          
-          {/* Source information row */}
-          {record.source && (
-            <Box sx={{ mt: 1 }}>
-              <Labeled>
-                <TextField source="source" label="Source Information" />
-              </Labeled>
-            </Box>
-          )}
-        </Paper>
-      )}
-
-      {/* Comments and Timestamps - Combined compact section */}
-      <Paper sx={{ p: 2 }}>
-        <Box display="flex" flexDirection="column" gap={1}>
-          {record.remarks && (
-            <Labeled>
-              <TextField source="remarks" label="Comments" />
-            </Labeled>
-          )}
-          <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
-            <Labeled>
-              <DateField source="created_at" label="Created" showTime />
-            </Labeled>
-            <Labeled>
-              <DateField source="last_updated" label="Last Modified" showTime />
-            </Labeled>
-          </Box>
-        </Box>
-      </Paper>
-    </Box>
+    <ArrayField source="treatments" label={false}>
+      <SingleFieldList linkType={false}>
+        <TreatmentItem />
+      </SingleFieldList>
+    </ArrayField>
   );
 };
 
-const ExperimentalResultsTable = () => {
-  const record = useRecordContext();
-  const redirect = useRedirect();
-  const [frozenFilter, setFrozenFilter] = React.useState("all");
-  const [experimentFilter, setExperimentFilter] = React.useState("all");
-  const [treatmentFilter, setTreatmentFilter] = React.useState("all");
+// Individual treatment display component
+const TreatmentItem = () => {
+  const treatment = useRecordContext();
+  const [expanded, setExpanded] = React.useState(false);
+  
+  if (!treatment) return null;
 
-  if (
-    !record ||
-    !record.experimental_results ||
-    record.experimental_results.length === 0
-  ) {
-    return (
-      <Typography
-        variant="body2"
-        color="textSecondary"
-        style={{ fontStyle: "italic" }}
-      >
-        No associated experiments found for this sample.
-      </Typography>
-    );
+  const handleChange = (event: React.SyntheticEvent, isExpanded: boolean) => {
+    setExpanded(isExpanded);
+  };
+
+  const treatmentDisplay = treatmentName[treatment.name] || treatment.name;
+  const hasResults = treatment.experimental_results?.length > 0;
+
+  return (
+    <Accordion 
+      expanded={expanded} 
+      onChange={handleChange}
+      sx={{ width: '100%', mb: 2 }}
+    >
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+          <Chip 
+            label={treatmentDisplay} 
+            color="primary" 
+            variant="outlined"
+          />
+          {treatment.enzyme_volume_litres && (
+            <Typography variant="body2" color="text.secondary">
+              Enzyme: {treatment.enzyme_volume_litres}L
+            </Typography>
+          )}
+          {treatment.notes && treatment.notes !== "Default treatment" && (
+            <Typography variant="body2" color="text.secondary">
+              {treatment.notes}
+            </Typography>
+          )}
+          {hasResults && (
+            <Typography variant="body2" sx={{ ml: 'auto', mr: 2 }}>
+              {treatment.experimental_results.length} results | 
+              {treatment.statistics?.success_rate ? 
+                ` ${(treatment.statistics.success_rate * 100).toFixed(0)}% success` : ''}
+            </Typography>
+          )}
+        </Box>
+      </AccordionSummary>
+      <AccordionDetails>
+        {hasResults ? (
+          <DilutionSummaries treatment={treatment} />
+        ) : (
+          <Typography color="text.secondary">No experimental results</Typography>
+        )}
+      </AccordionDetails>
+    </Accordion>
+  );
+};
+
+// Display dilution summaries for a treatment
+const DilutionSummaries = ({ treatment }) => {
+  if (!treatment.dilution_summaries || treatment.dilution_summaries.length === 0) {
+    return <Typography>No dilution data available</Typography>;
   }
-
-  // Categorize results based on actual data
-  const categorizeResult = (result) => {
-    if (result.final_state === "frozen") return "frozen";
-
-    // Check if we have actual measurement data for liquid state
-    const hasTemperatureData = result.freezing_temperature_avg !== null;
-    const hasTimeData = result.freezing_time_seconds !== null;
-
-    if (
-      result.final_state === "liquid" &&
-      (hasTemperatureData || hasTimeData)
-    ) {
-      return "liquid";
-    }
-
-    return "no_result"; // No actual measurement data
-  };
-
-  // Get unique experiments for dropdown
-  const uniqueExperiments = Array.from(
-    new Set(record.experimental_results.map((result) => result.experiment_id)),
-  )
-    .map((experimentId) => {
-      const result = record.experimental_results.find(
-        (r) => r.experiment_id === experimentId,
-      );
-      return {
-        id: experimentId,
-        name: result?.experiment_name || experimentId,
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  // Get unique treatments for dropdown
-  const uniqueTreatments = Array.from(
-    new Set(record.experimental_results.map((result) => result.treatment_id).filter(Boolean)),
-  )
-    .map((treatmentId) => {
-      const result = record.experimental_results.find(
-        (r) => r.treatment_id === treatmentId,
-      );
-      return {
-        id: treatmentId,
-        name: result?.treatment_name || treatmentId,
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  // Filter results based on category, experiment, and treatment
-  const filteredResults = record.experimental_results.filter((result) => {
-    // Apply frozen state filter
-    if (frozenFilter !== "all" && categorizeResult(result) !== frozenFilter) {
-      return false;
-    }
-
-    // Apply experiment filter
-    if (
-      experimentFilter !== "all" &&
-      result.experiment_id !== experimentFilter
-    ) {
-      return false;
-    }
-
-    // Apply treatment filter
-    if (
-      treatmentFilter !== "all" &&
-      result.treatment_id !== treatmentFilter
-    ) {
-      return false;
-    }
-
-    return true;
-  });
-
-  const handleFilterChange = (newFilter) => {
-    setFrozenFilter(newFilter);
-  };
-
-  const handleExperimentFilterChange = (event) => {
-    setExperimentFilter(event.target.value);
-  };
-
-  const handleTreatmentFilterChange = (event) => {
-    setTreatmentFilter(event.target.value);
-  };
-
-  const frozenCount = record.experimental_results.filter(
-    (r) => categorizeResult(r) === "frozen",
-  ).length;
-  const liquidCount = record.experimental_results.filter(
-    (r) => categorizeResult(r) === "liquid",
-  ).length;
-  const noResultCount = record.experimental_results.filter(
-    (r) => categorizeResult(r) === "no_result",
-  ).length;
-  const totalCount = record.experimental_results.length;
-
-  // Transform data for React Admin Datagrid
-  const resultsWithId = filteredResults.map((result, index) => ({
-    id: `${result.experiment_id}-${result.well_coordinate}-${index}`,
-    ...result,
-    original_experiment_id: result.experiment_id, // Keep original experiment ID separate
-  }));
-
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${remainingSeconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    } else {
-      return `${remainingSeconds}s`;
-    }
-  };
-
-  const cleanTreatmentName = (name: string) => {
-    // Remove the Rust Option wrapper "Some(...)" if present
-    if (name && name.startsWith("Some(") && name.endsWith(")")) {
-      return name.slice(5, -1);
-    }
-    return name;
-  };
-
-  // Create list context for React Admin
-  const listContext = useList({
-    data: resultsWithId,
-    isPending: false,
-    perPage: 25,
-  });
 
   return (
     <Box>
-      {/* Filter Controls */}
-      <Box
-        sx={{
-          mb: 2,
-          display: "flex",
-          alignItems: "center",
-          gap: 2,
-          flexWrap: "wrap",
-        }}
-      >
-        <FormControl size="small" sx={{ minWidth: 150 }}>
-          <InputLabel>Filter by State</InputLabel>
-          <Select
-            value={frozenFilter}
-            onChange={(event) => handleFilterChange(event.target.value)}
-            label="Filter by State"
+      <Typography variant="h6" gutterBottom>
+        Dilution Factor Analysis
+      </Typography>
+      
+      {/* Summary table of dilutions */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Datagrid 
+            data={treatment.dilution_summaries}
+            bulkActionButtons={false}
+            rowClick={false}
           >
-            <MenuItem value="all">All ({totalCount})</MenuItem>
-            <MenuItem value="frozen">Frozen ({frozenCount})</MenuItem>
-            <MenuItem value="liquid">Liquid ({liquidCount})</MenuItem>
-            <MenuItem value="no_result">No Result ({noResultCount})</MenuItem>
-          </Select>
-        </FormControl>
-
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Filter by Experiment</InputLabel>
-          <Select
-            value={experimentFilter}
-            onChange={handleExperimentFilterChange}
-            label="Filter by Experiment"
-          >
-            <MenuItem value="all">
-              All Experiments ({uniqueExperiments.length})
-            </MenuItem>
-            {uniqueExperiments.map((experiment) => (
-              <MenuItem key={experiment.id} value={experiment.id}>
-                {experiment.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        <FormControl size="small" sx={{ minWidth: 200 }}>
-          <InputLabel>Filter by Treatment</InputLabel>
-          <Select
-            value={treatmentFilter}
-            onChange={handleTreatmentFilterChange}
-            label="Filter by Treatment"
-          >
-            <MenuItem value="all">
-              All Treatments ({uniqueTreatments.length})
-            </MenuItem>
-            {uniqueTreatments.map((treatment) => (
-              <MenuItem key={treatment.id} value={treatment.id}>
-                {treatment.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-
-        {filteredResults.length > 0 && (
-          <Chip
-            label={`${filteredResults.length} results`}
-            size="small"
-            variant="outlined"
-          />
-        )}
-      </Box>
-
-      {/* Results Datagrid with React Admin */}
-      {filteredResults.length > 0 ? (
-        <ListContextProvider value={listContext}>
-          <Datagrid bulkActionButtons={false} rowClick={false}>
+            <TextField source="dilution_factor" label="Dilution Factor" />
             <FunctionField
-              source="experiment_name"
-              label="Experiment"
-              render={(record) => (
-                <Button
-                  onClick={() =>
-                    redirect(
-                      "show",
-                      "experiments",
-                      record.original_experiment_id,
-                    )
-                  }
-                  sx={{
-                    textTransform: "none",
-                    p: 0,
-                    minWidth: "auto",
-                    textDecoration: "underline",
-                    "&:hover": { textDecoration: "underline" },
-                  }}
-                >
-                  {record.experiment_name}
-                </Button>
-              )}
+              label="Wells"
+              render={record => `${record.statistics.frozen_count}/${record.statistics.total_wells}`}
             />
             <FunctionField
-              source="experiment_date"
-              label="Date"
-              render={(record) =>
-                record.experiment_date
-                  ? new Date(record.experiment_date).toLocaleDateString()
-                  : "-"
-              }
+              label="Success Rate"
+              render={record => `${(record.statistics.success_rate * 100).toFixed(1)}%`}
             />
-            <TextField source="well_coordinate" label="Well" />
-            <TextField source="tray_name" label="Tray" />
             <FunctionField
-              source="treatment_name"
-              label="Treatment"
-              render={(record) =>
-                record.treatment_id ? (
-                  <Button
-                    onClick={() =>
-                      redirect("show", "treatments", record.treatment_id)
-                    }
-                    sx={{
-                      textTransform: "none",
-                      p: 0,
-                      minWidth: "auto",
-                      textDecoration: "underline",
-                      "&:hover": { textDecoration: "underline" },
-                    }}
-                  >
-                    {cleanTreatmentName(record.treatment_name) || "-"}
-                  </Button>
-                ) : (
-                  cleanTreatmentName(record.treatment_name) || "-"
-                )
-              }
-            />
-            <TextField source="dilution_factor" label="Dilution" />
-            <FunctionField
-              source="freezing_time_seconds"
-              label="Freezing Time"
-              render={(record) =>
-                record.freezing_time_seconds
-                  ? formatTime(record.freezing_time_seconds)
-                  : "-"
+              label="Mean Temp (°C)"
+              render={record => 
+                record.statistics.mean_nucleation_temp_celsius?.toFixed(2) || '-'
               }
             />
             <FunctionField
-              source="freezing_temperature_avg"
-              label="Avg Temp (°C)"
-              render={(record) =>
-                record.freezing_temperature_avg
-                  ? Number(record.freezing_temperature_avg).toFixed(2)
-                  : "-"
+              label="Median Time (s)"
+              render={record => 
+                record.statistics.median_nucleation_time_seconds || '-'
               }
-            />
-            <FunctionField
-              source="final_state"
-              label="Final State"
-              render={(record) => (
-                <Chip
-                  label={record.final_state}
-                  size="small"
-                  sx={{
-                    bgcolor:
-                      record.final_state === "frozen"
-                        ? "success.light"
-                        : "info.light",
-                  }}
-                />
-              )}
             />
           </Datagrid>
-          <Pagination />
-        </ListContextProvider>
-      ) : (
-        <Typography
-          variant="body2"
-          color="textSecondary"
-          style={{ fontStyle: "italic" }}
-        >
-          No experiments found matching the selected filter.
-        </Typography>
-      )}
+        </CardContent>
+      </Card>
+
+      {/* Detailed results by dilution */}
+      {treatment.dilution_summaries.map((dilutionSummary) => (
+        <DilutionDetails
+          key={dilutionSummary.dilution_factor}
+          dilutionSummary={dilutionSummary}
+          experimentalResults={treatment.experimental_results}
+        />
+      ))}
     </Box>
   );
 };
 
-const TabbedContentWithCounts = () => {
-  const record = useRecordContext();
-  const experimentCount = record?.experimental_results?.length || 0;
+// Display individual well results for a specific dilution
+const DilutionDetails = ({ dilutionSummary, experimentalResults }) => {
+  const [expanded, setExpanded] = React.useState(false);
+  
+  // Filter results for this dilution factor
+  const dilutionResults = experimentalResults.filter(
+    result => result.dilution_factor === dilutionSummary.dilution_factor
+  );
+
+  // Create paginated list context
+  const listContext = useList({
+    data: dilutionResults,
+    perPage: 5,
+    sort: { field: 'well_coordinate', order: 'ASC' },
+  });
 
   return (
-    <TabbedShowLayout>
-      <TabbedShowLayout.Tab label="Sample Details">
-        <SampleDetailsContent />
-      </TabbedShowLayout.Tab>
+    <Accordion 
+      expanded={expanded}
+      onChange={(e, isExpanded) => setExpanded(isExpanded)}
+      sx={{ mb: 1 }}
+    >
+      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+        <Typography>
+          Dilution {dilutionSummary.dilution_factor}× — 
+          {' '}{dilutionResults.length} wells
+        </Typography>
+      </AccordionSummary>
+      <AccordionDetails>
+        <ListContextProvider value={listContext}>
+          <Datagrid bulkActionButtons={false} rowClick={false}>
+            <TextField source="well_coordinate" label="Well" sortable />
+            <TextField source="tray_name" label="Tray" sortable />
+            <ReferenceField source="experiment_id" reference="experiments" link="show" label="Experiment" sortable>
+              <TextField source="name" />
+            </ReferenceField>
+            <FunctionField
+              label="Time (s)"
+              source="nucleation_time_seconds"
+              render={record => record.nucleation_time_seconds || '-'}
+              sortable
+            />
+            <FunctionField
+              label="Temp (°C)"
+              source="nucleation_temperature_avg_celsius"
+              render={record => 
+                record.nucleation_temperature_avg_celsius 
+                  ? parseFloat(record.nucleation_temperature_avg_celsius).toFixed(2)
+                  : '-'
+              }
+              sortable
+            />
+            <ChipField source="final_state" label="State" />
+          </Datagrid>
+          <Pagination rowsPerPageOptions={[5, 10, 25, 50]} />
+        </ListContextProvider>
+      </AccordionDetails>
+    </Accordion>
+  );
+};
 
-      <ReferenceManyField reference="treatments" target="sample_id" label="">
-        {({ data, total }) => (
-          <TabbedShowLayout.Tab label={`Treatments (${total || 0})`}>
-          <>
-            <TopToolbar>
-              <CreateTreatmentButton />
-            </TopToolbar>
-            <Datagrid bulkActionButtons={false} rowClick={false}>
-              <FunctionField
-                source="name"
-                label="Treatment Type"
-                render={(record) => {
-                  return treatmentName[record.name] || record.name;
-                }}
-              />
-              <TextField source="notes" />
-              <NumberField source="enzyme_volume_litres" />
-              <DateField source="last_updated" showTime />
-            </Datagrid>
-          </>
-          </TabbedShowLayout.Tab>
-        )}
-      </ReferenceManyField>
+// Main sample information display
+const SampleInfo = () => {
+  const record = useRecordContext();
+  if (!record) return null;
 
-      <TabbedShowLayout.Tab
-        label={`Associated Experiments (${experimentCount})`}
-      >
-        <ExperimentalResultsTable />
-      </TabbedShowLayout.Tab>
-    </TabbedShowLayout>
+  return (
+    <Card sx={{ mb: 3 }}>
+      <CardContent>
+        <Typography variant="h5" gutterBottom>
+          {record.name}
+        </Typography>
+        
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+          <Labeled label="Sample Type">
+            <TextField source="type" transform={value => sampleType[value] || value} />
+          </Labeled>
+          
+          {record.location_id && (
+            <Labeled label="Location">
+              <ReferenceField source="location_id" reference="locations" link="show">
+                <TextField source="name" />
+              </ReferenceField>
+            </Labeled>
+          )}
+          
+          {record.well_volume_litres && (
+            <Labeled label="Well Volume (L)">
+              <NumberField source="well_volume_litres" />
+            </Labeled>
+          )}
+          
+          {record.suspension_volume_litres && (
+            <Labeled label="Suspension Volume (L)">
+              <NumberField source="suspension_volume_litres" />
+            </Labeled>
+          )}
+          
+          {record.material_description && (
+            <Labeled label="Material">
+              <TextField source="material_description" />
+            </Labeled>
+          )}
+          
+          {record.extraction_procedure && (
+            <Labeled label="Extraction">
+              <TextField source="extraction_procedure" />
+            </Labeled>
+          )}
+          
+          {record.remarks && (
+            <Labeled label="Remarks" sx={{ gridColumn: 'span 2' }}>
+              <TextField source="remarks" />
+            </Labeled>
+          )}
+        </Box>
+        
+        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+          <Typography variant="caption" color="text.secondary">
+            Created: <DateField source="created_at" showTime />
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Updated: <DateField source="last_updated" showTime />
+          </Typography>
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
 
 export const ShowComponent = () => {
   return (
-    <Show actions={<ShowComponentActions />}>
-      <TabbedContentWithCounts />
+    <Show actions={<ShowActions />}>
+      <SimpleShowLayout>
+        <SampleInfo />
+        <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
+          Treatments
+        </Typography>
+        <TreatmentsList />
+      </SimpleShowLayout>
     </Show>
   );
 };

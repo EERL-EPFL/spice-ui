@@ -45,6 +45,19 @@ import { treatmentName } from "../treatments";
 
 // Import the WellSummary interface from TrayGrid
 import { WellSummary } from "./TrayGrid";
+import { flattenSampleResults } from '../utils/experimentUtils';
+
+interface TreatmentResultsSummary {
+  treatment: any;
+  wells: WellSummary[];
+  wells_frozen: number;
+  wells_liquid: number;
+}
+
+interface SampleResultsSummary {
+  sample: any;
+  treatments: TreatmentResultsSummary[];
+}
 
 // Interface for experiment results summary
 interface ExperimentResultsSummary {
@@ -55,7 +68,7 @@ interface ExperimentResultsSummary {
   total_time_points: number;
   first_timestamp: string | null;
   last_timestamp: string | null;
-  well_summaries: WellSummary[];
+  sample_results: SampleResultsSummary[];
 }
 
 // Generate dynamic column letters based on tray dimensions
@@ -184,14 +197,14 @@ const cellToStringWithRotation = (
 
 interface SingleRegion {
   name: string;
-  tray_sequence_id: number; // Changed from tray_name to tray_sequence_id (order_sequence)
+  tray_id: number; // Changed from tray_sequence_id to tray_id to match API
   col_min: number; // Changed from upper_left string to numeric columns
   col_max: number; // New field for maximum column
   row_min: number; // Changed from lower_right string to numeric rows
   row_max: number; // New field for maximum row
-  color: string;
+  display_colour_hex: string; // Changed from color to display_colour_hex to match API
   treatment_id?: string; // Changed from sample to treatment_id
-  dilution?: string; // Add dilution field
+  dilution_factor?: number; // Changed from dilution to dilution_factor to match API (integer type)
   is_background_key?: boolean; // Changed from is_region_key to is_background_key
   treatment?: {
     // Add the nested treatment object
@@ -593,7 +606,7 @@ export const RegionInput: React.FC<{
       // Check for empty required fields
       const hasEmptyNames = regions.some((r) => !r.name?.trim());
       const hasEmptyTreatments = regions.some((r) => !r.treatment_id?.trim());
-      const hasEmptyDilutions = regions.some((r) => !r.dilution?.trim());
+      const hasEmptyDilutions = regions.some((r) => !r.dilution_factor || r.dilution_factor <= 0);
 
       if (hasEmptyNames) {
         return "All regions must have a name";
@@ -602,7 +615,7 @@ export const RegionInput: React.FC<{
         return "All regions must have a treatment selected";
       }
       if (hasEmptyDilutions) {
-        return "All regions must have a dilution factor";
+        return "All regions must have a valid dilution factor (positive number)";
       }
 
       // Call any additional validation passed as prop
@@ -667,11 +680,12 @@ export const RegionInput: React.FC<{
 
   // Calculate color scale based on freezing times for time point visualization
   const { colorScale, minSeconds, maxSeconds } = useMemo(() => {
-    if (!showTimePointVisualization || !resultsSummary?.well_summaries) {
+    if (!showTimePointVisualization || !resultsSummary?.sample_results) {
       return { colorScale: () => "#f5f5f5", minSeconds: 0, maxSeconds: 0 };
     }
 
-    const freezingTimes = resultsSummary.well_summaries
+    const wellSummaries = flattenSampleResults(resultsSummary.sample_results);
+    const freezingTimes = wellSummaries
       .filter((w) => w.first_phase_change_seconds !== null)
       .map((w) => w.first_phase_change_seconds!);
 
@@ -709,14 +723,14 @@ export const RegionInput: React.FC<{
     const wellRow = well.row - 1; // Convert 1-indexed to 0-indexed
     const wellCol = well.col - 1; // Convert 1-indexed to 0-indexed
 
-    // Find regions that match this well's tray by tray_sequence_id
+    // Find regions that match this well's tray by tray_id
     const matchingRegions = regions.filter((region) => {
       // Skip regions without proper tray configuration
-      if (!region.tray_sequence_id) return false;
+      if (!region.tray_id) return false;
       
       // Find the tray configuration for this region
       const trayInfo = flatTrays.find(
-        (t) => t.tray.order_sequence === region.tray_sequence_id
+        (t) => t.tray.order_sequence === region.tray_id
       );
       
       // Check if this tray matches the well's tray name
@@ -786,7 +800,7 @@ export const RegionInput: React.FC<{
     };
 
     fetchTrayTemperatures();
-  }, [record?.id, showTimePointVisualization]);
+  }, [record?.id, showTimePointVisualization, dataProvider]);
 
   const formatSeconds = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -801,7 +815,7 @@ export const RegionInput: React.FC<{
   // Initialize or update input refs when regions change
   React.useEffect(() => {
     regions.forEach((region, idx) => {
-      ["name", "treatment", "dilution"].forEach((field) => {
+      ["name", "treatment", "dilution_factor"].forEach((field) => {
         const key = `region-${idx}-${field}`;
         if (!inputRefs.current[key]) {
           inputRefs.current[key] = React.createRef();
@@ -849,7 +863,7 @@ export const RegionInput: React.FC<{
 
       // Check overlap on same tray using new coordinate system
       const existingOnTray = regions.filter(
-        (r) => r.tray_sequence_id === trayId,
+        (r) => r.tray_id === trayId,
       );
       for (const r of existingOnTray) {
         const overlapInRows =
@@ -879,14 +893,14 @@ export const RegionInput: React.FC<{
         ...regions,
         {
           name: defaultName,
-          tray_sequence_id: trayId,
+          tray_id: trayId,
           col_min: upperLeft.col,
           col_max: lowerRight.col,
           row_min: upperLeft.row,
           row_max: lowerRight.row,
-          color,
+          display_colour_hex: color,
           treatment_id: "",
-          dilution: "",
+          dilution_factor: 1,
           is_background_key: false, // Default to false
         },
       ];
@@ -904,7 +918,7 @@ export const RegionInput: React.FC<{
   );
 
   const handleRegionChange = useCallback(
-    (idx: number, field: string, newValue: string | boolean) => {
+    (idx: number, field: string, newValue: string | boolean | number) => {
       // Check for duplicate names when changing name field
       if (field === 'name' && typeof newValue === 'string') {
         const isDuplicate = regions.some((r, i) => i !== idx && r.name === newValue);
@@ -967,7 +981,7 @@ export const RegionInput: React.FC<{
     if (!props.readOnly && inputResult.fieldState) {
       const hasEmptyNames = regions.some((r) => !r.name?.trim());
       const hasEmptyTreatments = regions.some((r) => !r.treatment_id?.trim());
-      const hasEmptyDilutions = regions.some((r) => !r.dilution?.trim());
+      const hasEmptyDilutions = regions.some((r) => !r.dilution_factor || r.dilution_factor <= 0);
 
       if (
         hasDuplicates ||
@@ -995,6 +1009,12 @@ export const RegionInput: React.FC<{
   // Hook to enhance regions with treatment information for display
   const [enhancedRegions, setEnhancedRegions] = React.useState<SingleRegion[]>(
     [],
+  );
+
+  // Memoize the regions key to prevent unnecessary effect triggers
+  const regionsKey = useMemo(() => 
+    regions.map(r => `${r.treatment_id}-${!!r.treatment?.sample?.name}`).join(','),
+    [regions]
   );
 
   React.useEffect(() => {
@@ -1048,7 +1068,7 @@ export const RegionInput: React.FC<{
     } else {
       setEnhancedRegions([]);
     }
-  }, [regions]);
+  }, [regionsKey]); // Use memoized key instead of raw regions
 
   const handleYAMLImport = useCallback(() => {
     fileInputRef.current?.click();
@@ -1078,7 +1098,7 @@ export const RegionInput: React.FC<{
                   const color =
                     COLOR_PALETTE[colorIndex % COLOR_PALETTE.length];
 
-                  // Find the tray by name to get its order_sequence (tray_sequence_id)
+                  // Find the tray by name to get its order_sequence (tray_id)
                   const trayInfo = trayConfiguration?.trays?.find(
                     (t) => t.name === region.tray,
                   );
@@ -1095,14 +1115,14 @@ export const RegionInput: React.FC<{
 
                     importedRegions.push({
                       name: regionName,
-                      tray_sequence_id: trayInfo.order_sequence, // Use the order_sequence as tray_sequence_id
+                      tray_id: trayInfo.order_sequence, // Use the order_sequence as tray_id
                       col_min: upperLeftCell.col,
                       col_max: lowerRightCell.col,
                       row_min: upperLeftCell.row,
                       row_max: lowerRightCell.row,
-                      color: color,
+                      display_colour_hex: color,
                       treatment_id: "",
-                      dilution: "",
+                      dilution_factor: 1,
                       is_background_key: false, // Default to false
                     });
                   }
@@ -1171,16 +1191,25 @@ export const RegionInput: React.FC<{
     return [null, flattened];
   }, [trayConfiguration, props.label, props.source, isRequired]);
 
+  // Memoize dependency for well summary computation
+  const wellSummaryDeps = useMemo(() => ({
+    hasResults: !!resultsSummary?.sample_results,
+    showTimePoint: showTimePointVisualization,
+    flatTraysLength: flatTrays.length,
+    regionsKey: regionsKey
+  }), [resultsSummary?.sample_results, showTimePointVisualization, flatTrays.length, regionsKey]);
+
   // Compute well summary map after flatTrays is available
   React.useEffect(() => {
-    if (!showTimePointVisualization || !resultsSummary?.well_summaries || !flatTrays.length) {
+    if (!wellSummaryDeps.hasResults || !wellSummaryDeps.showTimePoint || !wellSummaryDeps.flatTraysLength) {
       setWellSummaryMapByTray(new Map());
       return;
     }
 
     const trayMaps = new Map<string, Map<string, WellSummary>>();
+    const wellSummaries = flattenSampleResults(resultsSummary.sample_results);
 
-    resultsSummary.well_summaries.forEach((well) => {
+    wellSummaries.forEach((well) => {
       const trayName = well.tray_name || "unknown";
       if (!trayMaps.has(trayName)) {
         trayMaps.set(trayName, new Map());
@@ -1201,7 +1230,7 @@ export const RegionInput: React.FC<{
     });
 
     setWellSummaryMapByTray(trayMaps);
-  }, [resultsSummary, showTimePointVisualization, regions, flatTrays]);
+  }, [wellSummaryDeps, resultsSummary, regions, flatTrays]);
 
   // YAML export must be defined AFTER flatTrays is available
   const handleYAMLExport = useCallback(() => {
@@ -1219,13 +1248,13 @@ export const RegionInput: React.FC<{
         groupedRegions[regionName] = [];
       }
 
-      // MIGRATION LOGIC: Handle old regions that don't have tray_sequence_id set
-      let effectiveTrayId = region.tray_sequence_id;
+      // MIGRATION LOGIC: Handle old regions that don't have tray_id set
+      let effectiveTrayId = region.tray_id;
       if (effectiveTrayId === undefined || effectiveTrayId === null) {
         effectiveTrayId = 1; // Default to first tray configuration
       }
 
-      // Find the tray info by matching the order_sequence with the region's effective tray_sequence_id
+      // Find the tray info by matching the order_sequence with the region's effective tray_id
       const trayInfo = flatTrays.find(
         (t) => t.tray.order_sequence === effectiveTrayId,
       );
@@ -1292,59 +1321,66 @@ export const RegionInput: React.FC<{
     URL.revokeObjectURL(url);
   }, [regions, flatTrays, trayConfiguration]);
 
+  // Memoize migration check to prevent infinite loops
+  const needsMigration = useMemo(() => {
+    return !readOnly && regions.some(
+      (r) => r.tray_id === null || r.tray_id === undefined,
+    );
+  }, [readOnly, regions]);
+
+  // Memoized migration function to prevent recreation on every render
+  const performMigration = useCallback(() => {
+    if (!needsMigration || flatTrays.length === 0) return;
+
+    console.log(
+      "Found regions with null tray_id, performing one-time migration...",
+    );
+
+    const updatedRegions = regions.map((region, idx) => {
+      if (
+        region.tray_id === null ||
+        region.tray_id === undefined
+      ) {
+        // Check which tray this region is currently being displayed on
+        // by finding which tray configuration contains a region at these coordinates
+        for (let i = 0; i < flatTrays.length; i++) {
+          const flatTray = flatTrays[i];
+          const trayConfig = flatTray.trayConfig;
+
+          // Check if this region's coordinates are within this tray's bounds
+          if (
+            region.row_max < (trayConfig.tray.qty_y_axis || 0) &&
+            region.col_max < (trayConfig.tray.qty_x_axis || 0)
+          ) {
+            return { ...region, tray_id: trayConfig.tray.order_sequence };
+          }
+        }
+
+        // Fallback: assign to first tray
+        return { ...region, tray_id: 1 };
+      }
+      return region;
+    });
+
+    // Only update if there were actual changes
+    const hasChanges = updatedRegions.some(
+      (r, idx) => r.tray_id !== regions[idx].tray_id,
+    );
+
+    if (hasChanges) {
+      onChange(updatedRegions);
+    }
+  }, [needsMigration, regions, flatTrays, onChange]);
+
   // Add a one-time migration effect to fix legacy regions
   React.useEffect(() => {
-    if (
-      !readOnly &&
-      regions.some(
-        (r) => r.tray_sequence_id === null || r.tray_sequence_id === undefined,
-      )
-    ) {
-      console.log(
-        "Found regions with null tray_sequence_id, performing one-time migration...",
-      );
-
-      const updatedRegions = regions.map((region, idx) => {
-        if (
-          region.tray_sequence_id === null ||
-          region.tray_sequence_id === undefined
-        ) {
-          // For the regions currently showing as null, we need to determine which tray they belong to
-          // Looking at the console logs and visual placement:
-          // - SA and T8_PB_D1 should be on tray 1 (P1)
-          // - But we need a more systematic way to determine this
-
-          // Check which tray this region is currently being displayed on
-          // by finding which tray configuration contains a region at these coordinates
-          for (let i = 0; i < flatTrays.length; i++) {
-            const flatTray = flatTrays[i];
-            const trayConfig = flatTray.trayConfig;
-
-            // Check if this region's coordinates are within this tray's bounds
-            if (
-              region.row_max < (trayConfig.tray.qty_y_axis || 0) &&
-              region.col_max < (trayConfig.tray.qty_x_axis || 0)
-            ) {
-              return { ...region, tray_sequence_id: trayConfig.tray.order_sequence };
-            }
-          }
-
-          // Fallback: assign to first tray
-          return { ...region, tray_sequence_id: 1 };
-        }
-        return region;
-      });
-
-      // Only update if there were changes
-      if (
-        updatedRegions.some(
-          (r, idx) => r.tray_sequence_id !== regions[idx].tray_sequence_id,
-        )
-      ) {
-        onChange(updatedRegions);
-      }
+    // Only run once when all conditions are met
+    if (needsMigration && flatTrays.length > 0) {
+      // Use a timeout to ensure this runs after the current render cycle
+      const timeoutId = setTimeout(performMigration, 0);
+      return () => clearTimeout(timeoutId);
     }
-  }, [regions, readOnly, onChange, flatTrays]);
+  }, [needsMigration, flatTrays.length > 0]); // Simplified dependencies
 
   // NOW we can do conditional returns after all hooks have been called
   if (noTraysMessage) {
@@ -1405,14 +1441,14 @@ export const RegionInput: React.FC<{
             const existingRegions: ExistingRegion[] = enhancedRegions
               .map((r, idx) => ({ ...r, idx }))
               .filter((r) => {
-                // Handle regions with null tray_sequence_id by assigning them to the first tray
+                // Handle regions with null tray_id by assigning them to the first tray
                 if (
-                  r.tray_sequence_id === null ||
-                  r.tray_sequence_id === undefined
+                  r.tray_id === null ||
+                  r.tray_id === undefined
                 ) {
                   return index === 0; // Show on first tray only
                 }
-                return r.tray_sequence_id === tray.order_sequence;
+                return r.tray_id === tray.order_sequence;
               })
               .map((r) => {
                 // Create a display name that includes treatment and sample info
@@ -1429,7 +1465,7 @@ export const RegionInput: React.FC<{
                   upperLeft: { row: r.row_min, col: r.col_min },
                   lowerRight: { row: r.row_max, col: r.col_max },
                   name: displayName,
-                  color: r.color,
+                  color: r.display_colour_hex,
                   onRemove: readOnly ? () => {} : () => handleRemove(r.idx),
                 };
               });
@@ -1552,15 +1588,15 @@ export const RegionInput: React.FC<{
                   {regions.map((r, idx) => {
                     // Removed debug logging
                     
-                    // MIGRATION LOGIC: Handle old regions that don't have tray_sequence_id set
-                    let effectiveTrayId = r.tray_sequence_id;
+                    // MIGRATION LOGIC: Handle old regions that don't have tray_id set
+                    let effectiveTrayId = r.tray_id;
 
-                    // If tray_sequence_id is undefined/null, try to determine it from the region's position
+                    // If tray_id is undefined/null, try to determine it from the region's position
                     if (
                       effectiveTrayId === undefined ||
                       effectiveTrayId === null
                     ) {
-                      // For existing regions without tray_sequence_id, we need to make an educated guess
+                      // For existing regions without tray_id, we need to make an educated guess
                       // Based on the console logs, assign to first tray as fallback
                       effectiveTrayId = 1;
                     }
@@ -1602,10 +1638,10 @@ export const RegionInput: React.FC<{
                         marginBottom={0.5}
                         padding={1}
                         paddingTop={1.5}
-                        border={`1px solid ${r.color}`}
+                        border={`1px solid ${r.display_colour_hex}`}
                         borderRadius={1}
                         sx={{
-                          backgroundColor: `${r.color}08`,
+                          backgroundColor: `${r.display_colour_hex}08`,
                           position: "relative",
                           minWidth: 380,
                         }}
@@ -1620,7 +1656,7 @@ export const RegionInput: React.FC<{
                             paddingX: 0.5,
                             fontSize: "0.875rem",
                             fontWeight: "medium",
-                            color: r.color,
+                            color: r.display_colour_hex,
                           }}
                         >
                           {trayName}: {ulStr}–{lrStr}
@@ -1685,21 +1721,23 @@ export const RegionInput: React.FC<{
                             id={`region-${idx}-dilution`}
                             placeholder="Dilution*"
                             size="small"
-                            value={r.dilution || ""}
+                            value={r.dilution_factor?.toString() || ""}
                             onChange={
                               readOnly
                                 ? undefined
-                                : (e) =>
+                                : (e) => {
+                                    const numValue = parseInt(e.target.value) || 0;
                                     handleRegionChange(
                                       idx,
-                                      "dilution",
-                                      e.target.value,
-                                    )
+                                      "dilution_factor",
+                                      numValue,
+                                    );
+                                  }
                             }
                             variant="standard"
                             disabled={readOnly}
                             required
-                            error={!r.dilution && !readOnly}
+                            error={(!r.dilution_factor || r.dilution_factor <= 0) && !readOnly}
                             sx={{ width: 80 }}
                             inputRef={inputRefs.current[`region-${idx}-dilution`]}
                             InputProps={{
@@ -1722,6 +1760,17 @@ export const RegionInput: React.FC<{
                                 size="small"
                                 compact={true}
                                 filteredTreatments={props.filteredTreatments}
+                                existingRegionTreatments={regions.map((region, index) => ({
+                                  regionName: region.name || `Region ${index + 1}`,
+                                  regionIndex: index,
+                                  treatment: region.treatment || {
+                                    id: region.treatment_id || "",
+                                    name: "Unknown Treatment"
+                                  },
+                                  dilution_factor: region.dilution_factor
+                                })).filter(rt => rt.treatment.id)} // Only include regions with treatments
+                                currentRegionIndex={idx}
+                                currentRegionName={r.name || `Region ${idx + 1}`}
                                 onChange={(treatmentId) => {
                                   if (!readOnly) {
                                     handleRegionChange(
@@ -1790,17 +1839,17 @@ export const RegionInput: React.FC<{
                               top: -8,
                               right: -8,
                               backgroundColor: "background.paper",
-                              border: `2px solid ${r.color}`,
+                              border: `2px solid ${r.display_colour_hex}`,
                               padding: 0.25,
                               "&:hover": {
-                                backgroundColor: r.color,
+                                backgroundColor: r.display_colour_hex,
                                 "& .MuiSvgIcon-root": {
                                   color: "white",
                                 },
                               },
                             }}
                           >
-                            <CloseIcon sx={{ fontSize: "0.9rem", color: r.color }} />
+                            <CloseIcon sx={{ fontSize: "0.9rem", color: r.display_colour_hex }} />
                           </IconButton>
                         )}
                       </Box>

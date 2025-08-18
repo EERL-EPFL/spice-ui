@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import {
     Create,
     SimpleForm,
@@ -13,6 +13,7 @@ import {
     useGetList,
     FormDataConsumer,
     useGetOne,
+    useInput,
 } from 'react-admin';
 import { useFormContext } from 'react-hook-form';
 import RegionInput from '../components/RegionInput';
@@ -20,16 +21,30 @@ import RegionInput from '../components/RegionInput';
 /**
  * Once we know the default tray ID, shove it into the form.
  */
-const InjectDefaultTray: React.FC<{ defaultTrayId?: any }> = ({ defaultTrayId }) => {
+const InjectDefaultTray: React.FC<{ defaultTrayId?: any; fallbackTrayId?: any }> = ({ 
+    defaultTrayId, 
+    fallbackTrayId 
+}) => {
     const { setValue, getValues, watch } = useFormContext();
     const currentValue = watch('tray_configuration_id');
     
     useEffect(() => {
-        if (defaultTrayId != null && !currentValue) {
-            console.log('Setting default tray configuration ID:', defaultTrayId);
-            setValue('tray_configuration_id', defaultTrayId, { shouldValidate: true });
+        const trayIdToUse = defaultTrayId || fallbackTrayId;
+        if (trayIdToUse != null) {
+            console.log('Setting tray configuration ID:', trayIdToUse, {
+                isDefault: !!defaultTrayId,
+                isFallback: !defaultTrayId && !!fallbackTrayId,
+                currentValue: currentValue
+            });
+            // Always set the value, even if there's already a value
+            // This ensures the default is properly applied
+            setValue('tray_configuration_id', trayIdToUse, { 
+                shouldValidate: true,
+                shouldDirty: true,
+                shouldTouch: true
+            });
         }
-    }, [defaultTrayId, setValue, currentValue]);
+    }, [defaultTrayId, fallbackTrayId, setValue]);
     return null;
 };
 
@@ -57,21 +72,143 @@ const TrayConfigurationRegionInput: React.FC<{ trayConfigurationId?: any }> = Re
     );
 });
 
-const CreateComponent: React.FC = () => {
-    // Load the tray configuration marked as experiment_default = true
-    const { data: trays } = useGetList(
-        'tray_configurations',
-        { 
-            pagination: { page: 1, perPage: 1 },
-            sort: { field: 'experiment_default', order: 'DESC' }, // DESC to get true values first
-            filter: { experiment_default: true } // Only get configurations marked as default
-        }
+/**
+ * Custom tray configuration selector that properly handles default values
+ */
+const TrayConfigurationSelector: React.FC<{ 
+    defaultTrayId?: any; 
+    fallbackTrayId?: any; 
+    isLoading?: boolean;
+}> = ({ 
+    defaultTrayId, 
+    fallbackTrayId,
+    isLoading 
+}) => {
+    if (isLoading) {
+        return <div>Loading tray configurations...</div>;
+    }
+    
+    return (
+        <ReferenceInput
+            source="tray_configuration_id"
+            reference="tray_configurations"
+            sort={{ field: 'experiment_default', order: 'DESC' }}
+        >
+            <SelectInput
+                optionText={record =>
+                    `${record.name}${record.experiment_default ? ' (Default)' : ''}`
+                }
+                optionValue="id"
+                validate={[required()]}
+            />
+        </ReferenceInput>
     );
-    const defaultTrayId = trays?.[0]?.id;
+};
+
+const CreateComponent: React.FC = () => {
+    // Memoize the query parameters to prevent infinite loops
+    const defaultTraysParams = useMemo(() => ({
+        pagination: { page: 1, perPage: 1 },
+        sort: { field: 'experiment_default', order: 'DESC' as const },
+        filter: { experiment_default: true }
+    }), []);
+
+    const allTraysParams = useMemo(() => ({
+        pagination: { page: 1, perPage: 10 },
+        sort: { field: 'experiment_default', order: 'DESC' as const }
+    }), []);
+
+    // Load the tray configuration marked as experiment_default = true
+    const { data: trays, isLoading: traysLoading, error: traysError } = useGetList(
+        'tray_configurations',
+        defaultTraysParams
+    );
+    
+    // Also load ALL tray configurations to check if any exist
+    const { data: allTrays, isLoading: allTraysLoading } = useGetList(
+        'tray_configurations',
+        allTraysParams
+    );
+    
+    const defaultTrayId = useMemo(() => trays?.[0]?.id, [trays]);
+    const fallbackTrayId = useMemo(() => allTrays?.[0]?.id, [allTrays]);
+    
+    const trayToUse = useMemo(() => defaultTrayId || fallbackTrayId, [defaultTrayId, fallbackTrayId]);
+
+    // Debug logging - memoize to prevent excessive logging
+    useEffect(() => {
+        if (!traysLoading && !allTraysLoading) {
+            console.log('=== Tray Configuration Debug ===');
+            console.log('Default trays query result:', { trays, isLoading: traysLoading, error: traysError });
+            console.log('All trays query result:', { allTrays, isLoading: allTraysLoading });
+            console.log('Default tray ID:', defaultTrayId);
+            console.log('Fallback tray ID:', fallbackTrayId);
+            console.log('Tray to use:', trayToUse);
+            console.log('================================');
+        }
+    }, [defaultTrayId, fallbackTrayId, trayToUse, traysLoading, allTraysLoading]);
+
+    // Don't render the form until we have tray data
+    if (traysLoading || allTraysLoading) {
+        return (
+            <Create redirect="show">
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                    Loading tray configurations...
+                </div>
+            </Create>
+        );
+    }
+
+    // Memoize transform function to prevent infinite loops
+    const transformData = useCallback((data) => {
+        // If no tray_configuration_id is set, use our default
+        if (!data.tray_configuration_id && trayToUse) {
+            data.tray_configuration_id = trayToUse;
+            console.log('Transform: Setting tray_configuration_id to', data.tray_configuration_id);
+        }
+        return data;
+    }, [trayToUse]);
+
+    // Memoize default values to prevent infinite loops
+    const defaultValues = useMemo(() => ({
+        tray_configuration_id: trayToUse
+    }), [trayToUse]);
 
     return (
-        <Create redirect="show">
-            <SimpleForm onError={(error) => console.error('Form submission error:', error)}>
+        <Create 
+            redirect="show"
+            transform={transformData}
+        >
+            <SimpleForm 
+                key={`form-${trayToUse || 'no-tray'}`} // Force re-render when tray changes
+                onError={(error) => console.error('Form submission error:', error)}
+                defaultValues={defaultValues}
+            >
+                {!traysLoading && !allTraysLoading && allTrays?.length === 0 && (
+                    <div style={{ 
+                        padding: '8px 12px', 
+                        marginBottom: '16px',
+                        backgroundColor: '#f8d7da', 
+                        border: '1px solid #f5c6cb',
+                        borderRadius: '4px',
+                        color: '#721c24'
+                    }}>
+                        ❌ No tray configurations found. Please create a tray configuration first.
+                    </div>
+                )}
+                {!traysLoading && !defaultTrayId && allTrays?.length > 0 && (
+                    <div style={{ 
+                        padding: '8px 12px', 
+                        marginBottom: '16px',
+                        backgroundColor: '#fff3cd', 
+                        border: '1px solid #ffeaa7',
+                        borderRadius: '4px',
+                        color: '#856404'
+                    }}>
+                        ⚠️ No default tray configuration found. Using "{allTrays[0]?.name}" as fallback.
+                        Consider setting a tray configuration as default.
+                    </div>
+                )}
                 <TextField source="id" />
                 <TextInput source="name" validate={[required()]} />
                 <TextInput source="username" />
@@ -91,23 +228,11 @@ const CreateComponent: React.FC = () => {
                 <TextInput source="remarks" />
                 <BooleanInput source="is_calibration" />
 
-                {/* once we know the ID, inject it */}
-                <InjectDefaultTray defaultTrayId={defaultTrayId} />
-
-                <ReferenceInput
-                    source="tray_configuration_id"
-                    reference="tray_configurations"
-                    sort={{ field: 'experiment_default', order: 'DESC' }} // Show defaults first
-                    defaultValue={defaultTrayId}
-                >
-                    <SelectInput
-                        optionText={record =>
-                            `${record.name}${record.experiment_default ? ' (Default)' : ''}`
-                        }
-                        optionValue="id"
-                        validate={[required()]}
-                    />
-                </ReferenceInput>
+                <TrayConfigurationSelector 
+                    defaultTrayId={defaultTrayId} 
+                    fallbackTrayId={fallbackTrayId} 
+                    isLoading={traysLoading || allTraysLoading}
+                />
 
                 <FormDataConsumer>
                     {({ formData }) => (

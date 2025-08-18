@@ -3,6 +3,7 @@ import {
     useRecordContext, 
     useGetOne
 } from 'react-admin';
+import { flattenSampleResults } from '../utils/experimentUtils';
 import { 
     Box, 
     Typography, 
@@ -31,6 +32,18 @@ interface WellSummary {
     dilution_factor: number | null;
 }
 
+interface TreatmentResultsSummary {
+    treatment: any;
+    wells: WellSummary[];
+    wells_frozen: number;
+    wells_liquid: number;
+}
+
+interface SampleResultsSummary {
+    sample: any;
+    treatments: TreatmentResultsSummary[];
+}
+
 interface ExperimentResultsSummary {
     total_wells: number;
     wells_with_data: number;
@@ -39,7 +52,7 @@ interface ExperimentResultsSummary {
     total_time_points: number;
     first_timestamp: string | null;
     last_timestamp: string | null;
-    well_summaries: WellSummary[];
+    sample_results: SampleResultsSummary[];
 }
 
 interface TrayConfig {
@@ -207,11 +220,12 @@ export const TimePointVisualization = () => {
 
     // Calculate color scale based on freezing times
     const { colorScale, minSeconds, maxSeconds } = useMemo(() => {
-        if (!resultsSummary?.well_summaries) {
+        if (!resultsSummary?.sample_results) {
             return { colorScale: () => '#f5f5f5', minSeconds: 0, maxSeconds: 0 };
         }
 
-        const freezingTimes = resultsSummary.well_summaries
+        const wellSummaries = flattenSampleResults(resultsSummary.sample_results);
+        const freezingTimes = wellSummaries
             .filter(w => w.first_phase_change_seconds !== null)
             .map(w => w.first_phase_change_seconds!);
 
@@ -411,7 +425,7 @@ export const TimePointVisualization = () => {
                                     <Box key={tray.id} sx={{ flexShrink: 0 }}>
                                         <TrayWellGrid
                                             tray={tray}
-                                            wellSummaries={resultsSummary.well_summaries}
+                                            wellSummaries={flattenSampleResults(resultsSummary.sample_results)}
                                             colorScale={colorScale}
                                             minSeconds={minSeconds}
                                             maxSeconds={maxSeconds}
