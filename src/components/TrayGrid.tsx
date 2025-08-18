@@ -49,8 +49,8 @@ export type Orientation = 0 | 90 | 180 | 270;
 
 // Interface for well summary data from time point visualization
 export interface WellSummary {
-    row: number;
-    col: number;
+    row_letter: string;
+    column_number: number;
     coordinate: string;
     tray_id?: string;
     tray_name?: string;

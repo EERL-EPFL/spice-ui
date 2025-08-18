@@ -45,8 +45,8 @@ interface TrayInfo {
 }
 
 interface WellResultSummary {
-    row: number;
-    col: number;
+    row_letter: string;
+    column_number: number;
     coordinate: string;
     sample_id?: string;
     sample_name?: string;

@@ -20,8 +20,8 @@ import { scaleSequential } from 'd3-scale';
 import { interpolateBlues } from 'd3-scale-chromatic';
 
 interface WellSummary {
-    row: number;
-    col: number;
+    row_letter: string;
+    column_number: number;
     coordinate: string;
     tray_id?: string;
     first_phase_change_time: string | null;
@@ -93,7 +93,9 @@ const TrayWellGrid: React.FC<{
     // Create a map for quick lookup
     const wellMap: { [key: string]: WellSummary } = {};
     trayWells.forEach(well => {
-        const key = `${well.row}-${well.col}`;
+        // Convert row_letter to number for grid positioning (A=1, B=2, etc.)
+        const rowNum = well.row_letter.charCodeAt(0) - 64;
+        const key = `${rowNum}-${well.column_number}`;
         wellMap[key] = well;
     });
 

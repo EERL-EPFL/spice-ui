@@ -75,6 +75,7 @@ const CreateComponent = () => {
                                     <NumberInput
                                         source="qty_x_axis"
                                         label="Columns"
+                                        helperText="Number of columns (numeric coordinate in microplate: 1, 2, 3, ...12)"
                                         validate={[required()]}
                                         min={1}
                                         max={50}
@@ -84,6 +85,7 @@ const CreateComponent = () => {
                                     <NumberInput
                                         source="qty_y_axis"
                                         label="Rows"
+                                        helperText="Number of rows (letter coordinate in microplate: A, B, C, ...H)"
                                         validate={[required()]}
                                         min={1}
                                         max={50}
@@ -92,9 +94,9 @@ const CreateComponent = () => {
                                     />
                                     <NumberInput
                                         source="well_relative_diameter"
-                                        label="Well diameter"
+                                        label="Well diameter (mm)"
                                         fullWidth
-                                        defaultValue={2.5}
+                                        defaultValue={6.4}
                                         step={0.1}
                                         min={0.1}
                                     />
@@ -110,7 +112,7 @@ const CreateComponent = () => {
                                                         qtyXAxis={parseInt(scopedFormData.qty_x_axis) || 8}
                                                         qtyYAxis={parseInt(scopedFormData.qty_y_axis) || 12}
                                                         rotation={parseInt(scopedFormData.rotation_degrees) || 0}
-                                                        wellDiameter={scopedFormData.well_relative_diameter || 2.5}
+                                                        wellDiameter={scopedFormData.well_relative_diameter || 6.4}
                                                         maxWidth={350}
                                                         maxHeight={350}
                                                     />

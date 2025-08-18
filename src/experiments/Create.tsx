@@ -15,38 +15,8 @@ import {
     useGetOne,
     useInput,
 } from 'react-admin';
-import { useFormContext } from 'react-hook-form';
 import RegionInput from '../components/RegionInput';
 
-/**
- * Once we know the default tray ID, shove it into the form.
- */
-const InjectDefaultTray: React.FC<{ defaultTrayId?: any; fallbackTrayId?: any }> = ({ 
-    defaultTrayId, 
-    fallbackTrayId 
-}) => {
-    const { setValue, getValues, watch } = useFormContext();
-    const currentValue = watch('tray_configuration_id');
-    
-    useEffect(() => {
-        const trayIdToUse = defaultTrayId || fallbackTrayId;
-        if (trayIdToUse != null) {
-            console.log('Setting tray configuration ID:', trayIdToUse, {
-                isDefault: !!defaultTrayId,
-                isFallback: !defaultTrayId && !!fallbackTrayId,
-                currentValue: currentValue
-            });
-            // Always set the value, even if there's already a value
-            // This ensures the default is properly applied
-            setValue('tray_configuration_id', trayIdToUse, { 
-                shouldValidate: true,
-                shouldDirty: true,
-                shouldTouch: true
-            });
-        }
-    }, [defaultTrayId, fallbackTrayId, setValue]);
-    return null;
-};
 
 /**
  * Separate component for tray configuration region input to prevent unnecessary re-renders.
@@ -148,18 +118,7 @@ const CreateComponent: React.FC = () => {
         }
     }, [defaultTrayId, fallbackTrayId, trayToUse, traysLoading, allTraysLoading]);
 
-    // Don't render the form until we have tray data
-    if (traysLoading || allTraysLoading) {
-        return (
-            <Create redirect="show">
-                <div style={{ padding: '20px', textAlign: 'center' }}>
-                    Loading tray configurations...
-                </div>
-            </Create>
-        );
-    }
-
-    // Memoize transform function to prevent infinite loops
+    // Memoize transform function to prevent infinite loops - ALWAYS call this hook
     const transformData = useCallback((data) => {
         // If no tray_configuration_id is set, use our default
         if (!data.tray_configuration_id && trayToUse) {
@@ -169,10 +128,21 @@ const CreateComponent: React.FC = () => {
         return data;
     }, [trayToUse]);
 
-    // Memoize default values to prevent infinite loops
+    // Memoize default values to prevent infinite loops - ALWAYS call this hook
     const defaultValues = useMemo(() => ({
         tray_configuration_id: trayToUse
     }), [trayToUse]);
+
+    // Handle loading state after all hooks are called
+    if (traysLoading || allTraysLoading) {
+        return (
+            <Create redirect="show">
+                <div style={{ padding: '20px', textAlign: 'center' }}>
+                    Loading tray configurations...
+                </div>
+            </Create>
+        );
+    }
 
     return (
         <Create 

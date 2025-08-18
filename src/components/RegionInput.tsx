@@ -720,8 +720,8 @@ export const RegionInput: React.FC<{
     }
 
     // Convert well coordinates to 0-indexed for region comparison
-    const wellRow = well.row - 1; // Convert 1-indexed to 0-indexed
-    const wellCol = well.col - 1; // Convert 1-indexed to 0-indexed
+    const wellRow = well.row_letter.charCodeAt(0) - 65; // Convert letter to 0-indexed (A=0, B=1, etc.)
+    const wellCol = well.column_number - 1; // Convert 1-indexed to 0-indexed
 
     // Find regions that match this well's tray by tray_id
     const matchingRegions = regions.filter((region) => {
