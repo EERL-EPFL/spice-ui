@@ -59,7 +59,7 @@ const Dashboard = () => {
 
       {/* Main Content Grid */}
       <Grid container spacing={1.5} sx={{ height: 'calc(100vh - 150px)' }}>
-        {/* Left Column: Experiments & Samples Stacked */}
+        {/* Left Column: Three Cards Stacked */}
         <Grid item xs={12} md={4}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%' }}>
             {/* Experiments Card */}
@@ -215,6 +215,83 @@ const Dashboard = () => {
                 </Box>
               </CardContent>
             </Card>
+
+            {/* Locations Card */}
+            <Card sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 1.5, '&:last-child': { pb: 1.5 } }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Typography variant="subtitle1">
+                  Locations
+                </Typography>
+                <Box sx={{ display: "flex", gap: 0.5 }}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    sx={{ minWidth: 'auto', p: 0.25, minHeight: 'auto' }}
+                    href="#/locations/create"
+                  >
+                    <Add sx={{ fontSize: 16 }} />
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    sx={{ minWidth: 'auto', p: 0.25, minHeight: 'auto' }}
+                    href="#/locations"
+                  >
+                    <Visibility sx={{ fontSize: 16 }} />
+                  </Button>
+                </Box>
+              </Box>
+              
+              {/* Recent Locations List */}
+              <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
+                Recent (3 most recent)
+              </Typography>
+              <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+                {locationsLoading ? (
+                  <Typography variant="body2" color="text.secondary">Loading...</Typography>
+                ) : locations && locations.length > 0 ? (
+                  <Box>
+                    {locations.slice(0, 3).map((location: any) => (
+                      <Box
+                        key={location.id}
+                        component="a"
+                        href={`#/locations/${location.id}/show`}
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          py: 0.25,
+                          borderBottom: "1px solid",
+                          borderColor: "divider",
+                          "&:last-child": { borderBottom: "none" },
+                          textDecoration: "none",
+                          color: "inherit",
+                          cursor: "pointer",
+                          "&:hover": {
+                            backgroundColor: "action.hover"
+                          }
+                        }}
+                      >
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                          <Typography variant="body2" noWrap>
+                            {location.name}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {location.latitude && location.longitude ? `${location.latitude?.toFixed(3)}, ${location.longitude?.toFixed(3)}` : 'No coordinates'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No locations yet
+                  </Typography>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
           </Box>
         </Grid>
 

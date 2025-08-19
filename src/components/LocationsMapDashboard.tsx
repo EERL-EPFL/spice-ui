@@ -1,6 +1,7 @@
 import React from "react";
 import { MapContainer, TileLayer, GeoJSON, Popup, Marker } from "react-leaflet";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, Paper } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -17,6 +18,8 @@ interface LocationsMapDashboardProps {
 }
 
 export const LocationsMapDashboard: React.FC<LocationsMapDashboardProps> = ({ locations }) => {
+  const theme = useTheme();
+  
   // Filter locations that have area data
   const locationsWithArea = locations.filter(location => location.area);
   
@@ -180,11 +183,12 @@ export const LocationsMapDashboard: React.FC<LocationsMapDashboardProps> = ({ lo
     const displayName = locationName || 'Unnamed Location';
     const borderColor = color || '#3f51b5';
     
-    // Use dark text for better readability against white background
-    const textColor = '#333';
+    // Use theme-aware colors
+    const backgroundColor = theme.palette.background.paper;
+    const textColor = theme.palette.text.primary;
     
     return L.divIcon({
-      html: `<span style="background: white; border: 2px solid ${borderColor}; border-radius: 4px; padding: 4px 8px; font-size: 12px; font-weight: bold; color: ${textColor}; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${displayName}</span>`,
+      html: `<span style="background: ${backgroundColor}; border: 2px solid ${borderColor}; border-radius: 4px; padding: 4px 8px; font-size: 12px; font-weight: bold; color: ${textColor}; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">${displayName}</span>`,
       className: 'location-label-marker',
       iconSize: [0, 0],
       iconAnchor: [0, 0],
@@ -249,20 +253,20 @@ export const LocationsMapDashboard: React.FC<LocationsMapDashboardProps> = ({ lo
       
       {/* Legend */}
       {uniqueProjects.length > 0 && (
-        <Box
+        <Paper
+          elevation={3}
           sx={{
             position: 'absolute',
-            bottom: 10,
+            bottom: 40,
             right: 10,
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            backdropFilter: 'blur(4px)',
-            borderRadius: 1,
-            border: '1px solid rgba(0, 0, 0, 0.1)',
             p: 1.5,
             minWidth: 120,
             maxWidth: 200,
             zIndex: 1000,
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)'
+            backdropFilter: 'blur(4px)',
+            backgroundColor: theme.palette.mode === 'dark' 
+              ? `${theme.palette.background.paper}dd`  // Semi-transparent in dark mode
+              : `${theme.palette.background.paper}f0`  // Semi-transparent in light mode
           }}
         >
           <Typography variant="caption" sx={{ fontWeight: 'bold', display: 'block', mb: 1 }}>
@@ -284,7 +288,7 @@ export const LocationsMapDashboard: React.FC<LocationsMapDashboardProps> = ({ lo
                   transition: 'opacity 0.2s ease',
                   '&:last-child': { mb: 0 },
                   '&:hover': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+                    backgroundColor: theme.palette.action.hover,
                   },
                   px: 0.5,
                   py: 0.25,
@@ -319,7 +323,7 @@ export const LocationsMapDashboard: React.FC<LocationsMapDashboardProps> = ({ lo
               </Box>
             );
           })}
-        </Box>
+        </Paper>
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import { Layout, AppBar, TitlePortal, Sidebar } from "react-admin";
 import { CssBaseline, Typography } from "@mui/material";
+import { CustomMenu } from "./Menu";
 
 const MyAppBar = (props: any) => {
   const appBarText = () => {
@@ -27,7 +28,23 @@ const MyAppBar = (props: any) => {
 };
 
 const MySidebar = (props: any) => (
-  <Sidebar {...props} sx={{ '& .RaSidebar-drawerPaper': { width: 180 } }} />
+ <Sidebar
+        sx={{
+            "& .RaSidebar-drawerPaper": {
+                width: 180,
+            },
+            "& .MuiDrawer-paper": {
+                width: 180,
+            },
+            "& .MuiPaper-root": {
+                width: 180,
+            },
+            width: 180,
+        }}
+        {...props}
+    >
+        <CustomMenu />
+    </Sidebar>
 );
 
 const MyLayout = ({

@@ -18,7 +18,7 @@ import {
   useRecordContext,
   Labeled,
 } from "react-admin";
-import { Box, Typography, Card, CardContent } from "@mui/material";
+import { Box, Typography, Card, CardContent, Chip } from "@mui/material";
 import { treatmentName } from "../treatments";
 import { LocationConvexHullMap } from "../components/LocationConvexHullMap";
 import { TreatmentChips } from "../components/TreatmentChips";
@@ -99,15 +99,44 @@ const LocationInfo = () => {
   );
 };
 
+// Helper component to create tab labels with counts
+const TabLabelWithCount = ({ label, count }: { label: string; count: number }) => (
+  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+    <Typography>{label}</Typography>
+    <Chip 
+      label={count} 
+      size="small" 
+      color="primary" 
+      sx={{ 
+        height: 20, 
+        fontSize: '0.75rem',
+        '& .MuiChip-label': { px: 1 }
+      }} 
+    />
+  </Box>
+);
+
 export const ShowComponent = () => {
   const redirect = useRedirect();
   const createPath = useCreatePath();
+  
   return (
     <Show actions={<ShowComponentActions />}>
       <SimpleShowLayout>
         <LocationInfo />
         <TabbedShowLayout>
-          <TabbedShowLayout.Tab label="Samples">
+          <TabbedShowLayout.Tab 
+            label={
+              <FunctionField
+                render={(record) => (
+                  <TabLabelWithCount 
+                    label="Samples" 
+                    count={record?.samples?.length || 0} 
+                  />
+                )}
+              />
+            }
+          >
             <ArrayField source="samples">
               <Datagrid
                 bulkActionButtons={false}
@@ -133,7 +162,18 @@ export const ShowComponent = () => {
               </Datagrid>
             </ArrayField>
           </TabbedShowLayout.Tab>
-          <TabbedShowLayout.Tab label="Experiments">
+          <TabbedShowLayout.Tab 
+            label={
+              <FunctionField
+                render={(record) => (
+                  <TabLabelWithCount 
+                    label="Experiments" 
+                    count={record?.experiments?.length || 0} 
+                  />
+                )}
+              />
+            }
+          >
             <ArrayField source="experiments">
               <Datagrid
                 bulkActionButtons={false}
