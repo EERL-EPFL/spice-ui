@@ -38,6 +38,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { sampleType } from ".";
 import { treatmentName } from "../treatments";
 import { formatEnzymeVolume } from "../utils/formatters";
+import { SampleLocationMap } from "../components/SampleLocationMap";
 
 const ShowActions = () => {
   const { permissions } = usePermissions();
@@ -267,6 +268,11 @@ const SampleInfo = () => {
   const record = useRecordContext();
   if (!record) return null;
 
+  // Convert coordinates for map
+  const lat = typeof record.latitude === 'string' ? parseFloat(record.latitude) : record.latitude;
+  const lng = typeof record.longitude === 'string' ? parseFloat(record.longitude) : record.longitude;
+  const hasValidCoordinates = lat && lng && !isNaN(lat) && !isNaN(lng);
+
   return (
     <Card sx={{ mb: 3 }}>
       <CardContent>
@@ -274,65 +280,86 @@ const SampleInfo = () => {
           {record.name}
         </Typography>
 
-        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
-          <Labeled label="Sample Type">
-            <TextField
-              source="type"
-              transform={(value) => sampleType[value] || value}
-            />
-          </Labeled>
+        <Box sx={{ display: "grid", gridTemplateColumns: hasValidCoordinates ? "1fr 1fr" : "1fr 1fr", gap: 2 }}>
+          {/* Left column - Sample information */}
+          <Box>
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 2 }}>
+              <Labeled label="Sample Type">
+                <TextField
+                  source="type"
+                  transform={(value) => sampleType[value] || value}
+                />
+              </Labeled>
 
-          {record.location_id && (
-            <Labeled label="Location">
-              <ReferenceField
-                source="location_id"
-                reference="locations"
-                link="show"
-              >
-                <TextField source="name" />
-              </ReferenceField>
-            </Labeled>
-          )}
+              {record.location_id && (
+                <Labeled label="Location">
+                  <ReferenceField
+                    source="location_id"
+                    reference="locations"
+                    link="show"
+                  >
+                    <TextField source="name" />
+                  </ReferenceField>
+                </Labeled>
+              )}
 
-          {record.well_volume_litres && (
-            <Labeled label="Well Volume (L)">
-              <NumberField source="well_volume_litres" />
-            </Labeled>
-          )}
+              {record.well_volume_litres && (
+                <Labeled label="Well Volume (L)">
+                  <NumberField source="well_volume_litres" />
+                </Labeled>
+              )}
 
-          {record.suspension_volume_litres && (
-            <Labeled label="Suspension Volume (L)">
-              <NumberField source="suspension_volume_litres" />
-            </Labeled>
-          )}
+              {record.suspension_volume_litres && (
+                <Labeled label="Suspension Volume (L)">
+                  <NumberField source="suspension_volume_litres" />
+                </Labeled>
+              )}
 
-          {record.material_description && (
-            <Labeled label="Material">
-              <TextField source="material_description" />
-            </Labeled>
-          )}
+              {record.material_description && (
+                <Labeled label="Material">
+                  <TextField source="material_description" />
+                </Labeled>
+              )}
 
-          {record.extraction_procedure && (
-            <Labeled label="Extraction">
-              <TextField source="extraction_procedure" />
-            </Labeled>
-          )}
+              {record.extraction_procedure && (
+                <Labeled label="Extraction">
+                  <TextField source="extraction_procedure" />
+                </Labeled>
+              )}
+            </Box>
 
-          {record.remarks && (
-            <Labeled label="Remarks" sx={{ gridColumn: "span 2" }}>
+            <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
+              <Typography variant="caption" color="text.secondary">
+                Created: <DateField source="created_at" showTime />
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Updated: <DateField source="last_updated" showTime />
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Right column - Map */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {hasValidCoordinates && (
+              <Box sx={{ flex: 1, border: 1, borderColor: 'divider', borderRadius: 1, minHeight: 250 }}>
+                <SampleLocationMap
+                  latitude={lat}
+                  longitude={lng}
+                  sampleName={record.name}
+                  compact={true}
+                />
+              </Box>
+            )}
+          </Box>
+        </Box>
+
+        {record.remarks && (
+          <Box sx={{ mt: 2 }}>
+            <Labeled label="Remarks">
               <TextField source="remarks" />
             </Labeled>
-          )}
-        </Box>
-
-        <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
-          <Typography variant="caption" color="text.secondary">
-            Created: <DateField source="created_at" showTime />
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Updated: <DateField source="last_updated" showTime />
-          </Typography>
-        </Box>
+          </Box>
+        )}
       </CardContent>
     </Card>
   );
