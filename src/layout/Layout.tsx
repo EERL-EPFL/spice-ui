@@ -1,4 +1,4 @@
-import { Layout, AppBar, TitlePortal } from "react-admin";
+import { Layout, AppBar, TitlePortal, Sidebar } from "react-admin";
 import { CssBaseline, Typography } from "@mui/material";
 
 const MyAppBar = (props: any) => {
@@ -26,6 +26,10 @@ const MyAppBar = (props: any) => {
   );
 };
 
+const MySidebar = (props: any) => (
+  <Sidebar {...props} sx={{ '& .RaSidebar-drawerPaper': { width: 180 } }} />
+);
+
 const MyLayout = ({
   children,
   deployment,
@@ -36,7 +40,10 @@ const MyLayout = ({
   return (
     <>
       <CssBaseline />
-      <Layout appBar={() => <MyAppBar deployment={deployment} />}>
+      <Layout 
+        appBar={() => <MyAppBar deployment={deployment} />}
+        sidebar={MySidebar}
+      >
         {children}
       </Layout>
     </>

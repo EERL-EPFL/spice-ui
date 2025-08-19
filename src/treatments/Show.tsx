@@ -43,6 +43,7 @@ import {
 import { CheckCircle, Cancel } from "@mui/icons-material";
 import { treatmentName } from ".";
 import { formatEnzymeVolume } from "../utils/formatters";
+import { SingleTreatmentChip } from "../components/TreatmentChips";
 
 const ExperimentalResultsTable = () => {
   const record = useRecordContext();
@@ -361,14 +362,8 @@ const TabbedContentWithCounts = () => {
             <Labeled>
               <TextField source="id" />
             </Labeled>
-            <Labeled>
-              <FunctionField
-                source="name"
-                label="Treatment Type"
-                render={(record) => {
-                  return treatmentName[record.name] || record.name;
-                }}
-              />
+            <Labeled label="Treatment Type">
+              <SingleTreatmentChip treatmentName={record?.name || ""} size="medium" />
             </Labeled>
             <Labeled>
               <ReferenceField

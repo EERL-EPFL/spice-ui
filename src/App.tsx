@@ -16,6 +16,7 @@ import experiments from "./experiments";
 import axios from "axios";
 import Dashboard from "./Dashboard";
 import "./App.css";
+import "leaflet/dist/leaflet.css";
 import tray_configurations from "./tray_configurations";
 import treatments from "./treatments";
 

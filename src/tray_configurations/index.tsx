@@ -11,6 +11,6 @@ export default {
   show: ShowComponent,
   icon: AppRegistrationIcon,
   options: {
-    label: "Tray Configuration",
+    label: "Trays",
   },
 };

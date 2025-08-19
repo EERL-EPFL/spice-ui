@@ -1,4 +1,3 @@
-import React from "react";
 import { usePermissions, useGetList } from "react-admin";
 import {
   Typography,
@@ -8,28 +7,33 @@ import {
   CardContent,
   Button,
   Alert,
-  Chip,
   Paper,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
 } from "@mui/material";
 import {
   Add,
-  Science,
-  Assessment,
-  PlayArrow,
   Visibility,
 } from "@mui/icons-material";
+import { LocationsMapDashboard } from "./components/LocationsMapDashboard";
 
 const Dashboard = () => {
   const { permissions } = usePermissions();
 
   // Fetch recent experiments for quick access
-  const { data: recentExperiments, isLoading } = useGetList("experiments", {
-    pagination: { page: 1, perPage: 5 },
-    sort: { field: "updated_at", order: "DESC" },
+  const { data: recentExperiments, isLoading: experimentsLoading } = useGetList("experiments", {
+    pagination: { page: 1, perPage: 3 },
+    sort: { field: "last_updated", order: "DESC" },
+  });
+
+  // Fetch recent samples for quick access
+  const { data: recentSamples, isLoading: samplesLoading } = useGetList("samples", {
+    pagination: { page: 1, perPage: 3 },
+    sort: { field: "last_updated", order: "DESC" },
+  });
+
+  // Fetch locations for the map and list
+  const { data: locations, isLoading: locationsLoading } = useGetList("locations", {
+    pagination: { page: 1, perPage: 100 }, // Get all locations for the map and recent list
+    sort: { field: "name", order: "ASC" }, // Keep name sorting for map, we'll slice recent ones separately
   });
 
   if (!permissions) {
@@ -42,153 +46,201 @@ const Dashboard = () => {
   }
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: 1.5, maxHeight: '100vh', overflow: 'hidden' }}>
       {/* Header */}
-      <Box sx={{ mb: 3, textAlign: "center" }}>
-        <Typography variant="h4" gutterBottom color="primary">
+      <Box sx={{ mb: 1.5, textAlign: "center" }}>
+        <Typography variant="h5" gutterBottom color="primary">
           SPICE Dashboard
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body2" color="text.secondary">
           Submicron Particle Ice Nucleation Analysis
         </Typography>
       </Box>
 
-      {/* Quick Actions */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Experiments
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Create new experiments or browse existing ones
-              </Typography>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <Button
-                  variant="contained"
-                  startIcon={<Add />}
-                  size="medium"
-                  href="#/experiments/create"
-                >
-                  Create New
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<Visibility />}
-                  size="medium"
-                  href="#/experiments"
-                >
-                  Browse All
-                </Button>
-              </Box>
-            </CardContent>
-          </Card>
+      {/* Main Content Grid */}
+      <Grid container spacing={1.5} sx={{ height: 'calc(100vh - 150px)' }}>
+        {/* Left Column: Experiments & Samples Stacked */}
+        <Grid item xs={12} md={4}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, height: '100%' }}>
+            {/* Experiments Card */}
+            <Card sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                  <Typography variant="subtitle1">
+                    Experiments
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 0.5 }}>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      sx={{ minWidth: 'auto', p: 0.25, minHeight: 'auto' }}
+                      href="#/experiments/create"
+                    >
+                      <Add sx={{ fontSize: 16 }} />
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      sx={{ minWidth: 'auto', p: 0.25, minHeight: 'auto' }}
+                      href="#/experiments"
+                    >
+                      <Visibility sx={{ fontSize: 16 }} />
+                    </Button>
+                  </Box>
+                </Box>
+                
+                {/* Recent Experiments List */}
+                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
+                  Recent (3 most recent)
+                </Typography>
+                <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+                  {experimentsLoading ? (
+                    <Typography variant="body2" color="text.secondary">Loading...</Typography>
+                  ) : recentExperiments && recentExperiments.length > 0 ? (
+                    <Box>
+                      {recentExperiments.map((experiment: any) => (
+                        <Box
+                          key={experiment.id}
+                          component="a"
+                          href={`#/experiments/${experiment.id}/show`}
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            py: 0.25,
+                            borderBottom: "1px solid",
+                            borderColor: "divider",
+                            "&:last-child": { borderBottom: "none" },
+                            textDecoration: "none",
+                            color: "inherit",
+                            cursor: "pointer",
+                            "&:hover": {
+                              backgroundColor: "action.hover"
+                            }
+                          }}
+                        >
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" noWrap>
+                              {experiment.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(experiment.last_updated).toLocaleDateString()}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      No experiments yet
+                    </Typography>
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
+
+            {/* Samples Card */}
+            <Card sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+              <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                  <Typography variant="subtitle1">
+                    Samples
+                  </Typography>
+                  <Box sx={{ display: "flex", gap: 0.5 }}>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      sx={{ minWidth: 'auto', p: 0.25, minHeight: 'auto' }}
+                      href="#/samples/create"
+                    >
+                      <Add sx={{ fontSize: 16 }} />
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      sx={{ minWidth: 'auto', p: 0.25, minHeight: 'auto' }}
+                      href="#/samples"
+                    >
+                      <Visibility sx={{ fontSize: 16 }} />
+                    </Button>
+                  </Box>
+                </Box>
+                
+                {/* Recent Samples List */}
+                <Typography variant="subtitle2" sx={{ mb: 1, color: "text.secondary" }}>
+                  Recent (3 most recent)
+                </Typography>
+                <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
+                  {samplesLoading ? (
+                    <Typography variant="body2" color="text.secondary">Loading...</Typography>
+                  ) : recentSamples && recentSamples.length > 0 ? (
+                    <Box>
+                      {recentSamples.map((sample: any) => (
+                        <Box
+                          key={sample.id}
+                          component="a"
+                          href={`#/samples/${sample.id}/show`}
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            py: 0.25,
+                            borderBottom: "1px solid",
+                            borderColor: "divider",
+                            "&:last-child": { borderBottom: "none" },
+                            textDecoration: "none",
+                            color: "inherit",
+                            cursor: "pointer",
+                            "&:hover": {
+                              backgroundColor: "action.hover"
+                            }
+                          }}
+                        >
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <Typography variant="body2" noWrap>
+                              {sample.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {new Date(sample.last_updated).toLocaleDateString()}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      No samples yet
+                    </Typography>
+                  )}
+                </Box>
+              </CardContent>
+            </Card>
+          </Box>
         </Grid>
 
-        <Grid item xs={12} md={6}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Sample Management
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Manage samples and treatments
-              </Typography>
-              <Box sx={{ display: "flex", gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<Science />}
-                  size="medium"
-                  href="#/samples"
-                >
-                  Samples
-                </Button>
-                <Button
-                  variant="outlined"
-                  startIcon={<Assessment />}
-                  size="medium"
-                  href="#/treatments"
-                >
-                  Treatments
-                </Button>
+        {/* Right Column: Locations Map */}
+        <Grid item xs={12} md={8} sx={{ flex: 1, minWidth: 0 }}>
+          <Paper sx={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column', p: 1.5 }}>
+            <Typography variant="subtitle1" gutterBottom>
+              Locations Map
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+              Click on a location polygon to view its details
+            </Typography>
+            {locationsLoading ? (
+              <Typography>Loading locations...</Typography>
+            ) : locations && locations.length > 0 ? (
+              <Box sx={{ flex: 1, minHeight: 0, width: '100%' }}>
+                <LocationsMapDashboard locations={locations} />
               </Box>
-            </CardContent>
-          </Card>
+            ) : (
+              <Alert severity="info">
+                No locations found. Create your first location to see it on the map.
+              </Alert>
+            )}
+          </Paper>
         </Grid>
       </Grid>
-
-      {/* Recent Experiments */}
-      <Paper sx={{ p: 2, mb: 4 }}>
-        <Typography variant="h6" gutterBottom>
-          Recent Experiments
-        </Typography>
-        {isLoading ? (
-          <Typography>Loading recent experiments...</Typography>
-        ) : recentExperiments && recentExperiments.length > 0 ? (
-          <List>
-            {recentExperiments.map((experiment: any) => (
-              <ListItem
-                key={experiment.id}
-                sx={{
-                  border: 1,
-                  borderColor: "divider",
-                  borderRadius: 1,
-                  mb: 1,
-                }}
-              >
-                <ListItemIcon>
-                  <Assessment color="primary" />
-                </ListItemIcon>
-                <ListItemText
-                  primary={experiment.name}
-                  secondary={
-                    <Box>
-                      <Typography variant="body2">
-                        Last updated:{" "}
-                        {new Date(
-                          experiment.updated_at || experiment.performed_at,
-                        ).toLocaleString()}
-                      </Typography>
-                      <Box sx={{ display: "flex", gap: 1, mt: 1 }}>
-                        {experiment.is_calibration && (
-                          <Chip
-                            size="small"
-                            label="Calibration"
-                            variant="outlined"
-                          />
-                        )}
-                      </Box>
-                    </Box>
-                  }
-                />
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  <Button
-                    size="small"
-                    href={`#/experiments/${experiment.id}/show`}
-                    startIcon={<Visibility />}
-                  >
-                    View
-                  </Button>
-                  <Button
-                    size="small"
-                    href={`#/experiments/${experiment.id}/edit`}
-                    startIcon={<PlayArrow />}
-                    variant="outlined"
-                  >
-                    Edit
-                  </Button>
-                </Box>
-              </ListItem>
-            ))}
-          </List>
-        ) : (
-          <Alert severity="info">
-            No experiments found. Create your first experiment using the button
-            above.
-          </Alert>
-        )}
-      </Paper>
     </Box>
   );
 };

@@ -14,6 +14,7 @@ import {
 import { postFilters } from "../filters/list";
 import { treatmentName } from ".";
 import { formatEnzymeVolume } from "../utils/formatters";
+import { SingleTreatmentChip } from "../components/TreatmentChips";
 const ListComponentActions = () => {
   const { permissions } = usePermissions();
   return (
@@ -39,9 +40,9 @@ export const ListComponent = () => {
         <FunctionField
           source="name"
           label="Treatment Type"
-          render={(record) => {
-            return treatmentName[record.name] || record.name;
-          }}
+          render={(record) => (
+            <SingleTreatmentChip treatmentName={record.name} />
+          )}
         />
         <ReferenceField source="sample_id" reference="samples" link="show">
           <TextField source="name" />

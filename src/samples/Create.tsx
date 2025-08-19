@@ -13,6 +13,7 @@ import {
   SimpleFormIterator,
 } from "react-admin";
 import { Box, Typography, Divider } from "@mui/material";
+import { SampleCoordinateInput } from "../components/SampleCoordinateInput";
 
 const CreateComponent = () => (
   <Create redirect="show">
@@ -66,6 +67,7 @@ const CreateComponent = () => (
                   <DateTimeInput
                     source="start_time"
                     label="Collection Date & Time"
+                    parse={(value) => value ? new Date(value).toISOString() : null}
                     fullWidth
                   />
                 </>
@@ -108,8 +110,7 @@ const CreateComponent = () => (
                   <Typography variant="h6" gutterBottom>
                     Bulk Sample Details
                   </Typography>
-                  <NumberInput source="latitude" label="Latitude" fullWidth />
-                  <NumberInput source="longitude" label="Longitude" fullWidth />
+                  <SampleCoordinateInput />
                   <NumberInput
                     source="bulk_mass_mg"
                     label="Bulk Mass (mg)"

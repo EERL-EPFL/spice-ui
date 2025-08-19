@@ -17,6 +17,7 @@ import {
 import { Typography, Box, Paper } from "@mui/material";
 import { postFilters } from "../filters/list";
 import { sampleType } from ".";
+import { SampleTypeChip } from "../components/SampleTypeChips";
 
 const ListComponentActions = () => {
   const { permissions } = usePermissions();
@@ -56,9 +57,9 @@ const ExperimentalSamplesTable = () => {
         <FunctionField
           source="type"
           label="Type"
-          render={(record) => {
-            return sampleType[record.type] || record.type;
-          }}
+          render={(record) => (
+            <SampleTypeChip sampleType={record.type} />
+          )}
         />
         <ReferenceField source="location_id" reference="locations" link="show">
           <TextField source="name" />
@@ -93,9 +94,9 @@ const ControlSamplesTable = () => {
         <FunctionField
           source="type"
           label="Type"
-          render={(record) => {
-            return sampleType[record.type] || record.type;
-          }}
+          render={(record) => (
+            <SampleTypeChip sampleType={record.type} />
+          )}
         />
         <FunctionField
           label="Treatments"

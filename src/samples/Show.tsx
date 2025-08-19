@@ -12,7 +12,6 @@ import {
   Datagrid,
   ArrayField,
   SingleFieldList,
-  ShowButton,
   TopToolbar,
   EditButton,
   DeleteButton,
@@ -20,9 +19,7 @@ import {
   ListContextProvider,
   useList,
   Pagination,
-  BooleanField,
   Labeled,
-  WithRecord,
 } from "react-admin";
 import {
   Card,
@@ -32,13 +29,13 @@ import {
   AccordionSummary,
   AccordionDetails,
   Box,
-  Chip,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import { sampleType } from ".";
 import { treatmentName } from "../treatments";
 import { formatEnzymeVolume } from "../utils/formatters";
 import { SampleLocationMap } from "../components/SampleLocationMap";
+import { TreatmentChips, SingleTreatmentChip } from "../components/TreatmentChips";
+import { SampleTypeChip } from "../components/SampleTypeChips";
 
 const ShowActions = () => {
   const { permissions } = usePermissions();
@@ -95,7 +92,7 @@ const TreatmentItem = () => {
         <Box
           sx={{ display: "flex", alignItems: "center", gap: 2, width: "100%" }}
         >
-          <Chip label={treatmentDisplay} color="primary" variant="outlined" />
+          <SingleTreatmentChip treatmentName={treatment.name} size="medium" variant="filled" />
           {treatment.enzyme_volume_litres && (
             <Typography variant="body2" color="text.secondary">
               Enzyme: {formatEnzymeVolume(treatment.enzyme_volume_litres)}L
@@ -276,20 +273,23 @@ const SampleInfo = () => {
   return (
     <Card sx={{ mb: 3 }}>
       <CardContent>
-        <Typography variant="h5" gutterBottom>
-          {record.name}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
+          <Typography variant="h5">
+            {record.name}
+          </Typography>
+          <SampleTypeChip sampleType={record.type} size="medium" />
+        </Box>
 
         <Box sx={{ display: "grid", gridTemplateColumns: hasValidCoordinates ? "1fr 1fr" : "1fr 1fr", gap: 2 }}>
           {/* Left column - Sample information */}
           <Box>
             <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 2 }}>
-              <Labeled label="Sample Type">
-                <TextField
-                  source="type"
-                  transform={(value) => sampleType[value] || value}
-                />
-              </Labeled>
+
+              {record.start_time && (
+                <Labeled label="Collection Date">
+                  <DateField source="start_time" showTime />
+                </Labeled>
+              )}
 
               {record.location_id && (
                 <Labeled label="Location">
