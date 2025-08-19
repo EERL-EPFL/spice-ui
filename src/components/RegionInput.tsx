@@ -18,18 +18,11 @@ import {
   IconButton,
   Button,
   Checkbox,
-  FormControlLabel,
   Card,
   CardContent,
   Chip,
-  Grid,
   Tooltip,
-  Alert,
-  CircularProgress,
-  Tabs,
-  Tab,
   ToggleButton,
-  MenuItem,
   ToggleButtonGroup,
   Link as MuiLink,
 } from "@mui/material";
@@ -42,34 +35,6 @@ import ScienceIcon from "@mui/icons-material/Science";
 import { scaleSequential } from "d3-scale";
 import { interpolateBlues } from "d3-scale-chromatic";
 import { treatmentName } from "../treatments";
-
-// Import the WellSummary interface from TrayGrid
-import { WellSummary } from "./TrayGrid";
-import { flattenSampleResults } from '../utils/experimentUtils';
-
-interface TreatmentResultsSummary {
-  treatment: any;
-  wells: WellSummary[];
-  wells_frozen: number;
-  wells_liquid: number;
-}
-
-interface SampleResultsSummary {
-  sample: any;
-  treatments: TreatmentResultsSummary[];
-}
-
-// Interface for experiment results summary
-interface ExperimentResultsSummary {
-  total_wells: number;
-  wells_with_data: number;
-  wells_frozen: number;
-  wells_liquid: number;
-  total_time_points: number;
-  first_timestamp: string | null;
-  last_timestamp: string | null;
-  sample_results: SampleResultsSummary[];
-}
 
 // Generate dynamic column letters based on tray dimensions
 const generateColumnLetters = (maxCols: number): string[] => {
@@ -275,9 +240,9 @@ const parseYAML = (yamlText: string, trayConfigs: TrayConfig[]): any => {
 
 // Component to display well details with hyperlink functionality
 const WellDetailsDisplay: React.FC<{
-  well: WellSummary;
+  well: any; // Use API data structure directly
   formatSeconds: (seconds: number) => string;
-  onViewImage?: (well: WellSummary) => void;
+  onViewImage?: (well: any) => void;
 }> = ({ well, formatSeconds, onViewImage }) => {
   const redirect = useRedirect();
 
@@ -311,9 +276,6 @@ const WellDetailsDisplay: React.FC<{
         {well.tray_name
           ? `${well.tray_name}: ${well.coordinate}`
           : `Well ${well.coordinate}`}
-      </Typography>
-      <Typography variant="body2" color="text.secondary">
-        <strong>State:</strong> {well.final_state}
       </Typography>
       {well.first_phase_change_temperature_probes?.average && (
         <Tooltip
@@ -377,7 +339,12 @@ const WellDetailsDisplay: React.FC<{
       {well.first_phase_change_seconds !== null && (
         <Typography variant="body2" color="text.secondary">
           <strong>Freezing time:</strong>{" "}
-          {formatSeconds(well.first_phase_change_seconds)}
+          {formatSeconds(well.first_phase_change_seconds)} ({well.first_phase_change_seconds}s)
+          {well.first_phase_change_time && (
+            <span style={{ marginLeft: 4 }}>
+              [{new Date(well.first_phase_change_time).toLocaleTimeString()}]
+            </span>
+          )}
         </Typography>
       )}
       {(well.sample?.name || well.treatment?.sample?.name || well.sample_name) && (
@@ -427,15 +394,15 @@ const WellDetailsDisplay: React.FC<{
           <strong>Dilution:</strong> {well.dilution_factor}
         </Typography>
       )}
-      {well.image_filename_at_freeze && (
+      {(well.temperatures?.image_filename || well.image_filename_at_freeze) && (
         <Box mt={1} display="flex" alignItems="center">
           <Typography variant="body2" color="text.secondary" mr={1}>
             <strong>Image:</strong>
             <span style={{ marginLeft: 4 }}>
-              {well.image_filename_at_freeze}
+              {well.temperatures?.image_filename || well.image_filename_at_freeze}
             </span>
           </Typography>
-          {well.image_asset_id ? (
+          {(well.image_asset_id || well.temperatures?.image_asset_id) ? (
             <Tooltip title="View freeze image">
               <IconButton 
                 size="small" 
@@ -560,7 +527,7 @@ export const RegionInput: React.FC<{
   const dataProvider = useDataProvider();
   const record = useRecordContext(); // Get the current experiment record for time point data
   const notify = useNotify();
-  const [availableTreatments, setAvailableTreatments] = useState<any[]>([]);
+
   // Always call useInput to maintain consistent hook order, but handle errors gracefully
   let inputResult;
   try {
@@ -643,7 +610,7 @@ export const RegionInput: React.FC<{
     readOnly = false,
     showTimePointVisualization = false,
   } = props;
-  const [selectedWell, setSelectedWell] = useState<WellSummary | null>(null);
+  const [selectedWell, setSelectedWell] = useState<any | null>(null);
 
   // Extract results from the experiment record for time point visualization
   const results: any = record?.results || null;
@@ -666,16 +633,13 @@ export const RegionInput: React.FC<{
       return { colorScale: () => "#f5f5f5", minSeconds: 0, maxSeconds: 0 };
     }
 
-    // Extract all wells from all trays in the new structure
-    const wellSummaries = results.trays.flatMap((tray: any) => 
-      (tray.wells || []).map((well: any) => ({
-        first_phase_change_seconds: well.first_phase_change_time && results.summary?.first_timestamp ? 
-          Math.floor((new Date(well.first_phase_change_time).getTime() - new Date(results.summary.first_timestamp).getTime()) / 1000) : null
-      }))
-    );
-    const freezingTimes = wellSummaries
-      .filter((w) => w.first_phase_change_seconds !== null)
-      .map((w) => w.first_phase_change_seconds!);
+    // Extract freezing times directly from API data
+    const freezingTimes = results.trays
+      .flatMap((tray: any) => tray.wells || [])
+      .filter((well: any) => well.first_phase_change_time && results.summary?.first_timestamp)
+      .map((well: any) => 
+        Math.floor((new Date(well.first_phase_change_time).getTime() - new Date(results.summary.first_timestamp).getTime()) / 1000)
+      );
 
     if (freezingTimes.length === 0) {
       return { colorScale: () => "#f5f5f5", minSeconds: 0, maxSeconds: 0 };
@@ -699,7 +663,7 @@ export const RegionInput: React.FC<{
 
   // Function to properly assign sample/treatment to wells based on tray filtering
   const getCorrectSampleForWell = (
-    well: WellSummary,
+    well: any,
     regions: any[],
   ): { sample_name: string | null; treatment_name: string | null } => {
     // Only assign data if we have valid regions and the well has actual region assignments
@@ -753,9 +717,26 @@ export const RegionInput: React.FC<{
     return { sample_name: null, treatment_name: null };
   };
 
-  // Create well summary lookup for tooltip data - organized by tray
-  // This will be computed later after flatTrays is available
-  const [wellSummaryMapByTray, setWellSummaryMapByTray] = useState<Map<string, Map<string, WellSummary>>>(new Map());
+  // Direct access to well data from results - no reconstruction needed
+  const wellDataByTray = useMemo(() => {
+    if (!results?.trays) return new Map();
+    
+    const trayMap = new Map<string, Map<string, any>>();
+    results.trays.forEach((tray: any) => {
+      const wellMap = new Map<string, any>();
+      (tray.wells || []).forEach((well: any) => {
+        // Add calculated seconds for backward compatibility
+        const wellWithSeconds = {
+          ...well,
+          first_phase_change_seconds: well.first_phase_change_time && results.summary?.first_timestamp ? 
+            Math.floor((new Date(well.first_phase_change_time).getTime() - new Date(results.summary.first_timestamp).getTime()) / 1000) : null
+        };
+        wellMap.set(well.coordinate, wellWithSeconds);
+      });
+      trayMap.set(tray.tray_name, wellMap);
+    });
+    return trayMap;
+  }, [results]);
 
   // Function to fetch average temperature for each tray
   const [trayTemperatures, setTrayTemperatures] = useState<Map<number, number>>(
@@ -1178,63 +1159,21 @@ export const RegionInput: React.FC<{
     return [null, flattened];
   }, [trayConfiguration, props.label, props.source, isRequired]);
 
-  // Memoize dependency for well summary computation
-  const wellSummaryDeps = useMemo(() => ({
-    hasResults: !!results?.trays,
-    showTimePoint: showTimePointVisualization,
-    flatTraysLength: flatTrays.length,
-    regionsKey: regionsKey
-  }), [results?.trays, showTimePointVisualization, flatTrays.length, regionsKey]);
-
-  // Compute well summary map after flatTrays is available
-  React.useEffect(() => {
-    if (!wellSummaryDeps.hasResults || !wellSummaryDeps.showTimePoint || !wellSummaryDeps.flatTraysLength) {
-      setWellSummaryMapByTray(new Map());
-      return;
-    }
-
-    const trayMaps = new Map<string, Map<string, WellSummary>>();
-    // Convert new tray-centric results to well summaries
-    const wellSummaries = results.trays.flatMap((tray: any) => 
-      (tray.wells || []).map((well: any) => ({
-        row_letter: well.row_letter,
-        column_number: well.column_number,
-        coordinate: well.coordinate,
-        tray_id: tray.tray_id,
-        tray_name: tray.tray_name,
-        first_phase_change_time: well.first_phase_change_time,
-        first_phase_change_seconds: well.first_phase_change_time && results.summary?.first_timestamp ? 
-          Math.floor((new Date(well.first_phase_change_time).getTime() - new Date(results.summary.first_timestamp).getTime()) / 1000) : null,
-        final_state: well.final_state || 'no_data',
-        sample_name: well.sample?.name || null,
-        treatment_name: well.treatment_name || null,
-        dilution_factor: well.dilution_factor || null,
-        sample: well.sample || null
-      }))
-    );
-
-    wellSummaries.forEach((well) => {
-      const trayName = well.tray_name || "unknown";
-      if (!trayMaps.has(trayName)) {
-        trayMaps.set(trayName, new Map());
-      }
-      const trayMap = trayMaps.get(trayName)!;
-
-      // Fix the sample assignment using UI-side tray filtering
-      const correctedSample = getCorrectSampleForWell(well, regions);
-      const correctedWell = {
-        ...well,
-        sample_name: correctedSample.sample_name,
-        treatment_name: correctedSample.treatment_name,
-      };
-
-      // Use coordinate as key instead of row-col to avoid conflicts
-      const key = well.coordinate;
-      trayMap.set(key, correctedWell);
-    });
-
-    setWellSummaryMapByTray(trayMaps);
-  }, [wellSummaryDeps, results, regions, flatTrays]);
+  // Get well data with applied region corrections
+  const getWellWithRegionData = useCallback((well: any, trayName: string) => {
+    // Apply region-based sample/treatment corrections if needed
+    const correctedSample = getCorrectSampleForWell({ 
+      ...well, 
+      tray_name: trayName 
+    }, regions);
+    
+    return {
+      ...well,
+      // Override with region-corrected data if available, otherwise use API data
+      sample_name: correctedSample.sample_name || well.sample?.name,
+      treatment_name: correctedSample.treatment_name || well.treatment_name
+    };
+  }, [regions]);
 
   // YAML export must be defined AFTER flatTrays is available
   const handleYAMLExport = useCallback(() => {
@@ -1525,11 +1464,12 @@ export const RegionInput: React.FC<{
                   }
                   existingRegions={existingRegions}
                   readOnly={readOnly}
-                  wellSummaryMap={
-                    wellSummaryMapByTray.get(trayName) || new Map()
-                  }
+                  wellSummaryMap={wellDataByTray.get(trayName) || new Map()}
                   colorScale={colorScale}
-                  onWellClick={setSelectedWell}
+                  onWellClick={(well: any) => {
+                    const wellWithRegionData = getWellWithRegionData(well, trayName);
+                    setSelectedWell(wellWithRegionData);
+                  }}
                   showTimePointVisualization={
                     showTimePointVisualization && viewMode === "results"
                   }
@@ -1543,7 +1483,7 @@ export const RegionInput: React.FC<{
 
         {/* Unified panel controlled by view mode toggle - moved to right side */}
         {(regions.length > 0 ||
-          (showTimePointVisualization && resultsSummary)) && (
+          (showTimePointVisualization && results)) && (
           <Card
             sx={{ flex: "0 0 auto", width: "480px", height: "fit-content" }}
           >
@@ -1910,7 +1850,7 @@ export const RegionInput: React.FC<{
                         size="small"
                       />
                       <Chip
-                        label={`${results.trays.flatMap((tray: any) => tray.wells || []).length} wells with data`}
+                        label={`${results.trays.reduce((count: number, tray: any) => count + (tray.wells?.length || 0), 0)} wells with data`}
                         color="info"
                         size="small"
                       />
