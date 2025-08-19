@@ -13,19 +13,19 @@ import {
     Datagrid,
     FunctionField,
     TabbedShowLayout,
-    ReferenceManyField,
     Pagination,
     useRecordContext,
     useAuthProvider,
-    Labeled,
     useGetOne,
     useRefresh,
     useDataProvider,
     useNotify,
     useListContext,
+    useGetList,
+    ListContextProvider,
 } from "react-admin";
-import React, { useEffect, useState } from "react";
-import { Button, Box, Card, CardContent, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup, Divider, Dialog, DialogContent, DialogTitle, IconButton, Chip, CircularProgress, Tooltip, FormControl, InputLabel, Select, MenuItem, SelectChangeEvent, Switch, FormControlLabel, TextField as MuiTextField } from "@mui/material";
+import React, { useEffect, useState, useRef } from "react";
+import { Button, Box, Card, CardContent, Typography, Tabs, Tab, ToggleButton, ToggleButtonGroup, Divider, Dialog, DialogContent, DialogTitle, IconButton, Chip, CircularProgress, Tooltip, FormControl, InputLabel, Select, MenuItem, SelectChangeEvent, Switch, FormControlLabel, TextField as MuiTextField, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Checkbox } from "@mui/material";
 import DownloadIcon from '@mui/icons-material/Download';
 import GetAppIcon from '@mui/icons-material/GetApp';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -87,9 +87,19 @@ const DownloadAllButton = () => {
     const record = useRecordContext();
     const authProvider = useAuthProvider();
     const [isDownloading, setIsDownloading] = React.useState(false);
+    
+    // Get asset count directly from API
+    const { total: assetCount = 0 } = useGetList(
+        'assets',
+        {
+            filter: { experiment_id: record?.id },
+            pagination: { page: 1, perPage: 1 },
+            sort: { field: 'uploaded_at', order: 'DESC' }
+        }
+    );
 
     if (!record || !authProvider) return null;
-    if (!record.assets || record.assets.length === 0) return null;
+    if (assetCount === 0) return null;
 
     const handleDownload = async () => {
         if (!record) return;
@@ -1048,6 +1058,248 @@ const ExperimentDetailsHeader = () => {
     );
 };
 
+// Tabular Data Section Component using direct API call
+const TabularDataSection = ({ onRefresh }: { onRefresh: () => void }) => {
+    const record = useRecordContext();
+    const refresh = useRefresh();
+    const { data: tabularAssets, isLoading, refetch } = useGetList(
+        'assets',
+        {
+            filter: { experiment_id: record?.id, type: 'tabular' },
+            pagination: { page: 1, perPage: 50 },
+            sort: { field: 'uploaded_at', order: 'DESC' }
+        }
+    );
+
+    const handleRefresh = () => {
+        refetch();
+        refresh();
+        onRefresh();
+    };
+
+    if (isLoading) {
+        return (
+            <Box sx={{ mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <DescriptionIcon color="primary" />
+                    Data Processing Files
+                </Typography>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    return (
+        <Box sx={{ mb: 3 }}>
+            <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <DescriptionIcon color="primary" />
+                Data Processing Files
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Tabular data for experiment data processing - always visible for easy access. Select one to process results from.
+            </Typography>
+            <Box>
+                {(tabularAssets || []).map((asset: any) => (
+                    <Card key={asset.id} variant="outlined" sx={{ mb: 1, p: 1.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="body2" fontWeight="medium">
+                                    {asset.original_filename}
+                                </Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    <Chip 
+                                        label={formatRole(asset.role)} 
+                                        size="small" 
+                                        color={getRoleColor(asset.role)}
+                                    />
+                                    {asset.size_bytes && (
+                                        <Typography variant="caption" color="text.secondary">
+                                            {(asset.size_bytes / 1024 / 1024).toFixed(2)} MB
+                                        </Typography>
+                                    )}
+                                    <Typography variant="caption" color="text.secondary">
+                                        Uploaded: {new Date(asset.uploaded_at).toLocaleDateString()}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                            
+                            {/* Actions section */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <ProcessingColumn record={asset} onProcess={handleRefresh} />
+                                <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+                                <AssetDownloadButton record={asset} />
+                                <AssetDeleteButton record={asset} onDelete={handleRefresh} />
+                            </Box>
+                        </Box>
+                    </Card>
+                ))}
+                {(!tabularAssets || tabularAssets.length === 0) && (
+                    <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
+                        No data files uploaded yet. Upload Excel files (.xlsx) to process experiment data.
+                    </Typography>
+                )}
+            </Box>
+        </Box>
+    );
+};
+
+// Custom Assets List Component using direct API call
+const AssetsList = ({ 
+    filter, 
+    onAssetView, 
+    onRefresh 
+}: { 
+    filter: Record<string, any>; 
+    onAssetView: (asset: any) => void;
+    onRefresh: React.MutableRefObject<() => void>;
+}) => {
+    const record = useRecordContext();
+    const [page, setPage] = useState(1);
+    const [perPage, setPerPage] = useState(25);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    
+    const { data: assets, total, isLoading, refetch } = useGetList(
+        'assets',
+        {
+            filter: { experiment_id: record?.id, ...filter },
+            pagination: { page, perPage },
+            sort: { field: 'uploaded_at', order: 'DESC' }
+        }
+    );
+
+    // Refetch when onRefresh is called
+    useEffect(() => {
+        const refreshAssets = () => {
+            refetch();
+            setSelectedIds([]); // Clear selection on refresh
+        };
+        // Store refetch function so parent can call it
+        onRefresh.current = refreshAssets;
+    }, [refetch, onRefresh]);
+
+    const handleSelect = (ids: string[]) => {
+        setSelectedIds(ids);
+    };
+
+    const handleToggleItem = (id: string) => {
+        setSelectedIds(prev => 
+            prev.includes(id) 
+                ? prev.filter(selectedId => selectedId !== id)
+                : [...prev, id]
+        );
+    };
+
+    const handleUnselectItems = () => {
+        setSelectedIds([]);
+    };
+
+    if (isLoading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    return (
+        <ListContextProvider
+            value={{
+                data: assets || [],
+                total: total || 0,
+                isLoading,
+                selectedIds,
+                onSelect: handleSelect,
+                onToggleItem: handleToggleItem,
+                onUnselectItems: handleUnselectItems,
+                resource: 'assets',
+                displayedFilters: {},
+                filterValues: filter,
+                setFilters: () => {},
+                showFilter: () => {},
+                hideFilter: () => {},
+                sort: { field: 'uploaded_at', order: 'DESC' },
+                setSort: () => {},
+                page,
+                perPage,
+                setPage,
+                setPerPage,
+                hasCreate: false,
+                hasEdit: false,
+                hasShow: false,
+                hasList: true,
+                refetch,
+            }}
+        >
+            <Datagrid 
+                rowClick={false} 
+                bulkActionButtons={<AssetBulkActions />}
+                isRowSelectable={() => true}
+                size="small"
+                sx={{
+                    '& .MuiTableCell-root': {
+                        padding: '4px 8px',
+                        fontSize: '0.75rem',
+                    },
+                    '& .MuiTableRow-root': {
+                        minHeight: '32px',
+                    },
+                    '& .MuiChip-root': {
+                        height: '20px',
+                        fontSize: '0.65rem',
+                        '& .MuiChip-label': {
+                            paddingLeft: '6px',
+                            paddingRight: '6px',
+                        }
+                    }
+                }}
+            >
+                <TextField source="original_filename" />
+                <FunctionField
+                    label="Type"
+                    render={record => (
+                        <Chip 
+                            label={record.type || 'unknown'} 
+                            size="small" 
+                            color={getTypeColor(record.type)}
+                            variant="outlined"
+                        />
+                    )}
+                />
+                <FunctionField
+                    label="Role"
+                    render={record => (
+                        <Chip 
+                            label={formatRole(record.role)} 
+                            size="small" 
+                            color={getRoleColor(record.role)}
+                        />
+                    )}
+                />
+                <FunctionField
+                    source="size_bytes"
+                    render={(record) =>
+                        record.size_bytes
+                            ? `${(record.size_bytes / 1024 / 1024).toFixed(2)} MB`
+                            : ""
+                    }
+                />
+                <DateField source="uploaded_at" showTime label="Uploaded At" />
+                <FunctionField
+                    label="Actions"
+                    render={record => (
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <AssetDownloadButton record={record} />
+                            <AssetDeleteButton record={record} onDelete={() => refetch()} />
+                            <AssetViewButton record={record} onView={onAssetView} />
+                        </div>
+                    )}
+                />
+            </Datagrid>
+            <Pagination rowsPerPageOptions={[10, 25, 50, 100, 250]} />
+        </ListContextProvider>
+    );
+};
+
 const TabbedContent = () => {
     const record = useRecordContext();
     const refresh = useRefresh();
@@ -1059,9 +1311,17 @@ const TabbedContent = () => {
     const [assetRoleFilter, setAssetRoleFilter] = useState('all');
     const [filenameFilter, setFilenameFilter] = useState('');
     const [allowOverwrite, setAllowOverwrite] = useState(false);
+    const assetsRefreshRef = useRef(() => {});
     
-    // Get asset count for tab label
-    const assetCount = record?.assets?.length || 0;
+    // Use direct API call to get asset count for tab label
+    const { total: assetCount = 0 } = useGetList(
+        'assets',
+        {
+            filter: { experiment_id: record?.id },
+            pagination: { page: 1, perPage: 1 },
+            sort: { field: 'uploaded_at', order: 'DESC' }
+        }
+    );
     
     // Check if results are available
     const hasResults = record?.results && record.results.summary?.total_time_points > 0;
@@ -1132,63 +1392,7 @@ const TabbedContent = () => {
                 </Box>
                 
                 {/* Tabular Data Section */}
-                <Box sx={{ mb: 3 }}>
-                    <Typography variant="h6" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <DescriptionIcon color="primary" />
-                        Data Processing Files
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Tabular data for experiment data processing - always visible for easy access. Select one to process results from.
-                    </Typography>
-                    <ReferenceManyField
-                        reference="assets"
-                        target="experiment_id"
-                        label="Data Files"
-                        filter={{ type: 'tabular' }}
-                    >
-                        <Box>
-                            {record?.assets?.filter((asset: any) => asset.type === 'tabular').map((asset: any, index: number) => (
-                                <Card key={asset.id} variant="outlined" sx={{ mb: 1, p: 1.5 }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                        <Box sx={{ flex: 1 }}>
-                                            <Typography variant="body2" fontWeight="medium">
-                                                {asset.original_filename}
-                                            </Typography>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                                                <Chip 
-                                                    label={formatRole(asset.role)} 
-                                                    size="small" 
-                                                    color={getRoleColor(asset.role)}
-                                                />
-                                                {asset.size_bytes && (
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        {(asset.size_bytes / 1024 / 1024).toFixed(2)} MB
-                                                    </Typography>
-                                                )}
-                                                <Typography variant="caption" color="text.secondary">
-                                                    Uploaded: {new Date(asset.uploaded_at).toLocaleDateString()}
-                                                </Typography>
-                                            </Box>
-                                        </Box>
-                                        
-                                        {/* Actions section */}
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                            <ProcessingColumn record={asset} onProcess={refresh} />
-                                            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                                            <AssetDownloadButton record={asset} />
-                                            <AssetDeleteButton record={asset} onDelete={refresh} />
-                                        </Box>
-                                    </Box>
-                                </Card>
-                            ))}
-                            {(!record?.assets?.some((asset: any) => asset.type === 'tabular')) && (
-                                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', textAlign: 'center', py: 2 }}>
-                                    No data files uploaded yet. Upload Excel files (.xlsx) to process experiment data.
-                                </Typography>
-                            )}
-                        </Box>
-                    </ReferenceManyField>
-                </Box>
+                <TabularDataSection onRefresh={() => assetsRefreshRef.current()} />
 
                 {/* Asset Filters */}
                 <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -1246,83 +1450,15 @@ const TabbedContent = () => {
                         </Button>
                     )}
                 </Box>
-                <ReferenceManyField
-                    reference="assets"
-                    target="experiment_id"
-                    label="Tags"
-                    pagination={<Pagination rowsPerPageOptions={[10, 25, 50, 100, 250]} />}
+                <AssetsList
                     filter={{
                         ...(assetTypeFilter !== 'all' && { type: assetTypeFilter }),
                         ...(assetRoleFilter !== 'all' && { role: assetRoleFilter }),
                         ...(filenameFilter.trim() && { original_filename: filenameFilter.trim() })
                     }}
-                >
-                    <Datagrid 
-                        rowClick={false} 
-                        bulkActionButtons={<AssetBulkActions />}
-                        isRowSelectable={() => true}
-                        size="small"
-                        sx={{
-                            '& .MuiTableCell-root': {
-                                padding: '4px 8px', // Reduce cell padding
-                                fontSize: '0.75rem', // Smaller font size
-                            },
-                            '& .MuiTableRow-root': {
-                                minHeight: '32px', // Reduce row height
-                            },
-                            '& .MuiChip-root': {
-                                height: '20px', // Smaller chips
-                                fontSize: '0.65rem',
-                                '& .MuiChip-label': {
-                                    paddingLeft: '6px',
-                                    paddingRight: '6px',
-                                }
-                            }
-                        }}
-                    >
-                        <TextField source="original_filename" />
-                        <FunctionField
-                            label="Type"
-                            render={record => (
-                                <Chip 
-                                    label={record.type || 'unknown'} 
-                                    size="small" 
-                                    color={getTypeColor(record.type)}
-                                    variant="outlined"
-                                />
-                            )}
-                        />
-                        <FunctionField
-                            label="Role"
-                            render={record => (
-                                <Chip 
-                                    label={formatRole(record.role)} 
-                                    size="small" 
-                                    color={getRoleColor(record.role)}
-                                />
-                            )}
-                        />
-                        <FunctionField
-                            source="size_bytes"
-                            render={(record) =>
-                                record.size_bytes
-                                    ? `${(record.size_bytes / 1024 / 1024).toFixed(2)} MB`
-                                    : ""
-                            }
-                        />
-                        <DateField source="uploaded_at" showTime label="Uploaded At" />
-                        <FunctionField
-                            label="Actions"
-                            render={record => (
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <AssetDownloadButton record={record} />
-                                    <AssetDeleteButton record={record} onDelete={refresh} />
-                                    <AssetViewButton record={record} onView={handleAssetView} />
-                                </div>
-                            )}
-                        />
-                    </Datagrid>
-                </ReferenceManyField>
+                    onAssetView={handleAssetView}
+                    onRefresh={assetsRefreshRef}
+                />
                 </TabbedShowLayout.Tab>
             </TabbedShowLayout>
             <AssetImageViewer
