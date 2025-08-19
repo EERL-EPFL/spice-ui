@@ -73,7 +73,7 @@ const CreateComponent = () => {
                                         defaultValue={0}
                                     />
                                     <NumberInput
-                                        source="qty_x_axis"
+                                        source="qty_cols"
                                         label="Columns"
                                         helperText="Number of columns (numeric coordinate in microplate: 1, 2, 3, ...12)"
                                         validate={[required()]}
@@ -83,7 +83,7 @@ const CreateComponent = () => {
                                         defaultValue={12}
                                     />
                                     <NumberInput
-                                        source="qty_y_axis"
+                                        source="qty_rows"
                                         label="Rows"
                                         helperText="Number of rows (letter coordinate in microplate: A, B, C, ...H)"
                                         validate={[required()]}
@@ -105,12 +105,12 @@ const CreateComponent = () => {
                                 <Box sx={{ minWidth: 370, maxWidth: 420, flex: '0 0 370px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <FormDataConsumer>
                                         {({ scopedFormData }) => {
-                                            if (scopedFormData?.name && scopedFormData?.qty_x_axis && scopedFormData?.qty_y_axis) {
+                                            if (scopedFormData?.name && scopedFormData?.qty_cols && scopedFormData?.qty_rows) {
                                                 return (
                                                     <TrayDisplay
                                                         name={scopedFormData.name}
-                                                        qtyXAxis={parseInt(scopedFormData.qty_x_axis) || 8}
-                                                        qtyYAxis={parseInt(scopedFormData.qty_y_axis) || 12}
+                                                        qtyCols={parseInt(scopedFormData.qty_cols) || 8}
+                                                        qtyRows={parseInt(scopedFormData.qty_rows) || 12}
                                                         rotation={parseInt(scopedFormData.rotation_degrees) || 0}
                                                         wellDiameter={scopedFormData.well_relative_diameter || 6.4}
                                                         maxWidth={350}

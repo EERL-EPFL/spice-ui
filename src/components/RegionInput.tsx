@@ -101,16 +101,16 @@ const parseCell = (s: string, trayConfig?: any): Cell => {
 
   const match = s.match(/^([A-Za-z])(\d{1,2})$/);
   if (match) {
-    const col = letterToColIndex(match[1], trayConfig.qty_x_axis); // Letter maps to row index (but stored in col variable for grid positioning)
+    const col = letterToColIndex(match[1], trayConfig.qty_cols); // Letter maps to row index (but stored in col variable for grid positioning)
     const rowNumber = parseInt(match[2], 10);
     let row = numberToRowIndex(rowNumber); // Number maps to column index (but stored in row variable for grid positioning)
 
     // Validate bounds to prevent invalid coordinates
     if (
       row < 0 ||
-      row >= trayConfig.qty_y_axis ||
+      row >= trayConfig.qty_rows ||
       col < 0 ||
-      col >= trayConfig.qty_x_axis
+      col >= trayConfig.qty_cols
     ) {
       return { row: 0, col: 0 };
     }
@@ -126,71 +126,54 @@ const cellToString = (cell: Cell, trayConfig: any): string => {
   // Validate bounds before converting
   if (
     cell.row < 0 ||
-    cell.row >= trayConfig.qty_y_axis ||
+    cell.row >= trayConfig.qty_rows ||
     cell.col < 0 ||
-    cell.col >= trayConfig.qty_x_axis
+    cell.col >= trayConfig.qty_cols
   ) {
     return "A1"; // Return safe default
   }
 
-  const letter = colIndexToLetter(cell.col, trayConfig.qty_x_axis); // Grid col index maps to letter (row in microplate notation)
+  const letter = colIndexToLetter(cell.col, trayConfig.qty_cols); // Grid col index maps to letter (row in microplate notation)
   const rowNumber = cell.row + 1; // Grid row index maps to number (column in microplate notation)
   return `${letter}${rowNumber}`;
 };
 
 // Helper to convert a cell to string, considering tray rotation
+// This uses the exact same logic as getDisplayIndices in TrayDisplay.tsx and TrayGrid.tsx
 const cellToStringWithRotation = (
   cell: Cell,
   trayConfig: any,
   rotation: number,
 ): string => {
   
-  // The cell coordinates come from TrayGrid which are already in logical coordinates
-  // We need to convert these logical coordinates to visual microplate coordinates
-  // based on how the user sees the rotated tray
-  
-  // In microplate notation: Letter = Column (A,B,C...), Number = Row (1,2,3...)
-  // Standard microplate: A1 is top-left, H12 is bottom-right for 8x12 plate
-  
-  // For rotated trays, we need to map the logical coordinates to what the user visually sees
-  let visualRow: number;
-  let visualCol: number;
+  // Use the same getDisplayIndices logic from TrayDisplay.tsx
+  let xIndex: number;
+  let yIndex: number;
   
   switch (rotation) {
-    case 0:
-      // No rotation: logical coordinates match visual coordinates
-      visualRow = cell.row;
-      visualCol = cell.col;
-      break;
     case 90:
-      // 90° clockwise: visual row comes from logical col, visual col comes from logical row (reversed)
-      visualRow = cell.col;
-      visualCol = trayConfig.qty_y_axis - 1 - cell.row;
+      xIndex = cell.row;
+      yIndex = trayConfig.qty_cols - 1 - cell.col;
       break;
     case 180:
-      // 180°: both axes are reversed
-      visualRow = trayConfig.qty_y_axis - 1 - cell.row;
-      visualCol = trayConfig.qty_x_axis - 1 - cell.col;
+      xIndex = trayConfig.qty_cols - 1 - cell.col;
+      yIndex = trayConfig.qty_rows - 1 - cell.row;
       break;
     case 270:
-      // For 270° rotation: inverse of the storage transformation
-      // Storage: storageRow = xIndex, storageCol = qtyXAxis - 1 - yIndex
-      // To display storage(6,11) as G12: visualCol=6 (G), visualRow=11 (12)
-      visualRow = cell.col;
-      visualCol = cell.row;
+      xIndex = trayConfig.qty_rows - 1 - cell.row;
+      yIndex = cell.col;
       break;
-    default:
-      visualRow = cell.row;
-      visualCol = cell.col;
+    default: // 0 degrees
+      xIndex = cell.col;
+      yIndex = cell.row;
       break;
   }
   
-  // Convert to microplate notation: visualCol determines letter, visualRow determines number
-  const letter = String.fromCharCode(65 + visualCol);
-  const number = visualRow + 1;
+  // For microplate coordinates: row letter comes from yIndex, column number comes from xIndex
+  const letter = String.fromCharCode(65 + yIndex);
+  const number = xIndex + 1;
   
   const result = `${letter}${number}`;
-  // console.log(`COORD: ${cell.row},${cell.col} @${rotation}° -> ${result}`);
   
   return result;
 };
@@ -228,8 +211,8 @@ interface TrayConfig {
   order_sequence: number;
   rotation_degrees: number;
   name?: string;
-  qty_x_axis?: number;
-  qty_y_axis?: number;
+  qty_cols?: number;
+  qty_rows?: number;
   well_relative_diameter?: string;
 }
 
@@ -397,7 +380,7 @@ const WellDetailsDisplay: React.FC<{
           {formatSeconds(well.first_phase_change_seconds)}
         </Typography>
       )}
-      {(well.sample?.name || well.treatment?.sample?.name) && (
+      {(well.sample?.name || well.treatment?.sample?.name || well.sample_name) && (
         <Typography variant="body2" color="text.secondary">
           <strong>Sample:</strong>{" "}
           {(well.sample?.id || well.treatment?.sample?.id) ? (
@@ -411,10 +394,10 @@ const WellDetailsDisplay: React.FC<{
                 color: "primary.main",
               }}
             >
-              {well.sample?.name || well.treatment?.sample?.name}
+              {well.sample?.name || well.treatment?.sample?.name || well.sample_name}
             </MuiLink>
           ) : (
-            well.sample?.name || well.treatment?.sample?.name
+            well.sample?.name || well.treatment?.sample?.name || well.sample_name
           )}
         </Typography>
       )}
@@ -662,17 +645,16 @@ export const RegionInput: React.FC<{
   } = props;
   const [selectedWell, setSelectedWell] = useState<WellSummary | null>(null);
 
-  // Extract results summary from the experiment record for time point visualization
-  const resultsSummary: ExperimentResultsSummary | null =
-    record?.results_summary || null;
+  // Extract results from the experiment record for time point visualization
+  const results: any = record?.results || null;
 
   // Use external viewMode if provided, otherwise use internal state
   const [internalViewMode, setInternalViewMode] = useState<
     "regions" | "results"
   >(
     showTimePointVisualization &&
-      resultsSummary &&
-      resultsSummary.total_time_points > 0
+      results &&
+      results.summary?.total_time_points > 0
       ? "results"
       : "regions",
   );
@@ -680,11 +662,17 @@ export const RegionInput: React.FC<{
 
   // Calculate color scale based on freezing times for time point visualization
   const { colorScale, minSeconds, maxSeconds } = useMemo(() => {
-    if (!showTimePointVisualization || !resultsSummary?.sample_results) {
+    if (!showTimePointVisualization || !results?.trays) {
       return { colorScale: () => "#f5f5f5", minSeconds: 0, maxSeconds: 0 };
     }
 
-    const wellSummaries = flattenSampleResults(resultsSummary.sample_results);
+    // Extract all wells from all trays in the new structure
+    const wellSummaries = results.trays.flatMap((tray: any) => 
+      (tray.wells || []).map((well: any) => ({
+        first_phase_change_seconds: well.first_phase_change_time && results.summary?.first_timestamp ? 
+          Math.floor((new Date(well.first_phase_change_time).getTime() - new Date(results.summary.first_timestamp).getTime()) / 1000) : null
+      }))
+    );
     const freezingTimes = wellSummaries
       .filter((w) => w.first_phase_change_seconds !== null)
       .map((w) => w.first_phase_change_seconds!);
@@ -707,7 +695,7 @@ export const RegionInput: React.FC<{
       minSeconds: min,
       maxSeconds: max,
     };
-  }, [resultsSummary, showTimePointVisualization]);
+  }, [results, showTimePointVisualization]);
 
   // Function to properly assign sample/treatment to wells based on tray filtering
   const getCorrectSampleForWell = (
@@ -782,7 +770,6 @@ export const RegionInput: React.FC<{
         // Fetch temperature data for the experiment
         const response = await dataProvider.getOne("experiments", {
           id: record.id,
-          meta: { include_temperature_summary: true },
         });
 
         if (response.data?.temperature_summary?.average_temperatures_by_tray) {
@@ -1193,11 +1180,11 @@ export const RegionInput: React.FC<{
 
   // Memoize dependency for well summary computation
   const wellSummaryDeps = useMemo(() => ({
-    hasResults: !!resultsSummary?.sample_results,
+    hasResults: !!results?.trays,
     showTimePoint: showTimePointVisualization,
     flatTraysLength: flatTrays.length,
     regionsKey: regionsKey
-  }), [resultsSummary?.sample_results, showTimePointVisualization, flatTrays.length, regionsKey]);
+  }), [results?.trays, showTimePointVisualization, flatTrays.length, regionsKey]);
 
   // Compute well summary map after flatTrays is available
   React.useEffect(() => {
@@ -1207,7 +1194,24 @@ export const RegionInput: React.FC<{
     }
 
     const trayMaps = new Map<string, Map<string, WellSummary>>();
-    const wellSummaries = flattenSampleResults(resultsSummary.sample_results);
+    // Convert new tray-centric results to well summaries
+    const wellSummaries = results.trays.flatMap((tray: any) => 
+      (tray.wells || []).map((well: any) => ({
+        row_letter: well.row_letter,
+        column_number: well.column_number,
+        coordinate: well.coordinate,
+        tray_id: tray.tray_id,
+        tray_name: tray.tray_name,
+        first_phase_change_time: well.first_phase_change_time,
+        first_phase_change_seconds: well.first_phase_change_time && results.summary?.first_timestamp ? 
+          Math.floor((new Date(well.first_phase_change_time).getTime() - new Date(results.summary.first_timestamp).getTime()) / 1000) : null,
+        final_state: well.final_state || 'no_data',
+        sample_name: well.sample?.name || null,
+        treatment_name: well.treatment_name || null,
+        dilution_factor: well.dilution_factor || null,
+        sample: well.sample || null
+      }))
+    );
 
     wellSummaries.forEach((well) => {
       const trayName = well.tray_name || "unknown";
@@ -1230,7 +1234,7 @@ export const RegionInput: React.FC<{
     });
 
     setWellSummaryMapByTray(trayMaps);
-  }, [wellSummaryDeps, resultsSummary, regions, flatTrays]);
+  }, [wellSummaryDeps, results, regions, flatTrays]);
 
   // YAML export must be defined AFTER flatTrays is available
   const handleYAMLExport = useCallback(() => {
@@ -1349,8 +1353,8 @@ export const RegionInput: React.FC<{
 
           // Check if this region's coordinates are within this tray's bounds
           if (
-            region.row_max < (trayConfig.tray.qty_y_axis || 0) &&
-            region.col_max < (trayConfig.tray.qty_x_axis || 0)
+            region.row_max < (trayConfig.tray.qty_rows || 0) &&
+            region.col_max < (trayConfig.tray.qty_cols || 0)
           ) {
             return { ...region, tray_id: trayConfig.tray.order_sequence };
           }
@@ -1408,7 +1412,7 @@ export const RegionInput: React.FC<{
 
         {/* View Mode Toggle - only show when we have results data and not hidden */}
         {showTimePointVisualization &&
-          resultsSummary &&
+          results &&
           !props.hideInternalToggle && (
             <ToggleButtonGroup
               value={viewMode}
@@ -1503,8 +1507,8 @@ export const RegionInput: React.FC<{
                 </Typography>
                 <TrayGrid
                   tray={trayName}
-                  qtyXAxis={tray.qty_x_axis}
-                  qtyYAxis={tray.qty_y_axis}
+                  qtyCols={tray.qty_cols}
+                  qtyRows={tray.qty_rows}
                   orientation={rotation as Orientation}
                   onRegionSelect={
                     readOnly
@@ -1897,41 +1901,31 @@ export const RegionInput: React.FC<{
               {/* Results Content */}
               {viewMode === "results" &&
                 showTimePointVisualization &&
-                resultsSummary && (
+                results && (
                   <Box>
                     <Box display="flex" gap={1} flexWrap="wrap">
                       <Chip
-                        label={`${resultsSummary.total_time_points} time points`}
+                        label={`${results.summary.total_time_points} time points`}
                         color="primary"
                         size="small"
                       />
                       <Chip
-                        label={`${resultsSummary.wells_with_data} wells with data`}
+                        label={`${results.trays.flatMap((tray: any) => tray.wells || []).length} wells with data`}
                         color="info"
-                        size="small"
-                      />
-                      <Chip
-                        label={`${resultsSummary.wells_frozen} frozen wells`}
-                        color="warning"
-                        size="small"
-                      />
-                      <Chip
-                        label={`${resultsSummary.wells_liquid} liquid wells`}
-                        color="success"
                         size="small"
                       />
                     </Box>
 
-                    {resultsSummary.first_timestamp && (
+                    {results.summary.first_timestamp && (
                       <Box mt={2}>
                         <Typography variant="body2" color="text.secondary">
                           <strong>Start:</strong>{" "}
-                          {formatDateTime(resultsSummary.first_timestamp)}
+                          {formatDateTime(results.summary.first_timestamp)}
                         </Typography>
-                        {resultsSummary.last_timestamp && (
+                        {results.summary.last_timestamp && (
                           <Typography variant="body2" color="text.secondary">
                             <strong>End:</strong>{" "}
-                            {formatDateTime(resultsSummary.last_timestamp)}
+                            {formatDateTime(results.summary.last_timestamp)}
                           </Typography>
                         )}
                       </Box>

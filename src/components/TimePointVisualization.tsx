@@ -4,6 +4,7 @@ import {
     useGetOne
 } from 'react-admin';
 import { flattenSampleResults } from '../utils/experimentUtils';
+import { transformCellToWellCoordinate } from '../utils/coordinateTransforms';
 import { 
     Box, 
     Typography, 
@@ -62,8 +63,8 @@ interface TrayConfig {
     trays: Array<{
         id: string;
         name: string;
-        qty_x_axis: number;
-        qty_y_axis: number;
+        qty_cols: number;
+        qty_rows: number;
     }>;
 }
 
@@ -75,17 +76,30 @@ const TrayWellGrid: React.FC<{
     minSeconds: number;
     maxSeconds: number;
     onWellClick?: (well: WellSummary) => void;
+    trayConfigData?: any; // Add tray configuration data with rotation
 }> = ({ 
     tray,
     wellSummaries,
     colorScale,
     minSeconds,
     maxSeconds,
-    onWellClick
+    onWellClick,
+    trayConfigData
 }) => {
     const trayInfo = tray.trays[0];
-    const maxRows = trayInfo?.qty_y_axis || 8;
-    const maxCols = trayInfo?.qty_x_axis || 12;
+    const maxRows = trayInfo?.qty_rows || 8;
+    const maxCols = trayInfo?.qty_cols || 12;
+
+    // Get rotation from tray configuration data
+    const getTrayRotation = (trayId: string): number => {
+        if (!trayConfigData?.trays) return 0;
+        const trayConfig = trayConfigData.trays.find((t: any) => t.id === trayId);
+        console.log(`Looking for tray ${trayId}, found config:`, trayConfig);
+        return trayConfig?.rotation_degrees || 0;
+    };
+
+    const rotation = getTrayRotation(tray.id);
+    console.log(`Tray ${tray.name} (${tray.id}) rotation: ${rotation}°`);
 
     // Filter wells for this specific tray
     const trayWells = wellSummaries.filter(w => w.tray_id === tray.id);
@@ -100,7 +114,13 @@ const TrayWellGrid: React.FC<{
     });
 
     const getTooltipText = (well: WellSummary | undefined, row: number, col: number) => {
-        const coordinate = `${String.fromCharCode(65 + row)}${col + 1}`;
+        // Generate coordinate using rotation transformation
+        const coordinate = transformCellToWellCoordinate(
+            { row: row - 1, col: col - 1 }, // Convert to 0-based for the transform function
+            rotation,
+            maxCols,
+            maxRows
+        );
         if (!well) return `${coordinate}: No data`;
         
         const phaseText = well.final_state === 'frozen' ? 'Frozen' : 'Liquid';
@@ -115,6 +135,8 @@ const TrayWellGrid: React.FC<{
         if (well.sample_name) tooltip += `\nSample: ${well.sample_name}`;
         if (well.treatment_name) tooltip += `\nTreatment: ${well.treatment_name}`;
         if (well.dilution_factor) tooltip += `\nDilution: ${well.dilution_factor}`;
+        if (well.sample?.name) tooltip += `\nSample ID: ${well.sample.name}`;
+        if (well.treatment?.sample?.name) tooltip += `\nTreatment Sample: ${well.treatment.sample.name}`;
         
         return tooltip;
     };
@@ -126,7 +148,17 @@ const TrayWellGrid: React.FC<{
         for (let col = 1; col <= maxCols; col++) {
             const key = `${row}-${col}`;
             const well = wellMap[key];
-            const coordinate = `${String.fromCharCode(65 + row)}${col + 1}`;
+            // Generate coordinate using rotation transformation
+            const coordinate = transformCellToWellCoordinate(
+                { row: row - 1, col: col - 1 }, // Convert to 0-based for the transform function
+                rotation,
+                maxCols,
+                maxRows
+            );
+            // Debug logging for first few coordinates
+            if (row <= 2 && col <= 2) {
+                console.log(`Grid position (${row}, ${col}) -> cell (${row-1}, ${col-1}) -> coordinate: ${coordinate} (rotation: ${rotation}°)`);
+            }
             
             const backgroundColor = well?.first_phase_change_seconds !== null 
                 ? colorScale(well.first_phase_change_seconds)
@@ -167,7 +199,13 @@ const TrayWellGrid: React.FC<{
         grid.push(
             <Box key={`row-${row}`} display="flex" gap={0.5}>
                 <Box sx={{ width: 25, fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {String.fromCharCode(65 + row)}
+                    {/* Generate row label using the same coordinate for the first column */}
+                    {transformCellToWellCoordinate(
+                        { row: row - 1, col: 0 }, // First column of this row
+                        rotation,
+                        maxCols,
+                        maxRows
+                    ).charAt(0)}
                 </Box>
                 {rowCells}
             </Box>
@@ -179,7 +217,13 @@ const TrayWellGrid: React.FC<{
     for (let col = 1; col <= maxCols; col++) {
         colHeaders.push(
             <Box key={`col-${col}`} sx={{ width: 30, fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {col}
+                {/* Generate column label using the same coordinate for the first row */}
+                {transformCellToWellCoordinate(
+                    { row: 0, col: col - 1 }, // First row of this column
+                    rotation,
+                    maxCols,
+                    maxRows
+                ).slice(1)}
             </Box>
         );
     }
@@ -217,19 +261,36 @@ export const TimePointVisualization = () => {
         { enabled: !!record?.tray_configuration_id }
     );
 
-    // Extract results summary from the experiment record
-    const resultsSummary: ExperimentResultsSummary | null = record?.results_summary || null;
+    // Debug tray configuration
+    React.useEffect(() => {
+        if (trayConfiguration) {
+            console.log('Tray configuration loaded:', trayConfiguration);
+        }
+    }, [trayConfiguration]);
 
-    // Calculate color scale based on freezing times
+    // Extract results from the experiment record (new tray-centric structure)
+    const results: any = record?.results || null;
+
+    // Calculate color scale based on freezing times from new tray-centric structure
     const { colorScale, minSeconds, maxSeconds } = useMemo(() => {
-        if (!resultsSummary?.sample_results) {
+        if (!results?.trays) {
             return { colorScale: () => '#f5f5f5', minSeconds: 0, maxSeconds: 0 };
         }
 
-        const wellSummaries = flattenSampleResults(resultsSummary.sample_results);
-        const freezingTimes = wellSummaries
-            .filter(w => w.first_phase_change_seconds !== null)
-            .map(w => w.first_phase_change_seconds!);
+        // Extract all wells from all trays
+        const allWells = results.trays.flatMap((tray: any) => tray.wells || []);
+        const freezingTimes = allWells
+            .filter((w: any) => w.first_phase_change_time !== null)
+            .map((w: any) => {
+                // Calculate seconds from start time if we have timestamps
+                if (w.first_phase_change_time && results.summary?.first_timestamp) {
+                    const freezeTime = new Date(w.first_phase_change_time).getTime();
+                    const startTime = new Date(results.summary.first_timestamp).getTime();
+                    return Math.floor((freezeTime - startTime) / 1000);
+                }
+                return null;
+            })
+            .filter((time: number | null) => time !== null);
 
         if (freezingTimes.length === 0) {
             return { colorScale: () => '#f5f5f5', minSeconds: 0, maxSeconds: 0 };
@@ -250,7 +311,7 @@ export const TimePointVisualization = () => {
             minSeconds: min,
             maxSeconds: max
         };
-    }, [resultsSummary]);
+    }, [results]);
 
     if (trayLoading) {
         return (
@@ -268,7 +329,7 @@ export const TimePointVisualization = () => {
         );
     }
 
-    if (!resultsSummary || resultsSummary.total_time_points === 0) {
+    if (!results || !results.summary || results.summary.total_time_points === 0) {
         return (
             <Alert severity="info">
                 No time point data available. Upload a merged.xlsx file to see phase change visualization.
@@ -289,10 +350,16 @@ export const TimePointVisualization = () => {
     // Get all trays from configuration
     const trays: TrayConfig[] = trayConfiguration?.trays || [];
 
+    // Calculate summary statistics from tray data
+    const allWells = results.trays.flatMap((tray: any) => tray.wells || []);
+    const wellsWithData = allWells.length;
+    const wellsFrozen = allWells.filter((w: any) => w.final_state === 'frozen').length;
+    const wellsLiquid = allWells.filter((w: any) => w.final_state === 'liquid').length;
+
     return (
         <Box>
             <Typography variant="h6" gutterBottom>
-                Results Visualisation ({resultsSummary.total_time_points} time points)
+                Results Visualisation ({results.summary.total_time_points} time points)
             </Typography>
 
             <Grid container spacing={2}>
@@ -305,35 +372,25 @@ export const TimePointVisualization = () => {
                             </Typography>
                             <Box display="flex" flexDirection="column" gap={1}>
                                 <Chip 
-                                    label={`${resultsSummary.total_time_points} time points`}
+                                    label={`${results.summary.total_time_points} time points`}
                                     color="primary"
                                     size="small"
                                 />
                                 <Chip 
-                                    label={`${resultsSummary.wells_with_data} wells with data`}
+                                    label={`${wellsWithData} wells with data`}
                                     color="info"
-                                    size="small"
-                                />
-                                <Chip 
-                                    label={`${resultsSummary.wells_frozen} frozen wells`}
-                                    color="warning"
-                                    size="small"
-                                />
-                                <Chip 
-                                    label={`${resultsSummary.wells_liquid} liquid wells`}
-                                    color="success"
                                     size="small"
                                 />
                             </Box>
                             
-                            {resultsSummary.first_timestamp && (
+                            {results.summary.first_timestamp && (
                                 <Box mt={2}>
                                     <Typography variant="body2" color="text.secondary">
-                                        <strong>Start:</strong> {formatDateTime(resultsSummary.first_timestamp)}
+                                        <strong>Start:</strong> {formatDateTime(results.summary.first_timestamp)}
                                     </Typography>
-                                    {resultsSummary.last_timestamp && (
+                                    {results.summary.last_timestamp && (
                                         <Typography variant="body2" color="text.secondary">
-                                            <strong>End:</strong> {formatDateTime(resultsSummary.last_timestamp)}
+                                            <strong>End:</strong> {formatDateTime(results.summary.last_timestamp)}
                                         </Typography>
                                     )}
                                 </Box>
@@ -353,14 +410,19 @@ export const TimePointVisualization = () => {
                                             <strong>Freezing time:</strong> {formatSeconds(selectedWell.first_phase_change_seconds)}
                                         </Typography>
                                     )}
-                                    {selectedWell.sample_name && (
+                                    {(selectedWell.sample_name || selectedWell.sample?.name) && (
                                         <Typography variant="body2">
-                                            <strong>Sample:</strong> {selectedWell.sample_name}
+                                            <strong>Sample:</strong> {selectedWell.sample?.name || selectedWell.sample_name}
                                         </Typography>
                                     )}
-                                    {selectedWell.treatment_name && (
+                                    {(selectedWell.treatment_name || selectedWell.treatment?.name) && (
                                         <Typography variant="body2">
-                                            <strong>Treatment:</strong> {selectedWell.treatment_name}
+                                            <strong>Treatment:</strong> {selectedWell.treatment?.name || selectedWell.treatment_name}
+                                        </Typography>
+                                    )}
+                                    {selectedWell.treatment?.sample?.name && (
+                                        <Typography variant="body2">
+                                            <strong>Treatment Sample:</strong> {selectedWell.treatment.sample.name}
                                         </Typography>
                                     )}
                                     {selectedWell.dilution_factor && (
@@ -423,18 +485,48 @@ export const TimePointVisualization = () => {
                             </Alert>
                         ) : (
                             <Box sx={{ display: 'flex', gap: 2, minWidth: 'fit-content' }}>
-                                {trays.map((tray) => (
-                                    <Box key={tray.id} sx={{ flexShrink: 0 }}>
+                                {results.trays.map((resultTray: any) => {
+                                    console.log('Rendering tray:', resultTray.tray_id, resultTray.tray_name);
+                                    return (
+                                    <Box key={resultTray.tray_id} sx={{ flexShrink: 0 }}>
+                                        {/* Convert tray result wells to the expected format */}
                                         <TrayWellGrid
-                                            tray={tray}
-                                            wellSummaries={flattenSampleResults(resultsSummary.sample_results)}
+                                            tray={{
+                                                id: resultTray.tray_id,
+                                                name: resultTray.tray_name || `Tray ${resultTray.tray_id}`,
+                                                order_sequence: 1,
+                                                trays: [{
+                                                    id: resultTray.tray_id,
+                                                    name: resultTray.tray_name || `Tray ${resultTray.tray_id}`,
+                                                    qty_cols: 12, // Default to 96-well plate
+                                                    qty_rows: 8
+                                                }]
+                                            }}
+                                            wellSummaries={resultTray.wells.map((well: any) => ({
+                                                row_letter: well.row_letter,
+                                                column_number: well.column_number,
+                                                coordinate: well.coordinate,
+                                                tray_id: resultTray.tray_id,
+                                                first_phase_change_time: well.first_phase_change_time,
+                                                first_phase_change_seconds: well.first_phase_change_time && results.summary?.first_timestamp ? 
+                                                    Math.floor((new Date(well.first_phase_change_time).getTime() - new Date(results.summary.first_timestamp).getTime()) / 1000) : null,
+                                                final_state: well.final_state || 'no_data',
+                                                sample_name: well.sample?.name || null,
+                                                treatment_name: well.treatment_name || null,
+                                                dilution_factor: well.dilution_factor || null,
+                                                // Pass through full objects for linking
+                                                sample: well.sample || null,
+                                                treatment: well.treatment || null
+                                            }))}
                                             colorScale={colorScale}
                                             minSeconds={minSeconds}
                                             maxSeconds={maxSeconds}
                                             onWellClick={setSelectedWell}
+                                            trayConfigData={trayConfiguration}
                                         />
                                     </Box>
-                                ))}
+                                    );
+                                })}
                             </Box>
                         )}
                     </Box>

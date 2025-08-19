@@ -40,8 +40,8 @@ const TrayConfigurationDisplay = () => {
                         <Box display="flex" justifyContent="center">
                             <TrayDisplay
                                 name={tray.name}
-                                qtyXAxis={tray.qty_x_axis}
-                                qtyYAxis={tray.qty_y_axis}
+                                qtyCols={tray.qty_cols}
+                                qtyRows={tray.qty_rows}
                                 rotation={tray.rotation_degrees}
                                 wellDiameter={tray.well_relative_diameter}
                             />

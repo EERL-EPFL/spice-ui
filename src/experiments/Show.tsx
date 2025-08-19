@@ -297,7 +297,7 @@ const RegionsDisplay = ({ viewMode }: { viewMode: string }) => {
     }
 
     // Check if we have time point data to show visualization
-    const hasTimePointData = record?.results_summary && record.results_summary.total_time_points > 0;
+    const hasTimePointData = record?.results && record.results.summary?.total_time_points > 0;
 
     // Handler for when user clicks on well to view image
     const handleWellImageClick = (wellSummary: any) => {
@@ -1064,7 +1064,7 @@ const TabbedContent = () => {
     const assetCount = record?.assets?.length || 0;
     
     // Check if results are available
-    const hasResults = record?.results_summary && record.results_summary.total_time_points > 0;
+    const hasResults = record?.results && record.results.summary?.total_time_points > 0;
     
     // Auto-switch to Results view when results become newly available
     useEffect(() => {

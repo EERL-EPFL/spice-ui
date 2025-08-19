@@ -6,8 +6,8 @@ const BASE_SPACING = 30;
 
 export interface TrayDisplayProps {
     name: string;
-    qtyXAxis: number;  // number of columns (wells horizontally)
-    qtyYAxis: number;  // number of rows (wells vertically)
+    qtyCols: number;  // number of columns (wells horizontally)
+    qtyRows: number;  // number of rows (wells vertically)
     rotation: number;  // rotation in degrees
     wellDiameter?: string; // relative diameter (not used for display but could be)
     maxWidth?: number; // Maximum width constraint
@@ -16,13 +16,13 @@ export interface TrayDisplayProps {
 
 const TrayDisplay: React.FC<TrayDisplayProps> = ({
     name,
-    qtyXAxis,
-    qtyYAxis,
+    qtyCols,
+    qtyRows,
     rotation,
     maxWidth = 500,
     maxHeight = 400,
 }) => {
-    // Generate row letters dynamically based on qtyYAxis
+    // Generate row letters dynamically based on qtyRows
     const generateRowLetters = (count: number): string[] => {
         const letters = [];
         for (let i = 0; i < count; i++) {
@@ -31,12 +31,12 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
         return letters;
     };
 
-    const rowLetters = generateRowLetters(qtyYAxis);
+    const rowLetters = generateRowLetters(qtyRows);
 
     // Calculate SVG dimensions and scaling
     const isRotated90or270 = rotation === 90 || rotation === 270;
-    const displayCols = isRotated90or270 ? qtyYAxis : qtyXAxis;
-    const displayRows = isRotated90or270 ? qtyXAxis : qtyYAxis;
+    const displayCols = isRotated90or270 ? qtyRows : qtyCols;
+    const displayRows = isRotated90or270 ? qtyCols : qtyRows;
 
     // Calculate scale to fit within maxWidth and maxHeight constraints
     const TITLE_HEIGHT = 32;
@@ -62,11 +62,11 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
     const getDisplayIndices = (row: number, col: number) => {
         switch (rotation) {
             case 90:
-                return { xIndex: row, yIndex: qtyXAxis - 1 - col };
+                return { xIndex: row, yIndex: qtyCols - 1 - col };
             case 180:
-                return { xIndex: qtyXAxis - 1 - col, yIndex: qtyYAxis - 1 - row };
+                return { xIndex: qtyCols - 1 - col, yIndex: qtyRows - 1 - row };
             case 270:
-                return { xIndex: qtyYAxis - 1 - row, yIndex: col };
+                return { xIndex: qtyRows - 1 - row, yIndex: col };
             default: // 0 degrees
                 return { xIndex: col, yIndex: row };
         }
@@ -86,8 +86,8 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
         const getColumnLabel = (displayCol: number) => {
             switch (rotation) {
                 case 0: return String(displayCol + 1);  // 1,2,3...
-                case 90: return String.fromCharCode(65 + (qtyYAxis - 1 - displayCol));  // H,G,F... (corrected)
-                case 180: return String(qtyXAxis - displayCol);  // 12,11,10...
+                case 90: return String.fromCharCode(65 + (qtyRows - 1 - displayCol));  // H,G,F... (corrected)
+                case 180: return String(qtyCols - displayCol);  // 12,11,10...
                 case 270: return String.fromCharCode(65 + displayCol);  // A,B,C... (corrected)
             }
         };
@@ -97,8 +97,8 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
             switch (rotation) {
                 case 0: return String.fromCharCode(65 + displayRow);  // A,B,C...
                 case 90: return String(displayRow + 1);  // 1,2,3... (corrected)
-                case 180: return String.fromCharCode(65 + (qtyYAxis - 1 - displayRow));  // H,G,F...
-                case 270: return String(qtyXAxis - displayRow);  // 12,11,10... (corrected)
+                case 180: return String.fromCharCode(65 + (qtyRows - 1 - displayRow));  // H,G,F...
+                case 270: return String(qtyCols - displayRow);  // 12,11,10... (corrected)
             }
         };
         
@@ -148,8 +148,8 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
 
     const wellPositions = (() => {
         const positions = [];
-        for (let logicalRow = 0; logicalRow < qtyYAxis; logicalRow++) {
-            for (let logicalCol = 0; logicalCol < qtyXAxis; logicalCol++) {
+        for (let logicalRow = 0; logicalRow < qtyRows; logicalRow++) {
+            for (let logicalCol = 0; logicalCol < qtyCols; logicalCol++) {
                 const { xIndex, yIndex } = getDisplayIndices(logicalRow, logicalCol);
                 positions.push({
                     cx: LABEL_MARGIN + xIndex * SPACING,
@@ -194,7 +194,7 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
                     fontSize={13 * scale}
                     fill="#666"
                 >
-                    {qtyXAxis} × {qtyYAxis} wells
+                    {qtyCols} × {qtyRows} wells
                 </text>
                 {/* Top labels */}
                 {topLabels.map((label, idx) => (

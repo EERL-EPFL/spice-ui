@@ -29,8 +29,8 @@ const TrayConfigurationItem = ({ trayConfig, configIndex }: { trayConfig: any, c
                     <Grid item key={trayIndex}>
                         <TrayDisplay
                             name={tray.name || `Tray ${trayIndex + 1}`}
-                            qtyXAxis={tray.qty_x_axis || 8}
-                            qtyYAxis={tray.qty_y_axis || 12}
+                            qtyCols={tray.qty_cols || 8}
+                            qtyRows={tray.qty_rows || 12}
                             rotation={trayConfig.rotation_degrees || 0}
                             wellDiameter={tray.well_relative_diameter}
                             maxWidth={450}
@@ -127,7 +127,7 @@ const EditComponent = () => {
                                         fullWidth
                                     />
                                     <NumberInput
-                                        source="qty_x_axis"
+                                        source="qty_cols"
                                         label="Columns"
                                         helperText="Number of columns (numeric coordinate in microplate: 1, 2, 3, ...12)"
                                         validate={[required()]}
@@ -136,7 +136,7 @@ const EditComponent = () => {
                                         fullWidth
                                     />
                                     <NumberInput
-                                        source="qty_y_axis"
+                                        source="qty_rows"
                                         label="Rows"
                                         helperText="Number of rows (letter coordinate in microplate: A, B, C, ...H)"
                                         validate={[required()]}
@@ -157,12 +157,12 @@ const EditComponent = () => {
                                 <Box sx={{ minWidth: 370, maxWidth: 420, flex: '0 0 370px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <FormDataConsumer>
                                         {({ scopedFormData }) => {
-                                            if (scopedFormData?.name && scopedFormData?.qty_x_axis && scopedFormData?.qty_y_axis) {
+                                            if (scopedFormData?.name && scopedFormData?.qty_cols && scopedFormData?.qty_rows) {
                                                 return (
                                                     <TrayDisplay
                                                         name={scopedFormData.name}
-                                                        qtyXAxis={parseInt(scopedFormData.qty_x_axis) || 8}
-                                                        qtyYAxis={parseInt(scopedFormData.qty_y_axis) || 12}
+                                                        qtyCols={parseInt(scopedFormData.qty_cols) || 8}
+                                                        qtyRows={parseInt(scopedFormData.qty_rows) || 12}
                                                         rotation={parseInt(scopedFormData.rotation_degrees) || 0}
                                                         wellDiameter={scopedFormData.well_relative_diameter || 6.4}
                                                         maxWidth={350}

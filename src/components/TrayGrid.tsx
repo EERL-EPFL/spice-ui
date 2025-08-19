@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Tooltip } from '@mui/material';
+import { buildRotatedWellGrid } from '../utils/matrixTransform';
 
 //
 // Renders a dynamic tray of wells with deep, colorblind-safe overlays.
@@ -8,13 +9,13 @@ import { Tooltip } from '@mui/material';
 //
 // Props:
 //   - tray: string (tray name)
-//   - qtyXAxis: number (columns)
-//   - qtyYAxis: number (rows)
+//   - qtyCols: number (columns)
+//   - qtyRows: number (rows)
 //   - orientation: 0 | 90 | 180 | 270
 //   - onRegionSelect: ({ tray, upperLeft: Cell, lowerRight: Cell }) => void
 //   - existingRegions?: Array<{ upperLeft: Cell; lowerRight: Cell; name: string; color: string; onRemove: () => void; }>
 //
-// A "Cell" is { row: 0..qtyYAxis-1, col: 0..qtyXAxis-1 } in logical coordinates.
+// A "Cell" is { row: 0..qtyRows-1, col: 0..qtyCols-1 } in logical coordinates.
 //
 
 // Generate dynamic column letters based on tray dimensions
@@ -75,6 +76,13 @@ export interface WellSummary {
     treatment_id?: string;
     dilution_factor: number | null;
     // Full objects with UUIDs for UI linking
+    sample?: {
+        id: string;
+        name: string;
+        type?: string;
+        location_id?: string;
+        [key: string]: any; // Allow for additional sample fields
+    };
     treatment?: {
         id: string;
         name: string;
@@ -101,8 +109,8 @@ export interface WellSummary {
 
 export interface TrayGridProps {
     tray: string;
-    qtyXAxis: number;
-    qtyYAxis: number;
+    qtyCols: number;
+    qtyRows: number;
     orientation: Orientation;
     onRegionSelect: (region: { tray: string; upperLeft: Cell; lowerRight: Cell; hasOverlap?: boolean }) => void;
     existingRegions?: ExistingRegion[];
@@ -118,8 +126,8 @@ export interface TrayGridProps {
 
 const TrayGrid: React.FC<TrayGridProps> = ({
     tray,
-    qtyXAxis,
-    qtyYAxis,
+    qtyCols,
+    qtyRows,
     orientation,
     onRegionSelect,
     existingRegions = [],
@@ -131,6 +139,14 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     viewMode = 'regions',
     selectedWell = null,
 }) => {
+    // Build well grid using matrix transformations with proper naming
+    const wellGrid = React.useMemo(() => {
+        // Note: qtyCols represents columns, qtyRows represents rows
+        const cols = qtyCols;  // number of columns (1-12 typical)
+        const rows = qtyRows;  // number of rows (A-H typical)
+        
+        return buildRotatedWellGrid(orientation, cols, rows);
+    }, [tray, orientation, qtyCols, qtyRows]);
     // Helper function to format seconds as minutes and seconds
     const formatSeconds = (seconds: number | null | undefined) => {
         if (seconds === null || seconds === undefined) return 'N/A';
@@ -146,41 +162,17 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     // Use the explicit readOnly prop instead of trying to detect it
     const isDisplayMode = readOnly;
 
-    const columnLetters = generateColumnLetters(qtyXAxis);
+    const columnLetters = generateColumnLetters(qtyCols);
 
     // Helper function to get well summary for a cell
     const getWellSummary = (row: number, col: number): WellSummary | undefined => {
         if (!showTimePointVisualization || !wellSummaryMap) return undefined;
-        // Convert grid coordinates to well coordinate string (e.g., "A6")
-        // Standard notation: row index -> letter (A,B,C), column index -> number (1,2,3)
-        const coordinate = `${String.fromCharCode(65 + row)}${col + 1}`;
+        // Use the matrix-based coordinate transformation
+        const coordinate = wellGrid[row]?.[col] || 'ERR';
+        if (coordinate === 'ERR') return undefined;
+        
         const well = wellSummaryMap.get(coordinate);
-        
-        
         return well;
-    };
-
-    // Helper function to get tooltip text for a well
-    const getTooltipText = (row: number, col: number): string => {
-        const well = getWellSummary(row, col);
-        const coordinate = `${String.fromCharCode(65 + row)}${col + 1}`;
-        
-        if (!well) return `${coordinate}: No data`;
-        
-        const phaseText = well.final_state === 'frozen' ? 'Frozen' : 'Liquid';
-        let tooltip = `${coordinate}: ${phaseText}`;
-        
-        if (well.first_phase_change_seconds !== null && well.first_phase_change_seconds !== undefined) {
-            const minutes = Math.floor(well.first_phase_change_seconds / 60);
-            const seconds = well.first_phase_change_seconds % 60;
-            tooltip += `\nFreezing time: ${minutes}m ${seconds}s`;
-        }
-        
-        if (well.treatment?.sample?.name) tooltip += `\nSample: ${well.treatment.sample.name}`;
-        if (well.treatment?.name) tooltip += `\nTreatment: ${well.treatment.name}`;
-        if (well.dilution_factor) tooltip += `\nDilution: ${well.dilution_factor}`;
-        
-        return tooltip;
     };
 
     // Check if a cell would cause overlap if selected
@@ -208,11 +200,11 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 break;
             case 270:
                 storageRow = xIndex;
-                storageCol = qtyXAxis - 1 - yIndex;
+                storageCol = qtyCols - 1 - yIndex;
                 break;
             case 180:
-                storageRow = qtyYAxis - 1 - yIndex;
-                storageCol = qtyXAxis - 1 - xIndex;
+                storageRow = qtyRows - 1 - yIndex;
+                storageCol = qtyCols - 1 - xIndex;
                 break;
             default: // 0°
                 storageRow = yIndex;
@@ -249,18 +241,20 @@ const TrayGrid: React.FC<TrayGridProps> = ({
 
     // Calculate display dimensions based on orientation
     const isRotated90or270 = orientation === 90 || orientation === 270;
-    const displayCols = isRotated90or270 ? qtyYAxis : qtyXAxis;
-    const displayRows = isRotated90or270 ? qtyXAxis : qtyYAxis;
+    const displayCols = isRotated90or270 ? qtyRows : qtyCols;
+    const displayRows = isRotated90or270 ? qtyCols : qtyRows;
 
     // Convert a logical (row,col) → displayed (xIndex,yIndex) depending on orientation:
     const getDisplayIndices = (row: number, col: number) => {
         switch (orientation) {
             case 90:
-                return { xIndex: row, yIndex: qtyXAxis - 1 - col };
+                // Swapped: was 270° logic
+                return { xIndex: qtyRows - 1 - row, yIndex: col };
             case 180:
-                return { xIndex: qtyXAxis - 1 - col, yIndex: qtyYAxis - 1 - row };
+                return { xIndex: qtyCols - 1 - col, yIndex: qtyRows - 1 - row };
             case 270:
-                return { xIndex: qtyYAxis - 1 - row, yIndex: col };
+                // Swapped: was 90° logic  
+                return { xIndex: row, yIndex: qtyCols - 1 - col };
             default: // 0 degrees
                 return { xIndex: col, yIndex: row };
         }
@@ -276,6 +270,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     };
 
     const handleMouseDown = (row: number, col: number) => {
+        
         // If in time point visualization mode and there's a well click handler, handle click
         if (showTimePointVisualization && onWellClick) {
             const well = getWellSummary(row, col);
@@ -349,11 +344,11 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                         // Click position (row=1,col=0) with display indices (xIndex=6,yIndex=0)
                         // Should map to storage that represents G12 (row=6,col=11)
                         storageRow = xIndex;
-                        storageCol = qtyXAxis - 1 - yIndex;
+                        storageCol = qtyCols - 1 - yIndex;
                         break;
                     case 180:
-                        storageRow = qtyYAxis - 1 - yIndex;
-                        storageCol = qtyXAxis - 1 - xIndex;
+                        storageRow = qtyRows - 1 - yIndex;
+                        storageCol = qtyCols - 1 - xIndex;
                         break;
                     default: // 0°
                         storageRow = yIndex;
@@ -430,8 +425,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
         const getColumnLabel = (displayCol: number) => {
             switch (orientation) {
                 case 0: return String(displayCol + 1);  // 1,2,3...
-                case 90: return String.fromCharCode(65 + (qtyYAxis - 1 - displayCol));  // H,G,F...
-                case 180: return String(qtyXAxis - displayCol);  // 12,11,10...
+                case 90: return String.fromCharCode(65 + (qtyRows - 1 - displayCol));  // H,G,F...
+                case 180: return String(qtyCols - displayCol);  // 12,11,10...
                 case 270: return String.fromCharCode(65 + displayCol);  // A,B,C...
                 default: return String(displayCol + 1);
             }
@@ -442,8 +437,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
             switch (orientation) {
                 case 0: return String.fromCharCode(65 + displayRow);  // A,B,C...
                 case 90: return String(displayRow + 1);  // 1,2,3...
-                case 180: return String.fromCharCode(65 + (qtyYAxis - 1 - displayRow));  // H,G,F...
-                case 270: return String(qtyXAxis - displayRow);  // 12,11,10...
+                case 180: return String.fromCharCode(65 + (qtyRows - 1 - displayRow));  // H,G,F...
+                case 270: return String(qtyCols - displayRow);  // 12,11,10...
                 default: return String.fromCharCode(65 + displayRow);
             }
         };
@@ -493,18 +488,26 @@ const TrayGrid: React.FC<TrayGridProps> = ({
     const { topLabels, leftLabels, bottomLabels, rightLabels } = getLabels();
 
     // Create wells render function to use in two places
-    const renderWells = (onTop = false) => Array.from({ length: qtyYAxis }).map((_, rowIdx) =>
-        Array.from({ length: qtyXAxis }).map((_, colIdx) => {
+    const renderWells = (onTop = false) => Array.from({ length: qtyRows }).map((_, rowIdx) =>
+        Array.from({ length: qtyCols }).map((_, colIdx) => {
             const { xIndex, yIndex } = getDisplayIndices(rowIdx, colIdx);
             const cx = leftMargin + xIndex * SPACING;
             const cy = topMargin + yIndex * SPACING;
+            
             const selected = !isDisplayMode && isCellInSelection(rowIdx, colIdx);
             const hovered = !isDisplayMode && isCellHovered(rowIdx, colIdx);
             const well = getWellSummary(rowIdx, colIdx);
 
             const fillColor = getWellColor(rowIdx, colIdx, selected, hovered);
 
-            const coordinate = `${String.fromCharCode(65 + rowIdx)}${colIdx + 1}`;
+            // Use the matrix-based coordinate generation
+            // rowIdx and colIdx are the logical grid positions (what we're iterating through)
+            // The wellGrid tells us what well coordinate should appear at each position
+            const matrixCoordinate = wellGrid[rowIdx]?.[colIdx] || 'ERR';
+            
+            // Use well data coordinate if available, otherwise use matrix-generated
+            const coordinate = well?.coordinate || matrixCoordinate;
+            
             // Capture well data at render time to prevent race conditions
             const currentWell = well;
             const tooltipContent = currentWell && showTimePointVisualization ? (
@@ -696,19 +699,19 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                         y2 = lowerRight.col;
                         break;
                     case 270:
-                        // For 270°: When storing, we used: storageRow = xIndex, storageCol = qtyXAxis - 1 - yIndex
+                        // For 270°: When storing, we used: storageRow = xIndex, storageCol = qtyCols - 1 - yIndex
                         // To draw stored coordinates back:
-                        // xIndex = storageRow, yIndex = qtyXAxis - 1 - storageCol
+                        // xIndex = storageRow, yIndex = qtyCols - 1 - storageCol
                         x1 = upperLeft.row;
-                        y1 = qtyXAxis - 1 - upperLeft.col;
+                        y1 = qtyCols - 1 - upperLeft.col;
                         x2 = lowerRight.row;
-                        y2 = qtyXAxis - 1 - lowerRight.col;
+                        y2 = qtyCols - 1 - lowerRight.col;
                         break;
                     case 180:
-                        x1 = qtyXAxis - 1 - upperLeft.col;
-                        y1 = qtyYAxis - 1 - upperLeft.row;
-                        x2 = qtyXAxis - 1 - lowerRight.col;
-                        y2 = qtyYAxis - 1 - lowerRight.row;
+                        x1 = qtyCols - 1 - upperLeft.col;
+                        y1 = qtyRows - 1 - upperLeft.row;
+                        x2 = qtyCols - 1 - lowerRight.col;
+                        y2 = qtyRows - 1 - lowerRight.row;
                         break;
                     default: // 0°
                         x1 = upperLeft.col;
