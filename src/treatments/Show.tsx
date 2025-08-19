@@ -42,6 +42,7 @@ import {
 } from "@mui/material";
 import { CheckCircle, Cancel } from "@mui/icons-material";
 import { treatmentName } from ".";
+import { formatEnzymeVolume } from "../utils/formatters";
 
 const ExperimentalResultsTable = () => {
   const record = useRecordContext();
@@ -382,9 +383,12 @@ const TabbedContentWithCounts = () => {
 
           <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
             <Labeled>
-              <NumberField
+              <FunctionField
                 source="enzyme_volume_litres"
                 label="Enzyme Volume (L)"
+                render={(record) => {
+                  return `${formatEnzymeVolume(record.enzyme_volume_litres)}L`;
+                }}
               />
             </Labeled>
             <Labeled>

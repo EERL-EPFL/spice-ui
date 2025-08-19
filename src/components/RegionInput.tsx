@@ -104,42 +104,26 @@ const cellToString = (cell: Cell, trayConfig: any): string => {
 };
 
 // Helper to convert a cell to string, considering tray rotation
-// This uses the exact same logic as getDisplayIndices in TrayDisplay.tsx and TrayGrid.tsx
+// This converts stored numeric coordinates directly to scientific notation
 const cellToStringWithRotation = (
   cell: Cell,
   trayConfig: any,
   rotation: number,
 ): string => {
-  // Use the same getDisplayIndices logic from TrayDisplay.tsx
-  let xIndex: number;
-  let yIndex: number;
+  // For stored coordinates in the database:
+  // - cell.row represents the logical row (0-7 for A-H)
+  // - cell.col represents the logical column (0-11 for 1-12)
+  // 
+  // The rotation affects how these are displayed, but the stored coordinates
+  // are already in the correct logical format for direct conversion
 
-  switch (rotation) {
-    case 90:
-      xIndex = cell.row;
-      yIndex = trayConfig.qty_cols - 1 - cell.col;
-      break;
-    case 180:
-      xIndex = trayConfig.qty_cols - 1 - cell.col;
-      yIndex = trayConfig.qty_rows - 1 - cell.row;
-      break;
-    case 270:
-      xIndex = trayConfig.qty_rows - 1 - cell.row;
-      yIndex = cell.col;
-      break;
-    default: // 0 degrees
-      xIndex = cell.col;
-      yIndex = cell.row;
-      break;
-  }
+  // Convert stored coordinates directly to scientific notation
+  // Row index maps to letter (A, B, C, ..., H)
+  // Column index maps to number (1, 2, 3, ..., 12)
+  const letter = String.fromCharCode(65 + cell.row);
+  const number = cell.col + 1;
 
-  // For microplate coordinates: row letter comes from yIndex, column number comes from xIndex
-  const letter = String.fromCharCode(65 + yIndex);
-  const number = xIndex + 1;
-
-  const result = `${letter}${number}`;
-
-  return result;
+  return `${letter}${number}`;
 };
 
 interface SingleRegion {
@@ -909,7 +893,7 @@ export const RegionInput: React.FC<{
           row_max: lowerRight.row,
           display_colour_hex: color,
           treatment_id: "",
-          dilution_factor: 1,
+          dilution_factor: undefined,
           is_background_key: false, // Default to false
         },
       ];
@@ -1141,7 +1125,7 @@ export const RegionInput: React.FC<{
                       row_max: lowerRightCell.row,
                       display_colour_hex: color,
                       treatment_id: "",
-                      dilution_factor: 1,
+                      dilution_factor: undefined,
                       is_background_key: false, // Default to false
                     });
                   }
@@ -1756,18 +1740,21 @@ export const RegionInput: React.FC<{
                                 size="small"
                                 compact={true}
                                 filteredTreatments={props.filteredTreatments}
-                                existingRegionTreatments={regions
-                                  .map((region, index) => ({
-                                    regionName:
-                                      region.name || `Region ${index + 1}`,
-                                    regionIndex: index,
-                                    treatment: region.treatment || {
-                                      id: region.treatment_id || "",
-                                      name: "Unknown Treatment",
-                                    },
-                                    dilution_factor: region.dilution_factor,
-                                  }))
-                                  .filter((rt) => rt.treatment.id)} // Only include regions with treatments
+                                existingRegionTreatments={enhancedRegions
+                                  .map((region, index) => {
+                                    // Only include regions that have actual treatment data
+                                    if (!region.treatment || !region.treatment.id) {
+                                      return null;
+                                    }
+                                    
+                                    return {
+                                      regionName: region.name || `Region ${index + 1}`,
+                                      regionIndex: index,
+                                      treatment: region.treatment,
+                                      dilution_factor: region.dilution_factor,
+                                    };
+                                  })
+                                  .filter((rt) => rt !== null)} // Only include valid region treatments
                                 currentRegionIndex={idx}
                                 currentRegionName={
                                   r.name || `Region ${idx + 1}`

@@ -37,6 +37,7 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { sampleType } from ".";
 import { treatmentName } from "../treatments";
+import { formatEnzymeVolume } from "../utils/formatters";
 
 const ShowActions = () => {
   const { permissions } = usePermissions();
@@ -96,7 +97,7 @@ const TreatmentItem = () => {
           <Chip label={treatmentDisplay} color="primary" variant="outlined" />
           {treatment.enzyme_volume_litres && (
             <Typography variant="body2" color="text.secondary">
-              Enzyme: {treatment.enzyme_volume_litres}L
+              Enzyme: {formatEnzymeVolume(treatment.enzyme_volume_litres)}L
             </Typography>
           )}
           {treatment.notes && treatment.notes !== "Default treatment" && (

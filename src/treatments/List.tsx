@@ -13,6 +13,7 @@ import {
 } from "react-admin";
 import { postFilters } from "../filters/list";
 import { treatmentName } from ".";
+import { formatEnzymeVolume } from "../utils/formatters";
 const ListComponentActions = () => {
   const { permissions } = usePermissions();
   return (
@@ -45,7 +46,13 @@ export const ListComponent = () => {
         <ReferenceField source="sample_id" reference="samples" link="show">
           <TextField source="name" />
         </ReferenceField>
-        <NumberField source="enzyme_volume_litres" label="Enzyme Volume (L)" />
+        <FunctionField
+          source="enzyme_volume_litres"
+          label="Enzyme Volume (L)"
+          render={(record) => {
+            return `${formatEnzymeVolume(record.enzyme_volume_litres)}L`;
+          }}
+        />
         <DateField source="last_updated" label="Last Updated" showTime />
       </Datagrid>
     </List>
