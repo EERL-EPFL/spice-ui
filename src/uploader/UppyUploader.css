@@ -1,32 +1,32 @@
 #progressbar,
 #statusbar,
 #dragdrop {
-    margin: 20px 0;
+  margin: 20px 0;
 }
 
 #progressbar .uppy-ProgressBar-inner {
-    background-color: #4caf50;
-    /* Custom color for progress bar */
+  background-color: #4caf50;
+  /* Custom color for progress bar */
 }
 
 /* Styling now handled in the component via sx prop */
 
 #statusbar {
-    margin-top: 20px;
-    text-align: center;
+  margin-top: 20px;
+  text-align: center;
 }
 
 .uppy-DragDrop-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .uppy-DragDrop-inner {
-    max-width: 100%;
-    padding: 20px;
+  max-width: 100%;
+  padding: 20px;
 }
 
 .uppy-StatusBar-actions .uppy-StatusBar-action {
-    margin: 0 10px;
+  margin: 0 10px;
 }

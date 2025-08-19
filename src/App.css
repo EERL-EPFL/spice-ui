@@ -1,14 +1,14 @@
 .leaflet-tooltip.small-tooltip {
-    padding: 1px 4px !important;
-    font-size: 1em !important;
-    font-weight: bold;
-    white-space: nowrap;
-    line-height: 1;
-    background: rgba(255, 255, 255, 0.8) !important;
-    border-radius: 2px;
+  padding: 1px 4px !important;
+  font-size: 1em !important;
+  font-weight: bold;
+  white-space: nowrap;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.8) !important;
+  border-radius: 2px;
 }
 
 .leaflet-tooltip.small-tooltip span {
-    padding: 1px 3px;
-    margin: 0;
+  padding: 1px 3px;
+  margin: 0;
 }
