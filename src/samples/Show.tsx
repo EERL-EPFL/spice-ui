@@ -24,10 +24,20 @@ import {
   Labeled,
   WithRecord,
 } from "react-admin";
-import { Card, CardContent, Typography, Accordion, AccordionSummary, AccordionDetails, Box, Chip } from "@mui/material";
+import {
+  Card,
+  CardContent,
+  Typography,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Box,
+  Chip,
+} from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { sampleType } from ".";
 import { treatmentName } from "../treatments";
+import { formatEnzymeVolume } from "../utils/formatters";
 
 const ShowActions = () => {
   const { permissions } = usePermissions();
@@ -46,7 +56,7 @@ const ShowActions = () => {
 // Component to display treatment details with proper react-admin patterns
 const TreatmentsList = () => {
   const record = useRecordContext();
-  
+
   if (!record?.treatments || record.treatments.length === 0) {
     return <Typography>No treatments available</Typography>;
   }
@@ -64,7 +74,7 @@ const TreatmentsList = () => {
 const TreatmentItem = () => {
   const treatment = useRecordContext();
   const [expanded, setExpanded] = React.useState(false);
-  
+
   if (!treatment) return null;
 
   const handleChange = (event: React.SyntheticEvent, isExpanded: boolean) => {
@@ -75,21 +85,19 @@ const TreatmentItem = () => {
   const hasResults = treatment.experimental_results?.length > 0;
 
   return (
-    <Accordion 
-      expanded={expanded} 
+    <Accordion
+      expanded={expanded}
       onChange={handleChange}
-      sx={{ width: '100%', mb: 2 }}
+      sx={{ width: "100%", mb: 2 }}
     >
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-          <Chip 
-            label={treatmentDisplay} 
-            color="primary" 
-            variant="outlined"
-          />
+        <Box
+          sx={{ display: "flex", alignItems: "center", gap: 2, width: "100%" }}
+        >
+          <Chip label={treatmentDisplay} color="primary" variant="outlined" />
           {treatment.enzyme_volume_litres && (
             <Typography variant="body2" color="text.secondary">
-              Enzyme: {treatment.enzyme_volume_litres}L
+              Enzyme: {formatEnzymeVolume(treatment.enzyme_volume_litres)}L
             </Typography>
           )}
           {treatment.notes && treatment.notes !== "Default treatment" && (
@@ -98,10 +106,11 @@ const TreatmentItem = () => {
             </Typography>
           )}
           {hasResults && (
-            <Typography variant="body2" sx={{ ml: 'auto', mr: 2 }}>
-              {treatment.experimental_results.length} results | 
-              {treatment.statistics?.success_rate ? 
-                ` ${(treatment.statistics.success_rate * 100).toFixed(0)}% success` : ''}
+            <Typography variant="body2" sx={{ ml: "auto", mr: 2 }}>
+              {treatment.experimental_results.length} results |
+              {treatment.statistics?.success_rate
+                ? ` ${(treatment.statistics.success_rate * 100).toFixed(0)}% success`
+                : ""}
             </Typography>
           )}
         </Box>
@@ -110,7 +119,9 @@ const TreatmentItem = () => {
         {hasResults ? (
           <DilutionSummaries treatment={treatment} />
         ) : (
-          <Typography color="text.secondary">No experimental results</Typography>
+          <Typography color="text.secondary">
+            No experimental results
+          </Typography>
         )}
       </AccordionDetails>
     </Accordion>
@@ -119,7 +130,10 @@ const TreatmentItem = () => {
 
 // Display dilution summaries for a treatment
 const DilutionSummaries = ({ treatment }) => {
-  if (!treatment.dilution_summaries || treatment.dilution_summaries.length === 0) {
+  if (
+    !treatment.dilution_summaries ||
+    treatment.dilution_summaries.length === 0
+  ) {
     return <Typography>No dilution data available</Typography>;
   }
 
@@ -128,11 +142,11 @@ const DilutionSummaries = ({ treatment }) => {
       <Typography variant="h6" gutterBottom>
         Dilution Factor Analysis
       </Typography>
-      
+
       {/* Summary table of dilutions */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Datagrid 
+          <Datagrid
             data={treatment.dilution_summaries}
             bulkActionButtons={false}
             rowClick={false}
@@ -140,22 +154,27 @@ const DilutionSummaries = ({ treatment }) => {
             <TextField source="dilution_factor" label="Dilution Factor" />
             <FunctionField
               label="Wells"
-              render={record => `${record.statistics.frozen_count}/${record.statistics.total_wells}`}
+              render={(record) =>
+                `${record.statistics.frozen_count}/${record.statistics.total_wells}`
+              }
             />
             <FunctionField
               label="Success Rate"
-              render={record => `${(record.statistics.success_rate * 100).toFixed(1)}%`}
+              render={(record) =>
+                `${(record.statistics.success_rate * 100).toFixed(1)}%`
+              }
             />
             <FunctionField
               label="Mean Temp (°C)"
-              render={record => 
-                record.statistics.mean_nucleation_temp_celsius?.toFixed(2) || '-'
+              render={(record) =>
+                record.statistics.mean_nucleation_temp_celsius?.toFixed(2) ||
+                "-"
               }
             />
             <FunctionField
               label="Median Time (s)"
-              render={record => 
-                record.statistics.median_nucleation_time_seconds || '-'
+              render={(record) =>
+                record.statistics.median_nucleation_time_seconds || "-"
               }
             />
           </Datagrid>
@@ -177,29 +196,29 @@ const DilutionSummaries = ({ treatment }) => {
 // Display individual well results for a specific dilution
 const DilutionDetails = ({ dilutionSummary, experimentalResults }) => {
   const [expanded, setExpanded] = React.useState(false);
-  
+
   // Filter results for this dilution factor
   const dilutionResults = experimentalResults.filter(
-    result => result.dilution_factor === dilutionSummary.dilution_factor
+    (result) => result.dilution_factor === dilutionSummary.dilution_factor,
   );
 
   // Create paginated list context
   const listContext = useList({
     data: dilutionResults,
     perPage: 5,
-    sort: { field: 'well_coordinate', order: 'ASC' },
+    sort: { field: "well_coordinate", order: "ASC" },
   });
 
   return (
-    <Accordion 
+    <Accordion
       expanded={expanded}
       onChange={(e, isExpanded) => setExpanded(isExpanded)}
       sx={{ mb: 1 }}
     >
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Typography>
-          Dilution {dilutionSummary.dilution_factor}× — 
-          {' '}{dilutionResults.length} wells
+          Dilution {dilutionSummary.dilution_factor}× — {dilutionResults.length}{" "}
+          wells
         </Typography>
       </AccordionSummary>
       <AccordionDetails>
@@ -207,22 +226,30 @@ const DilutionDetails = ({ dilutionSummary, experimentalResults }) => {
           <Datagrid bulkActionButtons={false} rowClick={false}>
             <TextField source="well_coordinate" label="Well" sortable />
             <TextField source="tray_name" label="Tray" sortable />
-            <ReferenceField source="experiment_id" reference="experiments" link="show" label="Experiment" sortable>
+            <ReferenceField
+              source="experiment_id"
+              reference="experiments"
+              link="show"
+              label="Experiment"
+              sortable
+            >
               <TextField source="name" />
             </ReferenceField>
             <FunctionField
               label="Time (s)"
               source="nucleation_time_seconds"
-              render={record => record.nucleation_time_seconds || '-'}
+              render={(record) => record.nucleation_time_seconds || "-"}
               sortable
             />
             <FunctionField
               label="Temp (°C)"
               source="nucleation_temperature_avg_celsius"
-              render={record => 
-                record.nucleation_temperature_avg_celsius 
-                  ? parseFloat(record.nucleation_temperature_avg_celsius).toFixed(2)
-                  : '-'
+              render={(record) =>
+                record.nucleation_temperature_avg_celsius
+                  ? parseFloat(
+                      record.nucleation_temperature_avg_celsius,
+                    ).toFixed(2)
+                  : "-"
               }
               sortable
             />
@@ -246,52 +273,59 @@ const SampleInfo = () => {
         <Typography variant="h5" gutterBottom>
           {record.name}
         </Typography>
-        
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+
+        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
           <Labeled label="Sample Type">
-            <TextField source="type" transform={value => sampleType[value] || value} />
+            <TextField
+              source="type"
+              transform={(value) => sampleType[value] || value}
+            />
           </Labeled>
-          
+
           {record.location_id && (
             <Labeled label="Location">
-              <ReferenceField source="location_id" reference="locations" link="show">
+              <ReferenceField
+                source="location_id"
+                reference="locations"
+                link="show"
+              >
                 <TextField source="name" />
               </ReferenceField>
             </Labeled>
           )}
-          
+
           {record.well_volume_litres && (
             <Labeled label="Well Volume (L)">
               <NumberField source="well_volume_litres" />
             </Labeled>
           )}
-          
+
           {record.suspension_volume_litres && (
             <Labeled label="Suspension Volume (L)">
               <NumberField source="suspension_volume_litres" />
             </Labeled>
           )}
-          
+
           {record.material_description && (
             <Labeled label="Material">
               <TextField source="material_description" />
             </Labeled>
           )}
-          
+
           {record.extraction_procedure && (
             <Labeled label="Extraction">
               <TextField source="extraction_procedure" />
             </Labeled>
           )}
-          
+
           {record.remarks && (
-            <Labeled label="Remarks" sx={{ gridColumn: 'span 2' }}>
+            <Labeled label="Remarks" sx={{ gridColumn: "span 2" }}>
               <TextField source="remarks" />
             </Labeled>
           )}
         </Box>
-        
-        <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+
+        <Box sx={{ mt: 2, display: "flex", gap: 2 }}>
           <Typography variant="caption" color="text.secondary">
             Created: <DateField source="created_at" showTime />
           </Typography>
