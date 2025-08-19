@@ -7,6 +7,7 @@ export const CustomMenu = () => {
   return (
     <Menu>
       <DashboardMenuItem />
+      
       <Divider sx={{ my: 1 }} />
       {/* Projects */}
       {resources.projects && (
@@ -17,7 +18,6 @@ export const CustomMenu = () => {
           leftIcon={resources.projects.icon ? <resources.projects.icon /> : null}
         />
       )}
-
       {/* Trays */}
       {resources.tray_configurations && (
         <MenuItemLink
@@ -28,7 +28,6 @@ export const CustomMenu = () => {
         />
       )}
 
-      {/* First Divider - before main entities */}
       <Divider sx={{ my: 1 }} />
 
       {/* Locations */}

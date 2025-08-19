@@ -79,7 +79,6 @@ const TreatmentItem = () => {
     setExpanded(isExpanded);
   };
 
-  const treatmentDisplay = treatmentName[treatment.name] || treatment.name;
   const hasResults = treatment.experimental_results?.length > 0;
 
   return (
@@ -127,7 +126,7 @@ const TreatmentItem = () => {
 };
 
 // Display dilution summaries for a treatment
-const DilutionSummaries = ({ treatment }) => {
+const DilutionSummaries = ({ treatment }: { treatment: any }) => {
   if (
     !treatment.dilution_summaries ||
     treatment.dilution_summaries.length === 0
@@ -180,7 +179,7 @@ const DilutionSummaries = ({ treatment }) => {
       </Card>
 
       {/* Detailed results by dilution */}
-      {treatment.dilution_summaries.map((dilutionSummary) => (
+      {treatment.dilution_summaries.map((dilutionSummary: any) => (
         <DilutionDetails
           key={dilutionSummary.dilution_factor}
           dilutionSummary={dilutionSummary}
@@ -192,7 +191,7 @@ const DilutionSummaries = ({ treatment }) => {
 };
 
 // Display individual well results for a specific dilution
-const DilutionDetails = ({ dilutionSummary, experimentalResults }) => {
+const DilutionDetails = ({ dilutionSummary, experimentalResults }: { dilutionSummary: any; experimentalResults: any[] }) => {
   const [expanded, setExpanded] = React.useState(false);
 
   // Filter results for this dilution factor

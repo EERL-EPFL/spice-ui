@@ -13,11 +13,16 @@ import {
   SimpleFormIterator,
 } from "react-admin";
 import { Box, Typography, Divider } from "@mui/material";
+import { useLocation } from "react-router-dom";
 import { SampleCoordinateInput } from "../components/SampleCoordinateInput";
 
-const CreateComponent = () => (
-  <Create redirect="show">
-    <SimpleForm>
+const CreateComponent = () => {
+  const location = useLocation();
+  const prefilledLocationId = location.state?.record?.location_id;
+
+  return (
+    <Create redirect="show">
+      <SimpleForm>
       <Box sx={{ width: "100%" }}>
         <Typography variant="h6" gutterBottom>
           Sample Information
@@ -40,7 +45,11 @@ const CreateComponent = () => (
             <>
               {/* Location - hidden for procedural blank */}
               {formData.type !== "procedural_blank" && (
-                <ReferenceInput source="location_id" reference="locations">
+                <ReferenceInput 
+                  source="location_id" 
+                  reference="locations"
+                  defaultValue={prefilledLocationId}
+                >
                   <SelectInput
                     optionText="name"
                     validate={required()}
@@ -165,8 +174,9 @@ const CreateComponent = () => (
           )}
         </FormDataConsumer>
       </Box>
-    </SimpleForm>
-  </Create>
-);
+      </SimpleForm>
+    </Create>
+  );
+};
 
 export default CreateComponent;

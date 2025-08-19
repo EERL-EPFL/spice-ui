@@ -18,7 +18,8 @@ import {
   useRecordContext,
   Labeled,
 } from "react-admin";
-import { Box, Typography, Card, CardContent, Chip } from "@mui/material";
+import { Box, Typography, Card, CardContent, Chip, Button } from "@mui/material";
+import { Add as AddIcon } from "@mui/icons-material";
 import { treatmentName } from "../treatments";
 import { LocationConvexHullMap } from "../components/LocationConvexHullMap";
 import { TreatmentChips } from "../components/TreatmentChips";
@@ -116,6 +117,60 @@ const TabLabelWithCount = ({ label, count }: { label: string; count: number }) =
   </Box>
 );
 
+// Samples tab content with create button
+const SamplesTabContent = () => {
+  const record = useRecordContext();
+  const redirect = useRedirect();
+  const createPath = useCreatePath();
+
+  const handleCreateSample = () => {
+    // Use redirect with state data to prefill the location_id
+    redirect('create', 'samples', undefined, {}, { record: { location_id: record?.id } });
+  };
+
+  return (
+    <Box>
+      {/* Header with create button */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleCreateSample}
+          size="small"
+        >
+          Create Sample
+        </Button>
+      </Box>
+
+      {/* Samples data grid */}
+      <ArrayField source="samples">
+        <Datagrid
+          bulkActionButtons={false}
+          rowClick={(id) => {
+            return createPath({ resource: "samples", id, type: "show" });
+          }}
+        >
+          <TextField source="name" />
+          <FunctionField
+            source="type"
+            label="Type"
+            render={(record) => (
+              <SampleTypeChip sampleType={record.type} />
+            )}
+          />
+          <FunctionField
+            source="treatments"
+            label="Treatments"
+            render={(record) => (
+              <TreatmentChips treatments={record.treatments} />
+            )}
+          />
+        </Datagrid>
+      </ArrayField>
+    </Box>
+  );
+};
+
 export const ShowComponent = () => {
   const redirect = useRedirect();
   const createPath = useCreatePath();
@@ -137,30 +192,7 @@ export const ShowComponent = () => {
               />
             }
           >
-            <ArrayField source="samples">
-              <Datagrid
-                bulkActionButtons={false}
-                rowClick={(id) => {
-                  return createPath({ resource: "samples", id, type: "show" });
-                }}
-              >
-                <TextField source="name" />
-                <FunctionField
-                  source="type"
-                  label="Type"
-                  render={(record) => (
-                    <SampleTypeChip sampleType={record.type} />
-                  )}
-                />
-                <FunctionField
-                  source="treatments"
-                  label="Treatments"
-                  render={(record) => (
-                    <TreatmentChips treatments={record.treatments} />
-                  )}
-                />
-              </Datagrid>
-            </ArrayField>
+            <SamplesTabContent />
           </TabbedShowLayout.Tab>
           <TabbedShowLayout.Tab 
             label={

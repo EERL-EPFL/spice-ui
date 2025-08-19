@@ -7,9 +7,6 @@ import {
   CreateButton,
   ExportButton,
   DateField,
-  NumberField,
-  ReferenceField,
-  ReferenceManyCount,
 } from "react-admin";
 import { postFilters } from "../filters/list";
 
