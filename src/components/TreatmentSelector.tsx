@@ -1039,21 +1039,27 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                   Cancel
                 </Button>
 
-                <ButtonGroup variant="contained">
-                  <Button onClick={handleSelect} disabled={!treatmentId}>
-                    Select for {currentRegionName}
-                  </Button>
+                <Box display="flex" gap={1}>
                   {onApplyToAll && (
                     <Button
                       onClick={handleApplyToAll}
                       disabled={!treatmentId}
                       startIcon={<SelectAllIcon />}
-                      sx={{ borderLeft: "1px solid rgba(255,255,255,0.3)" }}
+                      variant="contained"
+                      color="warning"
                     >
                       Apply to All Regions
                     </Button>
                   )}
-                </ButtonGroup>
+                  <Button 
+                    onClick={handleSelect} 
+                    disabled={!treatmentId}
+                    variant="contained"
+                    color="primary"
+                  >
+                    Select for {currentRegionName}
+                  </Button>
+                </Box>
               </Box>
             </Box>
           </DialogContent>
