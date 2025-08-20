@@ -187,11 +187,29 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
             filter: { sample_id: sampleId },
           });
 
-          // Enrich treatments with usage information and treatment details
+          // Fetch the full sample with location data
+          const { data: fullSample } = await dataProvider.getOne("samples", { id: sampleId });
+          let sampleWithLocation = fullSample;
+          
+          // If sample has location_id, fetch the location data
+          if (fullSample.location_id) {
+            try {
+              const { data: location } = await dataProvider.getOne("locations", { id: fullSample.location_id });
+              sampleWithLocation = {
+                ...fullSample,
+                campaign: {
+                  location: location
+                }
+              };
+            } catch (error) {
+            }
+          }
+
+          // Enrich treatments with usage information and full sample+location data
           const enrichedTreatments = treatments.map((treatment: any) => ({
             id: treatment.id,
             name: treatment.name,
-            sample: sampleGroup.sample,
+            sample: sampleWithLocation, // Now includes location data
             enzyme_volume_litres: treatment.enzyme_volume_litres,
             notes: treatment.notes,
             usedInRegions: sampleGroup.usedTreatments.get(treatment.id) || []
@@ -233,22 +251,37 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
     >
   >(new Map());
 
-  // Get treatment name from ID - optimized to prevent infinite loops
+  // Get treatment name from ID - no caching to avoid stale data issues
   const getTreatmentName = useCallback(async () => {
     if (!value)
       return { location: "", sample: "", treatment: "", sampleType: "" };
 
-    // Check cache first to avoid redundant API calls
-    if (treatmentDisplayCache.has(value)) {
-      return treatmentDisplayCache.get(value)!;
-    }
+    console.log(`getTreatmentName: Processing ${value}, treatmentsBySample.length=${treatmentsBySample.length}, existingRegionTreatments.length=${existingRegionTreatments.length}`);
+
+    // Skip cache entirely to avoid corruption issues
 
     try {
-      // Check if it's from existing treatments first
+      // Priority 1: Check enhanced treatments by sample structure (has location info)
+      const enhancedTreatment = treatmentsBySample
+        .flatMap(sg => sg.treatments)
+        .find(t => t.id === value);
+      if (enhancedTreatment && enhancedTreatment.sample) {
+        console.log(`getTreatmentName: Found in treatmentsBySample with location: ${enhancedTreatment.sample.campaign?.location?.name || 'none'}`);
+        const result = {
+          location: enhancedTreatment.sample.campaign?.location?.name || "",
+          sample: enhancedTreatment.sample.name,
+          treatment: treatmentName[enhancedTreatment.name] || enhancedTreatment.name,
+          sampleType: enhancedTreatment.sample.type || "",
+        };
+        return result;
+      }
+
+      // Priority 2: Check existing treatments (may have location info)
       const existingTreatment = existingRegionTreatments.find(
         (rt) => rt.treatment.id === value,
       );
       if (existingTreatment && existingTreatment.treatment.sample) {
+        console.log(`getTreatmentName: Found in existingRegionTreatments with location: ${existingTreatment.treatment.sample.campaign?.location?.name || 'none'}`);
         const result = {
           location:
             existingTreatment.treatment.sample.campaign?.location?.name || "",
@@ -256,36 +289,30 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
           treatment: treatmentName[existingTreatment.treatment.name] || existingTreatment.treatment.name,
           sampleType: existingTreatment.treatment.sample.type || "",
         };
-        setTreatmentDisplayCache((prev) => new Map(prev).set(value, result));
         return result;
       }
 
-      // Check if it's from loaded options
+      // Priority 3: Check loaded treatment options (fallback)
       const loadedTreatment = treatmentOptions.find((t) => t.id === value);
       if (loadedTreatment && loadedTreatment.sample) {
+        console.log(`getTreatmentName: Found in treatmentOptions with location: ${loadedTreatment.sample.campaign?.location?.name || 'none'}`);
         const result = {
           location: loadedTreatment.sample.campaign?.location?.name || "",
           sample: loadedTreatment.sample.name,
           treatment: treatmentName[loadedTreatment.name] || loadedTreatment.name,
           sampleType: loadedTreatment.sample.type || "",
         };
-        setTreatmentDisplayCache((prev) => new Map(prev).set(value, result));
         return result;
       }
 
-      // Fallback: fetch from API (only if not cached)
+      // Priority 4: Fallback to API fetch
+      console.log(`getTreatmentName: Falling back to API fetch for ${value}`);
       const { data: treatment } = await dataProvider.getOne("treatments", {
         id: value,
       });
       if (!treatment) {
-        const result = {
-          location: "",
-          sample: "",
-          treatment: "",
-          sampleType: "",
-        };
-        setTreatmentDisplayCache((prev) => new Map(prev).set(value, result));
-        return result;
+        console.log(`getTreatmentName: Treatment ${value} not found`);
+        return { location: "", sample: "", treatment: "", sampleType: "" };
       }
 
       // Get the sample for this treatment
@@ -293,14 +320,8 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
         id: treatment.sample_id,
       });
       if (!sample) {
-        const result = {
-          location: "",
-          sample: "",
-          treatment: treatment.name,
-          sampleType: "",
-        };
-        setTreatmentDisplayCache((prev) => new Map(prev).set(value, result));
-        return result;
+        console.log(`getTreatmentName: Sample not found for treatment ${value}`);
+        return { location: "", sample: "", treatment: treatment.name, sampleType: "" };
       }
 
       // Get the location for this sample (if not procedural blank)
@@ -316,26 +337,19 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
         }
       }
 
+      console.log(`getTreatmentName: API fetch complete with location: ${locationName || 'none'}`);
       const result = {
         location: locationName,
         sample: sample.name,
         treatment: treatmentName[treatment.name] || treatment.name,
         sampleType: sample.type || "",
       };
-      setTreatmentDisplayCache((prev) => new Map(prev).set(value, result));
       return result;
     } catch (error) {
       console.error("Error fetching treatment hierarchy:", error);
-      const result = {
-        location: "",
-        sample: "",
-        treatment: "",
-        sampleType: "",
-      };
-      setTreatmentDisplayCache((prev) => new Map(prev).set(value, result));
-      return result;
+      return { location: "", sample: "", treatment: "", sampleType: "" };
     }
-  }, [value, dataProvider]); // Removed problematic dependencies
+  }, [value, dataProvider, treatmentsBySample, existingRegionTreatments, treatmentOptions]); // Added all data sources
 
   // Display the selected treatment name
   const [displayValue, setDisplayValue] = useState<{
@@ -437,6 +451,11 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
         const enrichedTreatments = await Promise.all(
           data.map(async (treatment: any) => {
             try {
+              // Skip treatments without valid sample_id
+              if (!treatment.sample_id) {
+                return treatment;
+              }
+              
               const { data: sampleData } = await dataProvider.getOne(
                 "samples",
                 { id: treatment.sample_id },

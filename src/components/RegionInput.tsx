@@ -1047,11 +1047,28 @@ export const RegionInput: React.FC<{
                 id: treatment.sample_id,
               });
 
+              // If sample has location_id, fetch the location data
+              let enhancedSample = sample;
+              if (sample.location_id) {
+                try {
+                  const { data: location } = await dataProvider.getOne("locations", {
+                    id: sample.location_id,
+                  });
+                  enhancedSample = {
+                    ...sample,
+                    campaign: {
+                      location: location,
+                    },
+                  };
+                } catch (error) {
+                }
+              }
+
               return {
                 ...region,
                 treatment: {
                   ...treatment,
-                  sample: sample,
+                  sample: enhancedSample, // Now includes location data
                 },
               };
             } catch (error) {
