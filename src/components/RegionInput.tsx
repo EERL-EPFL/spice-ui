@@ -383,6 +383,11 @@ const WellDetailsDisplay: React.FC<{
           <strong>Dilution:</strong> {well.dilution_factor}
         </Typography>
       )}
+      {well.treatment?.enzyme_volume_litres && (
+        <Typography variant="body2" color="text.secondary">
+          <strong>Enzyme volume:</strong> {well.treatment.enzyme_volume_litres}L
+        </Typography>
+      )}
       {(well.temperatures?.image_filename || well.image_filename_at_freeze) && (
         <Box mt={1} display="flex" alignItems="center">
           <Typography variant="body2" color="text.secondary" mr={1}>
@@ -1015,7 +1020,7 @@ export const RegionInput: React.FC<{
   const regionsKey = useMemo(
     () =>
       regions
-        .map((r) => `${r.treatment_id}-${!!r.treatment?.sample?.name}`)
+        .map((r) => `${r.treatment_id}-${!!r.treatment?.sample?.name}-${r.name}-${r.dilution_factor}`)
         .join(","),
     [regions],
   );
@@ -1424,8 +1429,13 @@ export const RegionInput: React.FC<{
                 return r.tray_id === tray.order_sequence;
               })
               .map((r) => {
-                // Create a display name that includes treatment and sample info
+                // Create a display name that includes dilution and treatment/sample info
                 let displayName = r.name || "Unnamed";
+
+                // Add dilution factor in brackets if available
+                if (r.dilution_factor) {
+                  displayName = `${displayName} (${r.dilution_factor}x)`;
+                }
 
                 // Add treatment/sample info if available
                 if (r.treatment?.sample?.name && r.treatment?.name) {

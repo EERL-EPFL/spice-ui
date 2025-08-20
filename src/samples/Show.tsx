@@ -29,6 +29,11 @@ import {
   AccordionSummary,
   AccordionDetails,
   Box,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { treatmentName } from "../treatments";
@@ -104,17 +109,14 @@ const TreatmentItem = () => {
           )}
           {hasResults && (
             <Typography variant="body2" sx={{ ml: "auto", mr: 2 }}>
-              {treatment.experimental_results.length} results |
-              {treatment.statistics?.success_rate
-                ? ` ${(treatment.statistics.success_rate * 100).toFixed(0)}% success`
-                : ""}
+              {treatment.experimental_results.length} results
             </Typography>
           )}
         </Box>
       </AccordionSummary>
       <AccordionDetails>
         {hasResults ? (
-          <DilutionSummaries treatment={treatment} />
+          <DilutionDatagrid treatment={treatment} />
         ) : (
           <Typography color="text.secondary">
             No experimental results
@@ -125,14 +127,39 @@ const TreatmentItem = () => {
   );
 };
 
-// Display dilution summaries for a treatment
-const DilutionSummaries = ({ treatment }: { treatment: any }) => {
+// Display dilution data directly in treatment accordion
+const DilutionDatagrid = ({ treatment }: { treatment: any }) => {
+  const [selectedDilution, setSelectedDilution] = React.useState<string>("all");
+  
   if (
     !treatment.dilution_summaries ||
     treatment.dilution_summaries.length === 0
   ) {
     return <Typography>No dilution data available</Typography>;
   }
+
+  // Get unique dilution factors for filter
+  const uniqueDilutions = [...new Set(
+    (treatment.experimental_results || []).map((result: any) => result.dilution_factor)
+  )].sort((a, b) => a - b);
+
+  // Filter experimental results based on selected dilution
+  const filteredResults = selectedDilution === "all" 
+    ? treatment.experimental_results || []
+    : (treatment.experimental_results || []).filter(
+        (result: any) => result.dilution_factor.toString() === selectedDilution
+      );
+
+  // Create paginated list context for filtered experimental results
+  const listContext = useList({
+    data: filteredResults,
+    perPage: 10,
+    sort: { field: "well_coordinate", order: "ASC" },
+  });
+
+  const handleDilutionChange = (event: SelectChangeEvent) => {
+    setSelectedDilution(event.target.value);
+  };
 
   return (
     <Box>
@@ -156,12 +183,6 @@ const DilutionSummaries = ({ treatment }: { treatment: any }) => {
               }
             />
             <FunctionField
-              label="Success Rate"
-              render={(record) =>
-                `${(record.statistics.success_rate * 100).toFixed(1)}%`
-              }
-            />
-            <FunctionField
               label="Mean Temp (°C)"
               render={(record) =>
                 record.statistics.mean_nucleation_temp_celsius?.toFixed(2) ||
@@ -178,86 +199,66 @@ const DilutionSummaries = ({ treatment }: { treatment: any }) => {
         </CardContent>
       </Card>
 
-      {/* Detailed results by dilution */}
-      {treatment.dilution_summaries.map((dilutionSummary: any) => (
-        <DilutionDetails
-          key={dilutionSummary.dilution_factor}
-          dilutionSummary={dilutionSummary}
-          experimentalResults={treatment.experimental_results}
-        />
-      ))}
+      {/* Detailed well results for entire treatment */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+        <Typography variant="h6">
+          Well Results ({filteredResults.length} of {treatment.experimental_results?.length || 0} wells)
+        </Typography>
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <InputLabel>Filter by Dilution</InputLabel>
+          <Select
+            value={selectedDilution}
+            label="Filter by Dilution"
+            onChange={handleDilutionChange}
+          >
+            <MenuItem value="all">All</MenuItem>
+            {uniqueDilutions.map((dilution) => (
+              <MenuItem key={dilution} value={dilution.toString()}>
+                {dilution}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Box>
+      <ListContextProvider value={listContext}>
+        <Datagrid bulkActionButtons={false} rowClick={false}>
+          <TextField source="well_coordinate" label="Well" sortable />
+          <TextField source="tray_name" label="Tray" sortable />
+          <TextField source="dilution_factor" label="Dilution" sortable />
+          <ReferenceField
+            source="experiment_id"
+            reference="experiments"
+            link="show"
+            label="Experiment"
+            sortable
+          >
+            <TextField source="name" />
+          </ReferenceField>
+          <FunctionField
+            label="Time (s)"
+            source="nucleation_time_seconds"
+            render={(record) => record.nucleation_time_seconds || "-"}
+            sortable
+          />
+          <FunctionField
+            label="Temp (°C)"
+            source="nucleation_temperature_avg_celsius"
+            render={(record) =>
+              record.nucleation_temperature_avg_celsius
+                ? parseFloat(
+                    record.nucleation_temperature_avg_celsius,
+                  ).toFixed(2)
+                : "-"
+            }
+            sortable
+          />
+        </Datagrid>
+        <Pagination rowsPerPageOptions={[5, 10, 25, 50]} />
+      </ListContextProvider>
     </Box>
   );
 };
 
-// Display individual well results for a specific dilution
-const DilutionDetails = ({ dilutionSummary, experimentalResults }: { dilutionSummary: any; experimentalResults: any[] }) => {
-  const [expanded, setExpanded] = React.useState(false);
-
-  // Filter results for this dilution factor
-  const dilutionResults = experimentalResults.filter(
-    (result) => result.dilution_factor === dilutionSummary.dilution_factor,
-  );
-
-  // Create paginated list context
-  const listContext = useList({
-    data: dilutionResults,
-    perPage: 5,
-    sort: { field: "well_coordinate", order: "ASC" },
-  });
-
-  return (
-    <Accordion
-      expanded={expanded}
-      onChange={(e, isExpanded) => setExpanded(isExpanded)}
-      sx={{ mb: 1 }}
-    >
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography>
-          Dilution {dilutionSummary.dilution_factor}× — {dilutionResults.length}{" "}
-          wells
-        </Typography>
-      </AccordionSummary>
-      <AccordionDetails>
-        <ListContextProvider value={listContext}>
-          <Datagrid bulkActionButtons={false} rowClick={false}>
-            <TextField source="well_coordinate" label="Well" sortable />
-            <TextField source="tray_name" label="Tray" sortable />
-            <ReferenceField
-              source="experiment_id"
-              reference="experiments"
-              link="show"
-              label="Experiment"
-              sortable
-            >
-              <TextField source="name" />
-            </ReferenceField>
-            <FunctionField
-              label="Time (s)"
-              source="nucleation_time_seconds"
-              render={(record) => record.nucleation_time_seconds || "-"}
-              sortable
-            />
-            <FunctionField
-              label="Temp (°C)"
-              source="nucleation_temperature_avg_celsius"
-              render={(record) =>
-                record.nucleation_temperature_avg_celsius
-                  ? parseFloat(
-                      record.nucleation_temperature_avg_celsius,
-                    ).toFixed(2)
-                  : "-"
-              }
-              sortable
-            />
-            <ChipField source="final_state" label="State" />
-          </Datagrid>
-          <Pagination rowsPerPageOptions={[5, 10, 25, 50]} />
-        </ListContextProvider>
-      </AccordionDetails>
-    </Accordion>
-  );
-};
 
 // Main sample information display
 const SampleInfo = () => {
