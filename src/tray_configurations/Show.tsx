@@ -12,8 +12,9 @@ import {
   DateField,
   useCreatePath,
 } from "react-admin";
-import { Box, Grid, Typography, Alert } from "@mui/material";
+import { Box, Grid, Typography, Alert, Paper, Chip } from "@mui/material";
 import TrayDisplay from "../components/TrayDisplay";
+import ProbeLocationGrid from "../components/ProbeLocationGrid";
 
 const TrayConfigurationDisplay = () => {
   const record = useRecordContext();
@@ -29,19 +30,88 @@ const TrayConfigurationDisplay = () => {
       </Typography>
       <Grid container spacing={3}>
         {record.trays.map((tray: any, index: number) => (
-          <Grid item key={index} xs={12} md={6}>
-            <Typography variant="subtitle1" marginBottom={1} align="center">
-              Tray {tray.order_sequence} - {tray.rotation_degrees}° rotation
-            </Typography>
-            <Box display="flex" justifyContent="center">
-              <TrayDisplay
-                name={tray.name}
-                qtyCols={tray.qty_cols}
-                qtyRows={tray.qty_rows}
-                rotation={tray.rotation_degrees}
-                wellDiameter={tray.well_relative_diameter}
-              />
-            </Box>
+          <Grid item key={index} xs={12}>
+            <Paper elevation={2} sx={{ p: 3, mb: 2 }}>
+              <Typography variant="h6" marginBottom={2} color="primary">
+                Tray {tray.order_sequence}: {tray.name || `Tray ${tray.order_sequence}`}
+              </Typography>
+              
+              <Grid container spacing={3}>
+                {/* Tray Display */}
+                <Grid item xs={12} md={6}>
+                  <Box>
+                    <Typography variant="subtitle2" marginBottom={1}>
+                      Tray Configuration
+                    </Typography>
+                    <Box display="flex" gap={1} flexWrap="wrap" marginBottom={2}>
+                      <Chip size="small" label={`${tray.qty_cols}×${tray.qty_rows} wells`} />
+                      <Chip size="small" label={`${tray.rotation_degrees}° rotation`} />
+                      <Chip size="small" label={`∅${tray.well_relative_diameter}mm wells`} />
+                    </Box>
+                    <Box display="flex" justifyContent="center">
+                      <TrayDisplay
+                        name={tray.name}
+                        qtyCols={tray.qty_cols}
+                        qtyRows={tray.qty_rows}
+                        rotation={tray.rotation_degrees}
+                        wellDiameter={tray.well_relative_diameter}
+                        maxWidth={300}
+                        maxHeight={250}
+                      />
+                    </Box>
+                  </Box>
+                </Grid>
+                
+                {/* Probe Configuration */}
+                <Grid item xs={12} md={6}>
+                  <Box>
+                    <Typography variant="subtitle2" marginBottom={1}>
+                      Temperature Probes
+                    </Typography>
+                    {tray.probe_count > 0 ? (
+                      <Box>
+                        <Box display="flex" gap={1} flexWrap="wrap" marginBottom={2}>
+                          <Chip size="small" label={`${tray.probe_count || 8} probes`} />
+                          <Chip size="small" label={`${tray.probe_position_units || "mm"} units`} />
+                          <Chip size="small" label={`${tray.probe_locations?.length || 0} locations`} />
+                        </Box>
+                        
+                        {tray.probe_locations && tray.probe_locations.length > 0 && (
+                          <ProbeLocationGrid
+                            locations={tray.probe_locations}
+                            positionUnits={tray.probe_position_units || "mm"}
+                            width={300}
+                            height={200}
+                          />
+                        )}
+                      </Box>
+                    ) : (
+                      <Alert severity="info" sx={{ mt: 1 }}>
+                        No temperature probes configured for this tray.
+                      </Alert>
+                    )}
+                  </Box>
+                </Grid>
+
+                {/* Image Coordinates (if configured) */}
+                {(tray.upper_left_corner_x || tray.upper_left_corner_y || 
+                  tray.lower_right_corner_x || tray.lower_right_corner_y) && (
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" marginBottom={1}>
+                      Image Corner Coordinates
+                    </Typography>
+                    <Box display="flex" gap={2} flexWrap="wrap">
+                      {tray.upper_left_corner_x && (
+                        <Chip size="small" label={`UL: (${tray.upper_left_corner_x}, ${tray.upper_left_corner_y})`} />
+                      )}
+                      {tray.lower_right_corner_x && (
+                        <Chip size="small" label={`LR: (${tray.lower_right_corner_x}, ${tray.lower_right_corner_y})`} />
+                      )}
+                    </Box>
+                  </Grid>
+                )}
+              </Grid>
+            </Paper>
           </Grid>
         ))}
       </Grid>
