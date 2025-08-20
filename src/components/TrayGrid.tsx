@@ -796,8 +796,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
         const rectH = (maxY - minY) * SPACING + 2 * CIRCLE_RADIUS;
 
         // Adjust opacity based on view mode
-        const fillOpacity = viewMode === "results" ? 0.1 : 0.3;
-        const strokeOpacity = viewMode === "results" ? 0.4 : 1.0;
+        const fillOpacity = viewMode === "results" ? 0.25 : 0.3;
+        const strokeOpacity = viewMode === "results" ? 0.8 : 1.0;
         const textVisible = viewMode === "regions";
 
         return (

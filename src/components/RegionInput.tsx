@@ -35,6 +35,7 @@ import ScienceIcon from "@mui/icons-material/Science";
 import { scaleSequential } from "d3-scale";
 import { interpolateBlues } from "d3-scale-chromatic";
 import { treatmentName } from "../treatments";
+import { formatEnzymeVolume } from "../utils/formatters";
 
 // Generate dynamic column letters based on tray dimensions
 const generateColumnLetters = (maxCols: number): string[] => {
@@ -66,9 +67,9 @@ const parseCell = (s: string, trayConfig?: any): Cell => {
 
   const match = s.match(/^([A-Za-z])(\d{1,2})$/);
   if (match) {
-    const col = letterToColIndex(match[1], trayConfig.qty_cols); // Letter maps to row index (but stored in col variable for grid positioning)
-    const rowNumber = parseInt(match[2], 10);
-    let row = numberToRowIndex(rowNumber); // Number maps to column index (but stored in row variable for grid positioning)
+    const row = letterToColIndex(match[1], trayConfig.qty_rows); // Letter maps to row index
+    const columnNumber = parseInt(match[2], 10);
+    let col = numberToRowIndex(columnNumber); // Number maps to column index
 
     // Validate bounds to prevent invalid coordinates
     if (
@@ -98,8 +99,8 @@ const cellToString = (cell: Cell, trayConfig: any): string => {
     return "A1"; // Return safe default
   }
 
-  const letter = colIndexToLetter(cell.col, trayConfig.qty_cols); // Grid col index maps to letter (row in microplate notation)
-  const rowNumber = cell.row + 1; // Grid row index maps to number (column in microplate notation)
+  const letter = colIndexToLetter(cell.row, trayConfig.qty_rows); // Grid row index maps to letter (row in microplate notation)  
+  const rowNumber = cell.col + 1; // Grid col index maps to number (column in microplate notation)
   return `${letter}${rowNumber}`;
 };
 
@@ -360,22 +361,7 @@ const WellDetailsDisplay: React.FC<{
       {well.treatment?.name && (
         <Typography variant="body2" color="text.secondary">
           <strong>Treatment:</strong>{" "}
-          {well.treatment?.id ? (
-            <MuiLink
-              component="button"
-              variant="body2"
-              onClick={handleTreatmentClick}
-              sx={{
-                cursor: "pointer",
-                textDecoration: "underline",
-                color: "primary.main",
-              }}
-            >
-              {treatmentName[well.treatment.name] || well.treatment.name}
-            </MuiLink>
-          ) : (
-            treatmentName[well.treatment.name] || well.treatment.name
-          )}
+          {treatmentName[well.treatment.name] || well.treatment.name}
         </Typography>
       )}
       {well.dilution_factor && (
@@ -385,7 +371,7 @@ const WellDetailsDisplay: React.FC<{
       )}
       {well.treatment?.enzyme_volume_litres && (
         <Typography variant="body2" color="text.secondary">
-          <strong>Enzyme volume:</strong> {well.treatment.enzyme_volume_litres}L
+          <strong>Enzyme volume:</strong> {formatEnzymeVolume(well.treatment.enzyme_volume_litres)}L
         </Typography>
       )}
       {(well.temperatures?.image_filename || well.image_filename_at_freeze) && (
@@ -431,15 +417,77 @@ const TreatmentDisplay: React.FC<{
   treatmentId: string;
   treatmentData?: SingleRegion["treatment"];
 }> = ({ treatmentId, treatmentData }) => {
-  const { data: fetchedTreatment, isLoading } = useGetOne(
-    "treatments",
-    { id: treatmentId },
-    { enabled: !!treatmentId && !treatmentData },
-  );
+  const redirect = useRedirect();
+  const dataProvider = useDataProvider();
+  const [fullTreatment, setFullTreatment] = React.useState<SingleRegion["treatment"] | null>(null);
+  const [loading, setLoading] = React.useState(false);
 
-  const treatment = treatmentData || fetchedTreatment;
+  // Fetch treatment data with sample if we have treatment_id but no complete treatment data
+  React.useEffect(() => {
+    const fetchTreatmentWithSample = async () => {
+      if (!treatmentId || (treatmentData?.sample?.name)) {
+        setFullTreatment(treatmentData || null);
+        return;
+      }
 
-  if (!treatmentId) {
+      setLoading(true);
+      try {
+        // Fetch the treatment
+        const { data: treatment } = await dataProvider.getOne("treatments", { id: treatmentId });
+        
+        // Fetch the sample if treatment has sample_id
+        let enrichedTreatment = { ...treatment };
+        if (treatment.sample_id) {
+          try {
+            const { data: sample } = await dataProvider.getOne("samples", { id: treatment.sample_id });
+            enrichedTreatment.sample = sample;
+          } catch (error) {
+            console.error("Error fetching sample for treatment:", error);
+          }
+        }
+        
+        setFullTreatment(enrichedTreatment);
+      } catch (error) {
+        console.error("Error fetching treatment:", error);
+        setFullTreatment(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTreatmentWithSample();
+  }, [treatmentId, treatmentData?.sample?.name, dataProvider]);
+
+  const treatment = fullTreatment;
+
+  const handleSampleClick = () => {
+    // Check if there's sample data in the treatment
+    const sampleId = treatment?.sample?.id;
+    if (sampleId) {
+      redirect("show", "samples", sampleId);
+    }
+  };
+
+  if (!treatmentId || !treatment) {
+    // Check if we have sample data to make clickable (could be a "none" treatment with a sample)
+    if (treatment?.sample?.id) {
+      return (
+        <MuiLink
+          component="button"
+          variant="caption"
+          onClick={handleSampleClick}
+          sx={{
+            cursor: "pointer",
+            textDecoration: "underline",
+            color: "primary.main",
+            fontSize: "0.8rem"
+          }}
+        >
+          {treatment.sample.name || "View Sample"}
+        </MuiLink>
+      );
+    }
+    
     return (
       <Typography
         variant="caption"
@@ -451,7 +499,7 @@ const TreatmentDisplay: React.FC<{
     );
   }
 
-  if (!treatment && isLoading) {
+  if (loading || (!treatment && treatmentId)) {
     return (
       <Typography
         variant="caption"
@@ -471,38 +519,131 @@ const TreatmentDisplay: React.FC<{
     );
   }
 
+  // Special handling for "none" treatments with samples - emphasize the sample
+  if (treatment.name === "none" && treatment.sample?.name) {
+    return (
+      <Button
+        variant="text"
+        size="small"
+        onClick={() => redirect("show", "samples", treatment.sample.id)}
+        sx={{
+          textTransform: "none",
+          justifyContent: "flex-start",
+          padding: "4px 8px",
+          minHeight: "48px",
+          width: "100%",
+          "&:hover": {
+            backgroundColor: "action.hover",
+          },
+        }}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            width: "100%",
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: "0.8rem",
+              lineHeight: 1.2,
+              fontWeight: "bold",
+              color: "primary.main",
+            }}
+          >
+            {treatment.sample.name}
+          </Typography>
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: "0.65rem",
+              lineHeight: 1.2,
+              color: "text.secondary",
+            }}
+          >
+            {treatmentName[treatment.name] || treatment.name}
+          </Typography>
+          {treatment.sample?.location?.name && (
+            <Typography
+              variant="caption"
+              sx={{
+                fontSize: "0.6rem",
+                lineHeight: 1.2,
+                color: "text.secondary",
+              }}
+            >
+              {treatment.sample.location.name}
+            </Typography>
+          )}
+        </Box>
+      </Button>
+    );
+  }
+
   return (
-    <Box
+    <Button
+      variant="text"
+      size="small"
+      onClick={() => redirect("show", "samples", treatment.sample.id)}
       sx={{
-        display: "flex",
-        flexDirection: "column",
+        textTransform: "none",
+        justifyContent: "flex-start",
+        padding: "4px 8px",
         minHeight: "48px",
-        justifyContent: "center",
+        width: "100%",
+        "&:hover": {
+          backgroundColor: "action.hover",
+        },
       }}
     >
-      {treatment.sample?.name && (
-        <Typography
-          variant="caption"
-          sx={{ fontSize: "0.75rem", lineHeight: 1.2, fontWeight: "medium" }}
-        >
-          {treatment.sample.name}
-        </Typography>
-      )}
-      <Typography
-        variant="caption"
-        sx={{ fontSize: "0.7rem", lineHeight: 1.2, color: "text.secondary" }}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          width: "100%",
+        }}
       >
-        {treatment.name}
-      </Typography>
-      {treatment.sample?.location?.name && (
+        {treatment.sample?.name && (
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: "0.75rem",
+              lineHeight: 1.2,
+              fontWeight: "medium",
+              color: "primary.main",
+            }}
+          >
+            {treatment.sample.name}
+          </Typography>
+        )}
         <Typography
           variant="caption"
-          sx={{ fontSize: "0.65rem", lineHeight: 1.2, color: "text.secondary" }}
+          sx={{
+            fontSize: "0.7rem",
+            lineHeight: 1.2,
+            color: "text.secondary",
+          }}
         >
-          {treatment.sample.location.name}
+          {treatmentName[treatment.name] || treatment.name}
         </Typography>
-      )}
-    </Box>
+        {treatment.sample?.location?.name && (
+          <Typography
+            variant="caption"
+            sx={{
+              fontSize: "0.65rem",
+              lineHeight: 1.2,
+              color: "text.secondary",
+            }}
+          >
+            {treatment.sample.location.name}
+          </Typography>
+        )}
+      </Box>
+    </Button>
   );
 };
 
@@ -1141,10 +1282,10 @@ export const RegionInput: React.FC<{
                     importedRegions.push({
                       name: regionName,
                       tray_id: trayInfo.order_sequence, // Use the order_sequence as tray_id
-                      col_min: upperLeftCell.col,
-                      col_max: lowerRightCell.col,
                       row_min: upperLeftCell.row,
                       row_max: lowerRightCell.row,
+                      col_min: upperLeftCell.col,
+                      col_max: lowerRightCell.col,
                       display_colour_hex: color,
                       treatment_id: "",
                       dilution_factor: undefined,
@@ -1289,8 +1430,8 @@ export const RegionInput: React.FC<{
       } else {
         // Fallback if tray info not found
 
-        const upperLeftStr = `${String.fromCharCode(65 + region.col_min)}${region.row_min + 1}`;
-        const lowerRightStr = `${String.fromCharCode(65 + region.col_max)}${region.row_max + 1}`;
+        const upperLeftStr = `${String.fromCharCode(65 + region.row_min)}${region.col_min + 1}`;
+        const lowerRightStr = `${String.fromCharCode(65 + region.row_max)}${region.col_max + 1}`;
 
         groupedRegions[regionName].push({
           tray: `Tray_${effectiveTrayId}`,
@@ -1451,7 +1592,7 @@ export const RegionInput: React.FC<{
 
                 // Add dilution factor in brackets if available
                 if (r.dilution_factor) {
-                  displayName = `${displayName} (${r.dilution_factor}x)`;
+                  displayName = `${displayName} (${r.dilution_factor})`;
                 }
 
                 // Add treatment/sample info if available
@@ -1539,8 +1680,9 @@ export const RegionInput: React.FC<{
           })}
         </Box>
 
+
         {/* Unified panel controlled by view mode toggle - moved to right side */}
-        {(regions.length > 0 || (showTimePointVisualization && results)) && (
+        {(regions.length > 0 || (showTimePointVisualization && results) || !readOnly) && (
           <Card
             sx={{ flex: "0 0 auto", width: "480px", height: "fit-content" }}
           >
@@ -1555,21 +1697,66 @@ export const RegionInput: React.FC<{
                   {viewMode === "regions" ? "Selected Regions" : "Results"}
                 </Typography>
 
-                {/* Export button for regions view in read-only mode */}
-                {viewMode === "regions" && readOnly && regions.length > 0 && (
-                  <Button
-                    variant="text"
-                    size="small"
-                    onClick={handleYAMLExport}
-                    startIcon={<DownloadIcon />}
-                    sx={{
-                      fontSize: "0.7rem",
-                      padding: "2px 8px",
-                      minWidth: "auto",
-                    }}
-                  >
-                    Export YAML
-                  </Button>
+                {/* Import/Export buttons */}
+                {viewMode === "regions" && (
+                  <Box display="flex" gap={1}>
+                    {/* Import/Export buttons for edit mode */}
+                    {!readOnly && (
+                      <>
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={handleYAMLImport}
+                          startIcon={<UploadFileIcon />}
+                          sx={{
+                            fontSize: "0.7rem",
+                            padding: "2px 8px",
+                            minWidth: "auto",
+                          }}
+                        >
+                          Import
+                        </Button>
+                        <Button
+                          variant="text"
+                          size="small"
+                          onClick={handleYAMLExport}
+                          startIcon={<DownloadIcon />}
+                          sx={{
+                            fontSize: "0.7rem",
+                            padding: "2px 8px",
+                            minWidth: "auto",
+                          }}
+                          disabled={regions.length === 0}
+                        >
+                          Export
+                        </Button>
+                        <input
+                          type="file"
+                          accept=".yaml,.yml"
+                          ref={fileInputRef}
+                          style={{ display: "none" }}
+                          onChange={handleFileChange}
+                        />
+                      </>
+                    )}
+                    
+                    {/* Export button for read-only mode */}
+                    {readOnly && regions.length > 0 && (
+                      <Button
+                        variant="text"
+                        size="small"
+                        onClick={handleYAMLExport}
+                        startIcon={<DownloadIcon />}
+                        sx={{
+                          fontSize: "0.7rem",
+                          padding: "2px 8px",
+                          minWidth: "auto",
+                        }}
+                      >
+                        Export
+                      </Button>
+                    )}
+                  </Box>
                 )}
               </Box>
 
@@ -1883,35 +2070,6 @@ export const RegionInput: React.FC<{
                     </Typography>
                   )}
 
-                  {!readOnly && (
-                    <Box display="flex" gap={1} marginTop={1}>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={handleYAMLImport}
-                        startIcon={<UploadFileIcon />}
-                        sx={{ fontSize: "0.7rem", padding: "4px 8px" }}
-                      >
-                        Import
-                      </Button>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={handleYAMLExport}
-                        startIcon={<DownloadIcon />}
-                        sx={{ fontSize: "0.7rem", padding: "4px 8px" }}
-                      >
-                        Export
-                      </Button>
-                      <input
-                        type="file"
-                        accept=".yaml,.yml"
-                        onChange={handleFileChange}
-                        ref={fileInputRef}
-                        style={{ display: "none" }}
-                      />
-                    </Box>
-                  )}
                 </Box>
               )}
 

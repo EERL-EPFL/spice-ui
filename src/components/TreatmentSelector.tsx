@@ -528,6 +528,14 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
     setTreatmentId(null);
     setSelectedTreatment(null);
     loadSamples(newLocationId);
+    
+    // Auto-focus sample dropdown after location is selected
+    setTimeout(() => {
+      const sampleSelect = document.querySelector('[aria-label="Sample"]');
+      if (sampleSelect) {
+        (sampleSelect as HTMLElement).focus();
+      }
+    }, 100);
   };
 
   const handleSampleChange = (event: SelectChangeEvent) => {
@@ -536,6 +544,14 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
     setTreatmentId(null);
     setSelectedTreatment(null);
     loadTreatments(newSampleId);
+    
+    // Auto-focus treatment dropdown after sample is selected
+    setTimeout(() => {
+      const treatmentSelect = document.querySelector('[aria-label="Treatment"]');
+      if (treatmentSelect) {
+        (treatmentSelect as HTMLElement).focus();
+      }
+    }, 100);
   };
 
   const handleTreatmentChange = (event: SelectChangeEvent) => {
@@ -673,27 +689,27 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
         <Dialog
           open={open}
           onClose={() => setOpen(false)}
-          maxWidth="md"
+          maxWidth="sm"
           fullWidth
         >
-          <DialogTitle>Select Treatment for {currentRegionName}</DialogTitle>
-          <DialogContent>
-            <Box display="flex" flexDirection="column" gap={3} p={1}>
+          <DialogTitle sx={{ pb: 2 }}>Select Treatment for {currentRegionName}</DialogTitle>
+          <DialogContent sx={{ py: 1 }}>
+            <Box display="flex" flexDirection="column" gap={2}>
               {/* Existing Treatments Section - Grouped by Sample or Fallback to Simple List */}
               {(treatmentsBySample.length > 0 || uniqueExistingTreatments.length > 0) && (
                 <Box>
                   <Typography
-                    variant="h6"
+                    variant="subtitle2"
                     gutterBottom
-                    sx={{ color: "primary.main" }}
+                    sx={{ color: "primary.main", fontWeight: 'medium' }}
                   >
-                    <CopyIcon sx={{ mr: 1, verticalAlign: "middle" }} />
+                    <CopyIcon sx={{ mr: 0.5, fontSize: '1rem', verticalAlign: "middle" }} />
                     Available Treatments by Sample
                   </Typography>
-                  <Alert severity="info" sx={{ mb: 2 }}>
-                    All treatments for each sample are shown. Click any treatment to apply it to {currentRegionName}
+                  <Alert severity="info" sx={{ mb: 1, py: 0.5, fontSize: '0.875rem' }}>
+                    Click any treatment to apply it to {currentRegionName}
                   </Alert>
-                  <Paper variant="outlined" sx={{ maxHeight: 300, overflow: "auto" }}>
+                  <Paper variant="outlined" sx={{ maxHeight: 200, overflow: "auto" }}>
                     <List dense>
                       {treatmentsBySample.length > 0 ? (
                         // Grouped by Sample Display
@@ -823,8 +839,8 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
 
               {/* Divider between sections */}
               {(treatmentsBySample.length > 0 || uniqueExistingTreatments.length > 0) && (
-                <Divider sx={{ my: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
+                <Divider sx={{ my: 1 }}>
+                  <Typography variant="caption" color="text.secondary">
                     OR SELECT NEW TREATMENT
                   </Typography>
                 </Divider>
@@ -833,11 +849,8 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
               {/* Mode Toggle - Hide when using filtered treatments */}
               {!filteredTreatments && (
                 <Box>
-                  <Typography variant="h6" gutterBottom>
+                  <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'medium' }}>
                     Select New Treatment
-                  </Typography>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Sample Type
                   </Typography>
                   <ToggleButtonGroup
                     value={mode}
@@ -845,6 +858,7 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                     onChange={handleModeChange}
                     aria-label="sample type"
                     fullWidth
+                    size="small"
                   >
                     <ToggleButton value="project" aria-label="project samples">
                       Project Samples
@@ -853,7 +867,7 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                       value="procedural_blank"
                       aria-label="procedural blank samples"
                     >
-                      Procedural blank samples
+                      Procedural Blank
                     </ToggleButton>
                   </ToggleButtonGroup>
                 </Box>
@@ -862,15 +876,8 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
               {/* Filtered treatments mode header */}
               {filteredTreatments && (
                 <Box>
-                  <Typography variant="h6" gutterBottom>
+                  <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'medium' }}>
                     Select Treatment
-                  </Typography>
-                  <Typography
-                    variant="subtitle2"
-                    color="text.secondary"
-                    gutterBottom
-                  >
-                    Choose from available treatments
                   </Typography>
                 </Box>
               )}
@@ -881,45 +888,55 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                   {/* Skip location and sample selection when using filtered treatments */}
                   {!filteredTreatments && (
                     <>
-                      <Box>
-                        <Typography variant="subtitle2" gutterBottom>
-                          1. Select Location
-                        </Typography>
-                        <FormControl fullWidth variant="outlined">
-                          <InputLabel>Location</InputLabel>
-                          <Select
-                            value={locationId || ""}
-                            onChange={handleLocationChange}
-                            label="Location"
-                            disabled={loading}
-                          >
-                            <MenuItem value="">
-                              <em>Select a location...</em>
-                            </MenuItem>
-                            {locationOptions.map((location) => (
-                              <MenuItem key={location.id} value={location.id}>
-                                {location.name}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </FormControl>
-                      </Box>
-
-                      {locationId && (
-                        <Box>
-                          <Typography variant="subtitle2" gutterBottom>
-                            2. Select Sample
+                      {/* Always show Location + Sample row */}
+                      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="body2" gutterBottom sx={{ fontWeight: 'medium' }}>
+                            Location
                           </Typography>
-                          <FormControl fullWidth variant="outlined">
+                          <FormControl fullWidth size="small" variant="outlined">
+                            <InputLabel>Location</InputLabel>
+                            <Select
+                              value={locationId || ""}
+                              onChange={handleLocationChange}
+                              label="Location"
+                              disabled={loading}
+                              aria-label="Location"
+                            >
+                              <MenuItem value="">
+                                <em>Select location...</em>
+                              </MenuItem>
+                              {locationOptions.map((location) => (
+                                <MenuItem key={location.id} value={location.id}>
+                                  {location.name}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+                        </Box>
+
+                        <Box sx={{ flex: 1 }}>
+                          <Typography 
+                            variant="body2" 
+                            gutterBottom 
+                            sx={{ 
+                              fontWeight: 'medium',
+                              color: !locationId ? 'text.disabled' : 'text.primary'
+                            }}
+                          >
+                            Sample
+                          </Typography>
+                          <FormControl fullWidth size="small" variant="outlined">
                             <InputLabel>Sample</InputLabel>
                             <Select
                               value={sampleId || ""}
                               onChange={handleSampleChange}
                               label="Sample"
                               disabled={loading || !locationId}
+                              aria-label="Sample"
                             >
                               <MenuItem value="">
-                                <em>Select a sample...</em>
+                                <em>{!locationId ? "Select location first..." : "Select sample..."}</em>
                               </MenuItem>
                               {sampleOptions.map((sample) => (
                                 <MenuItem key={sample.id} value={sample.id}>
@@ -929,51 +946,110 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                             </Select>
                           </FormControl>
                         </Box>
-                      )}
+                      </Box>
                     </>
                   )}
 
-                  {/* Treatment selection - works for both filtered and normal mode */}
-                  {(sampleId || filteredTreatments) && (
-                    <Box>
-                      <Typography variant="subtitle2" gutterBottom>
-                        {filteredTreatments
-                          ? "Select Treatment"
-                          : "3. Select Treatment"}
-                      </Typography>
-                      <FormControl fullWidth variant="outlined">
-                        <InputLabel>Treatment</InputLabel>
-                        <Select
-                          value={treatmentId || ""}
-                          onChange={handleTreatmentChange}
-                          label="Treatment"
-                          disabled={
-                            loading || (!sampleId && !filteredTreatments)
-                          }
-                        >
-                          <MenuItem value="">
-                            <em>Select a treatment...</em>
-                          </MenuItem>
-                          {treatmentOptions.map((treatment) => (
-                            <MenuItem key={treatment.id} value={treatment.id}>
-                              <Box>
-                                <Typography variant="body2" fontWeight="medium">
-                                  {treatmentName[treatment.name] || treatment.name}
-                                </Typography>
-                                {(treatment.enzyme_volume_litres || treatment.notes) && (
-                                  <Typography variant="caption" color="text.secondary" display="block">
-                                    {treatment.enzyme_volume_litres && `${formatEnzymeVolume(treatment.enzyme_volume_litres)}L enzyme`}
-                                    {treatment.enzyme_volume_litres && treatment.notes && ' • '}
-                                    {treatment.notes && treatment.notes.length > 50 ? `${treatment.notes.substring(0, 50)}...` : treatment.notes}
-                                  </Typography>
-                                )}
-                              </Box>
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Box>
-                  )}
+                  {/* Always show Treatment section - works for both filtered and normal mode */}
+                  <Box sx={{ mb: 2 }}>
+                    <Typography 
+                      variant="body2" 
+                      gutterBottom 
+                      sx={{ 
+                        fontWeight: 'medium',
+                        color: (!sampleId && !filteredTreatments) ? 'text.disabled' : 'text.primary'
+                      }}
+                    >
+                      Treatment
+                    </Typography>
+                    
+                    {/* Show message when no treatments available */}
+                    {!filteredTreatments && !sampleId ? (
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          textAlign: 'center',
+                          backgroundColor: 'action.hover',
+                          border: '1px dashed',
+                          borderColor: 'divider'
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                          Select location and sample to see available treatments
+                        </Typography>
+                      </Paper>
+                    ) : treatmentOptions.length === 0 && (sampleId || filteredTreatments) ? (
+                      <Paper
+                        variant="outlined"
+                        sx={{
+                          p: 2,
+                          textAlign: 'center',
+                          backgroundColor: 'warning.50',
+                          border: '1px solid',
+                          borderColor: 'warning.200'
+                        }}
+                      >
+                        <Typography variant="body2" color="warning.dark">
+                          No treatments available for this sample
+                        </Typography>
+                      </Paper>
+                    ) : (
+                      /* Treatment cards */
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {treatmentOptions.map((treatment) => (
+                          <Paper
+                            key={treatment.id}
+                            variant={treatmentId === treatment.id ? "elevation" : "outlined"}
+                            sx={{
+                              p: 1.5,
+                              minWidth: 120,
+                              cursor: 'pointer',
+                              border: treatmentId === treatment.id ? '2px solid' : '1px solid',
+                              borderColor: treatmentId === treatment.id ? 'primary.main' : 'divider',
+                              backgroundColor: treatmentId === treatment.id ? 'primary.50' : 'background.paper',
+                              '&:hover': {
+                                borderColor: 'primary.main',
+                                backgroundColor: 'primary.50',
+                              },
+                              transition: 'all 0.2s ease',
+                            }}
+                            onClick={() => {
+                              setTreatmentId(treatment.id);
+                              setSelectedTreatment(treatment);
+                            }}
+                          >
+                            <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>
+                              {treatmentName[treatment.name] || treatment.name}
+                            </Typography>
+                            {treatment.enzyme_volume_litres && (
+                              <Typography variant="caption" color="text.secondary" display="block">
+                                {formatEnzymeVolume(treatment.enzyme_volume_litres)}L enzyme
+                              </Typography>
+                            )}
+                            {treatment.notes && (
+                              <Typography 
+                                variant="caption" 
+                                color="text.secondary" 
+                                display="block"
+                                sx={{ 
+                                  mt: 0.5,
+                                  fontStyle: 'italic',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  maxWidth: 100
+                                }}
+                                title={treatment.notes}
+                              >
+                                {treatment.notes}
+                              </Typography>
+                            )}
+                          </Paper>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
                 </>
               ) : (
                 <>
@@ -1052,9 +1128,12 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                 display="flex"
                 justifyContent="space-between"
                 alignItems="center"
-                mt={2}
+                mt={1}
+                pt={1}
+                borderTop="1px solid"
+                borderColor="divider"
               >
-                <Button onClick={() => setOpen(false)} color="inherit">
+                <Button onClick={() => setOpen(false)} color="inherit" size="small">
                   Cancel
                 </Button>
 
@@ -1066,8 +1145,9 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                       startIcon={<SelectAllIcon />}
                       variant="contained"
                       color="warning"
+                      size="small"
                     >
-                      Apply to All Regions
+                      Apply to All
                     </Button>
                   )}
                   <Button 
@@ -1075,8 +1155,9 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                     disabled={!treatmentId}
                     variant="contained"
                     color="primary"
+                    size="small"
                   >
-                    Select for {currentRegionName}
+                    Select
                   </Button>
                 </Box>
               </Box>
