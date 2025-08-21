@@ -49,7 +49,7 @@ const CompactTrayEditor: React.FC = () => {
   };
 
   return (
-    <Paper elevation={2} sx={{ p: 2 }}>
+    <Box sx={{ width: '100%' }}>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
         <Typography variant="h6" color="primary">
           Tray Configuration
@@ -59,9 +59,10 @@ const CompactTrayEditor: React.FC = () => {
         </Typography>
       </Box>
 
-      <Grid container spacing={2}>
-        {/* Condensed Basic Settings */}
-        <Grid item xs={12}>
+      {/* Full width container for all content */}
+      <Box sx={{ width: '100%' }}>
+        {/* Top Settings Row - Full width */}
+        <Paper elevation={2} sx={{ p: 2, mb: 2, width: '100%' }}>
           <Box display="flex" gap={1.5} flexWrap="wrap" alignItems="center">
             <TextInput
               source="name"
@@ -114,18 +115,17 @@ const CompactTrayEditor: React.FC = () => {
               sx={{ width: 80 }}
             />
           </Box>
-        </Grid>
+        </Paper>
 
-        {/* Content Area: Split between Tabs and Interactive Preview */}
-        <Grid item xs={12}>
-          <Box display="flex" gap={3} sx={{ minHeight: 400 }}>
-            {/* Left: Tabbed Sections - Fixed width container */}
-            <Box sx={{ 
-              flex: 1, 
-              minWidth: 0,
-              maxWidth: 'calc(100vw - 500px)', // Reserve exact space for visualization
-              overflow: 'hidden'
-            }}>
+        {/* Two Cards Row */}
+        <Box display="flex" gap={3} sx={{ minHeight: 400, width: '100%' }}>
+          
+          {/* Left Card: Tray Configuration with Tabs - Fixed width */}
+          <Paper elevation={2} sx={{ 
+            flex: 1, 
+            minWidth: 0,
+            p: 2 
+          }}>
               <Tabs
                 value={activeTab}
                 onChange={handleTabChange}
@@ -146,16 +146,17 @@ const CompactTrayEditor: React.FC = () => {
                 />
               </Tabs>
 
-              <Box sx={{ width: '100%', overflow: 'hidden' }}>
-                <TabPanel value={activeTab} index={0}>
-                  <Box sx={{ width: '100%', minHeight: 300 }}>
-                    <TrayProbeConfig />
-                  </Box>
-                </TabPanel>
+              <TabPanel value={activeTab} index={0}>
+                <Box sx={{ minHeight: 300 }}>
+                  <TrayProbeConfig />
+                </Box>
+              </TabPanel>
 
-                <TabPanel value={activeTab} index={1}>
-                  <Box sx={{ width: '100%', minHeight: 300 }}>
-                    <Grid container spacing={2}>
+              <TabPanel value={activeTab} index={1}>
+                <Box sx={{ minHeight: 300 }}>
+                  <Box>
+                    {/* Upper Left Corner Row */}
+                    <Grid container spacing={2} sx={{ mb: 2 }}>
                       <Grid item xs={6}>
                         <NumberInput
                           source="upper_left_corner_x"
@@ -172,6 +173,10 @@ const CompactTrayEditor: React.FC = () => {
                           fullWidth
                         />
                       </Grid>
+                    </Grid>
+                    
+                    {/* Lower Right Corner Row */}
+                    <Grid container spacing={2}>
                       <Grid item xs={6}>
                         <NumberInput
                           source="lower_right_corner_x"
@@ -189,98 +194,99 @@ const CompactTrayEditor: React.FC = () => {
                         />
                       </Grid>
                     </Grid>
-                    
-                    <Box sx={{ mt: 2 }}>
-                      <FormDataConsumer>
-                        {({ scopedFormData, formData, ...rest }) => (
-                          <ImageCoordinateSelector
-                            value={{
-                              upper_left_corner_x: scopedFormData?.upper_left_corner_x,
-                              upper_left_corner_y: scopedFormData?.upper_left_corner_y,
-                              lower_right_corner_x: scopedFormData?.lower_right_corner_x,
-                              lower_right_corner_y: scopedFormData?.lower_right_corner_y,
-                            }}
-                            onChange={(coordinates) => {
-                              console.log('Image coordinates changed:', coordinates);
-                            }}
-                          />
-                        )}
-                      </FormDataConsumer>
-                    </Box>
                   </Box>
-                </TabPanel>
-              </Box>
-            </Box>
+                  
+                  <Box sx={{ mt: 2 }}>
+                    <FormDataConsumer>
+                      {({ scopedFormData, formData, ...rest }) => (
+                        <ImageCoordinateSelector
+                          value={{
+                            upper_left_corner_x: scopedFormData?.upper_left_corner_x,
+                            upper_left_corner_y: scopedFormData?.upper_left_corner_y,
+                            lower_right_corner_x: scopedFormData?.lower_right_corner_x,
+                            lower_right_corner_y: scopedFormData?.lower_right_corner_y,
+                          }}
+                          onChange={(coordinates) => {
+                            console.log('Image coordinates changed:', coordinates);
+                          }}
+                        />
+                      )}
+                    </FormDataConsumer>
+                  </Box>
+                </Box>
+              </TabPanel>
+            </Paper>
 
-            {/* Right: Always Visible Interactive Preview - Absolutely fixed position */}
-            <Box sx={{ 
+            {/* Right Card: Interactive Tray Preview - Completely Independent */}
+            <Paper elevation={2} sx={{ 
               flex: '0 0 450px', 
               width: 450, 
-              minWidth: 450, 
-              maxWidth: 450 
+              p: 2, 
+              bgcolor: 'background.default',
+              position: 'sticky', 
+              top: 20,
+              height: 'fit-content'
             }}>
-              <Paper elevation={1} sx={{ p: 2, bgcolor: 'background.default', position: 'sticky', top: 20 }}>
-                <Typography variant="subtitle2" gutterBottom color="primary">
-                  Interactive Tray Preview
-                </Typography>
-                <FormDataConsumer>
-                  {({ scopedFormData }) => {
-                    if (
-                      scopedFormData?.name &&
-                      scopedFormData?.qty_cols &&
-                      scopedFormData?.qty_rows
-                    ) {
-                      return (
-                        <InteractiveTrayDisplay
-                          name={scopedFormData.name}
-                          qtyCols={parseInt(scopedFormData.qty_cols) || 8}
-                          qtyRows={parseInt(scopedFormData.qty_rows) || 12}
-                          rotation={parseInt(scopedFormData.rotation_degrees) || 0}
-                          wellDiameter={scopedFormData.well_relative_diameter || 6.4}
-                          maxWidth={400}
-                          maxHeight={500}
-                          probePositions={scopedFormData.probe_locations || []}
-                          positionUnits={scopedFormData.probe_position_units || "mm"}
-                        />
-                      );
-                    }
+              <Typography variant="subtitle2" gutterBottom color="primary">
+                Interactive Tray Preview
+              </Typography>
+              <FormDataConsumer>
+                {({ scopedFormData }) => {
+                  if (
+                    scopedFormData?.name &&
+                    scopedFormData?.qty_cols &&
+                    scopedFormData?.qty_rows
+                  ) {
                     return (
-                      <Box 
-                        sx={{ 
-                          height: 300, 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          justifyContent: 'center',
-                          border: '2px dashed #ddd',
-                          borderRadius: 2,
-                          bgcolor: 'background.paper'
-                        }}
-                      >
-                        <Box textAlign="center">
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            gutterBottom
-                          >
-                            Interactive Tray Preview
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                          >
-                            Fill out tray details to see preview
-                          </Typography>
-                        </Box>
-                      </Box>
+                      <InteractiveTrayDisplay
+                        name={scopedFormData.name}
+                        qtyCols={parseInt(scopedFormData.qty_cols) || 8}
+                        qtyRows={parseInt(scopedFormData.qty_rows) || 12}
+                        rotation={parseInt(scopedFormData.rotation_degrees) || 0}
+                        wellDiameter={scopedFormData.well_relative_diameter || 6.4}
+                        maxWidth={400}
+                        maxHeight={500}
+                        probePositions={scopedFormData.probe_locations || []}
+                        positionUnits={scopedFormData.probe_position_units || "mm"}
+                      />
                     );
-                  }}
-                </FormDataConsumer>
-              </Paper>
-            </Box>
-          </Box>
-        </Grid>
-      </Grid>
-    </Paper>
+                  }
+                  return (
+                    <Box 
+                      sx={{ 
+                        height: 300, 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        border: '2px dashed #ddd',
+                        borderRadius: 2,
+                        bgcolor: 'background.paper'
+                      }}
+                    >
+                      <Box textAlign="center">
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          gutterBottom
+                        >
+                          Interactive Tray Preview
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                        >
+                          Fill out tray details to see preview
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                }}
+              </FormDataConsumer>
+            </Paper>
+
+        </Box>
+      </Box>
+    </Box>
   );
 };
 
