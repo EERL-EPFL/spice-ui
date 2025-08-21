@@ -260,46 +260,32 @@ const WellDetailsDisplay: React.FC<{
           ? `${well.tray_name}: ${well.coordinate}`
           : `Well ${well.coordinate}`}
       </Typography>
-      {well.first_phase_change_temperature_probes?.average && (
+      {(well.first_phase_change_temperature_probes?.average || well.temperatures?.probe_readings?.length > 0) && (
         <Tooltip
           title={
-            well.first_phase_change_temperature_probes ? (
+            (well.first_phase_change_temperature_probes || well.temperatures?.probe_readings) ? (
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
                   Individual Probe Temperatures:
                 </Typography>
-                <Typography variant="body2">
-                  Probe 1: {well.first_phase_change_temperature_probes.probe_1}
-                  °C
-                </Typography>
-                <Typography variant="body2">
-                  Probe 2: {well.first_phase_change_temperature_probes.probe_2}
-                  °C
-                </Typography>
-                <Typography variant="body2">
-                  Probe 3: {well.first_phase_change_temperature_probes.probe_3}
-                  °C
-                </Typography>
-                <Typography variant="body2">
-                  Probe 4: {well.first_phase_change_temperature_probes.probe_4}
-                  °C
-                </Typography>
-                <Typography variant="body2">
-                  Probe 5: {well.first_phase_change_temperature_probes.probe_5}
-                  °C
-                </Typography>
-                <Typography variant="body2">
-                  Probe 6: {well.first_phase_change_temperature_probes.probe_6}
-                  °C
-                </Typography>
-                <Typography variant="body2">
-                  Probe 7: {well.first_phase_change_temperature_probes.probe_7}
-                  °C
-                </Typography>
-                <Typography variant="body2">
-                  Probe 8: {well.first_phase_change_temperature_probes.probe_8}
-                  °C
-                </Typography>
+                {well.temperatures?.probe_readings ? (
+                  well.temperatures.probe_readings
+                    .sort((a, b) => a.probe.sequence - b.probe.sequence)
+                    .map((probe_data) => (
+                      <Typography key={probe_data.probe.id} variant="body2">
+                        {probe_data.probe.name}: {probe_data.probe_temperature_reading.temperature}°C
+                        {probe_data.probe.position_x && probe_data.probe.position_y && (
+                          <span style={{ opacity: 0.7, fontSize: '0.85em' }}>
+                            {' '}@ ({probe_data.probe.position_x}, {probe_data.probe.position_y})
+                          </span>
+                        )}
+                      </Typography>
+                    ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No individual probe data available
+                  </Typography>
+                )}
               </Box>
             ) : (
               ""
@@ -315,7 +301,10 @@ const WellDetailsDisplay: React.FC<{
             sx={{ cursor: "help" }}
           >
             <strong>Freezing temperature (average):</strong>{" "}
-            {well.first_phase_change_temperature_probes.average}°C
+            {well.first_phase_change_temperature_probes?.average || 
+             (well.temperatures?.probe_readings && 
+              (well.temperatures.probe_readings.reduce((sum, p) => sum + parseFloat(p.probe_temperature_reading.temperature), 0) / 
+               well.temperatures.probe_readings.length).toFixed(1))}°C
           </Typography>
         </Tooltip>
       )}

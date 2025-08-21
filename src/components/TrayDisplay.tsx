@@ -4,6 +4,14 @@ import { Box, Typography } from "@mui/material";
 const BASE_CIRCLE_RADIUS = 12;
 const BASE_SPACING = 30;
 
+export interface ProbePosition {
+  probe_number: number;
+  column_index: number;
+  position_x: number;
+  position_y: number;
+  name?: string;
+}
+
 export interface TrayDisplayProps {
   name: string;
   qtyCols: number; // number of columns (wells horizontally)
@@ -12,6 +20,7 @@ export interface TrayDisplayProps {
   wellDiameter?: string; // relative diameter (not used for display but could be)
   maxWidth?: number; // Maximum width constraint
   maxHeight?: number; // Maximum height constraint
+  probePositions?: ProbePosition[]; // Optional probe positions to display
 }
 
 const TrayDisplay: React.FC<TrayDisplayProps> = ({
@@ -21,6 +30,7 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
   rotation,
   maxWidth = 500,
   maxHeight = 400,
+  probePositions = [],
 }) => {
   // Generate row letters dynamically based on qtyRows
   const generateRowLetters = (count: number): string[] => {
@@ -292,6 +302,69 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
             strokeWidth={Math.max(0.8, 1 * scale)}
           />
         ))}
+
+        {/* Draw temperature probes */}
+        {probePositions.map((probe) => {
+          // Scale probe positions to the SVG coordinate system
+          // We need to map from the probe coordinate system to our SVG coordinate system
+          // This assumes probe positions are in the same coordinate space as the wells
+          // The wells span from 0,0 to (qtyCols-1)*spacing, (qtyRows-1)*spacing in the display
+          
+          // Calculate the bounds of the well area
+          const wellAreaWidth = (displayCols - 1) * SPACING;
+          const wellAreaHeight = (displayRows - 1) * SPACING;
+          
+          // Map probe position to SVG coordinates
+          // Assuming probe positions are in mm and need to be scaled to fit the well area
+          // This is a simple linear mapping - may need adjustment based on actual coordinate system
+          let probeX = LABEL_MARGIN + (probe.position_x / 150) * wellAreaWidth; // 150mm assumed max range
+          let probeY = TITLE_HEIGHT + LABEL_MARGIN + (probe.position_y / 100) * wellAreaHeight; // 100mm assumed max range
+          
+          // Clamp to stay within reasonable bounds
+          probeX = Math.max(LABEL_MARGIN - 20, Math.min(LABEL_MARGIN + wellAreaWidth + 20, probeX));
+          probeY = Math.max(TITLE_HEIGHT + LABEL_MARGIN - 20, Math.min(TITLE_HEIGHT + LABEL_MARGIN + wellAreaHeight + 20, probeY));
+          
+          return (
+            <g key={`probe-${probe.probe_number}`}>
+              {/* Probe circle */}
+              <circle
+                cx={probeX}
+                cy={probeY}
+                r={6 * scale}
+                fill="#1976d2"
+                stroke="#fff"
+                strokeWidth={2 * scale}
+                opacity={0.9}
+              />
+              
+              {/* Probe number label */}
+              <text
+                x={probeX}
+                y={probeY + 2 * scale}
+                textAnchor="middle"
+                fontSize={9 * scale}
+                fontWeight="bold"
+                fill="white"
+              >
+                {probe.probe_number}
+              </text>
+
+              {/* Probe name label */}
+              {probe.name && (
+                <text
+                  x={probeX}
+                  y={probeY - 10 * scale}
+                  textAnchor="middle"
+                  fontSize={8 * scale}
+                  fill="#1976d2"
+                  fontWeight="500"
+                >
+                  {probe.name}
+                </text>
+              )}
+            </g>
+          );
+        })}
       </svg>
     </Box>
   );

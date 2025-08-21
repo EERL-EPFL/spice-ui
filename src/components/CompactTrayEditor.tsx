@@ -19,14 +19,13 @@ import {
   required,
 } from "react-admin";
 import {
-  Visibility as PreviewIcon,
-  VisibilityOff as HidePreviewIcon,
   Settings as SettingsIcon,
   Image as ImageIcon,
 } from "@mui/icons-material";
 import TrayDisplay from "./TrayDisplay";
 import TrayProbeConfig from "./TrayProbeConfig";
 import ImageCoordinateSelector from "./ImageCoordinateSelector";
+import InteractiveTrayDisplay from "./InteractiveTrayDisplay";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -44,7 +43,6 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
 
 const CompactTrayEditor: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
-  const [showPreview, setShowPreview] = useState(false);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
@@ -56,18 +54,14 @@ const CompactTrayEditor: React.FC = () => {
         <Typography variant="h6" color="primary">
           Tray Configuration
         </Typography>
-        <IconButton
-          size="small"
-          onClick={() => setShowPreview(!showPreview)}
-          color={showPreview ? "primary" : "default"}
-        >
-          {showPreview ? <HidePreviewIcon /> : <PreviewIcon />}
-        </IconButton>
+        <Typography variant="caption" color="text.secondary">
+          Use the interactive preview on the right to place probes
+        </Typography>
       </Box>
 
       <Grid container spacing={3}>
         {/* Left: Form Controls */}
-        <Grid item xs={12} md={showPreview ? 8 : 12}>
+        <Grid item xs={12} md={8}>
           {/* Basic Tray Settings */}
           <Box sx={{ mb: 2 }}>
             <Grid container spacing={2}>
@@ -226,46 +220,72 @@ const CompactTrayEditor: React.FC = () => {
           </Box>
         </Grid>
 
-        {/* Right: Optional Preview */}
-        {showPreview && (
-          <Grid item xs={12} md={4}>
-            <Paper elevation={1} sx={{ p: 2, bgcolor: 'background.default' }}>
+        {/* Right: Always Visible Preview */}
+        <Grid item xs={12} md={4}>
+          <Paper elevation={1} sx={{ p: 2, bgcolor: 'background.default', position: 'sticky', top: 20 }}>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
               <Typography variant="subtitle2" gutterBottom>
-                Live Preview
+                Interactive Tray Preview
               </Typography>
-              <FormDataConsumer>
-                {({ scopedFormData }) => {
-                  if (
-                    scopedFormData?.name &&
-                    scopedFormData?.qty_cols &&
-                    scopedFormData?.qty_rows
-                  ) {
-                    return (
-                      <TrayDisplay
-                        name={scopedFormData.name}
-                        qtyCols={parseInt(scopedFormData.qty_cols) || 8}
-                        qtyRows={parseInt(scopedFormData.qty_rows) || 12}
-                        rotation={parseInt(scopedFormData.rotation_degrees) || 0}
-                        wellDiameter={scopedFormData.well_relative_diameter || 6.4}
-                        maxWidth={280}
-                        maxHeight={200}
-                      />
-                    );
-                  }
+            </Box>
+            <FormDataConsumer>
+              {({ scopedFormData }) => {
+                if (
+                  scopedFormData?.name &&
+                  scopedFormData?.qty_cols &&
+                  scopedFormData?.qty_rows
+                ) {
                   return (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ fontStyle: "italic", textAlign: 'center', py: 4 }}
-                    >
-                      Fill out tray details to see preview
-                    </Typography>
+                    <InteractiveTrayDisplay
+                      name={scopedFormData.name}
+                      qtyCols={parseInt(scopedFormData.qty_cols) || 8}
+                      qtyRows={parseInt(scopedFormData.qty_rows) || 12}
+                      rotation={parseInt(scopedFormData.rotation_degrees) || 0}
+                      wellDiameter={scopedFormData.well_relative_diameter || 6.4}
+                      maxWidth={320}
+                      maxHeight={400}
+                      probePositions={scopedFormData.probe_locations || []}
+                      positionUnits={scopedFormData.probe_position_units || "mm"}
+                      onProbePositionsChange={(positions) => {
+                        // This will be handled by the InteractiveTrayDisplay component
+                        // which will use the form context to update probe_locations
+                      }}
+                    />
                   );
-                }}
-              </FormDataConsumer>
-            </Paper>
-          </Grid>
-        )}
+                }
+                return (
+                  <Box 
+                    sx={{ 
+                      height: 300, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center',
+                      border: '2px dashed #ddd',
+                      borderRadius: 2,
+                      bgcolor: 'background.paper'
+                    }}
+                  >
+                    <Box textAlign="center">
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        gutterBottom
+                      >
+                        Tray Preview
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                      >
+                        Fill out tray details to see interactive preview
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              }}
+            </FormDataConsumer>
+          </Paper>
+        </Grid>
       </Grid>
     </Paper>
   );
