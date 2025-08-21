@@ -15,7 +15,6 @@ import {
 } from "react-admin";
 import { Box, Grid, Typography, Alert, Paper, Chip } from "@mui/material";
 import TrayDisplay from "../components/TrayDisplay";
-import ProbeLocationGrid from "../components/ProbeLocationGrid";
 
 const TrayConfigurationDisplay = () => {
   const record = useRecordContext();

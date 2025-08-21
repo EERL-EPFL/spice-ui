@@ -27,7 +27,6 @@ import {
 import TrayDisplay from "./TrayDisplay";
 import TrayProbeConfig from "./TrayProbeConfig";
 import ImageCoordinateSelector from "./ImageCoordinateSelector";
-import InteractiveTrayDisplay from "./InteractiveTrayDisplay";
 
 // Wrapper component to handle probe position updates with controls
 const InteractiveTrayWrapper: React.FC<{ scopedFormData: any }> = ({ scopedFormData }) => {

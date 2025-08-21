@@ -1384,7 +1384,7 @@ export const RegionInput: React.FC<{
         groupedRegions[regionName] = [];
       }
 
-      // MIGRATION LOGIC: Handle old regions that don't have tray_id set
+      // Handle backward compatibility for regions without tray_id
       let effectiveTrayId = region.tray_id;
       if (effectiveTrayId === undefined || effectiveTrayId === null) {
         effectiveTrayId = 1; // Default to first tray configuration
@@ -1502,7 +1502,7 @@ export const RegionInput: React.FC<{
     }
   }, [needsMigration, regions, flatTrays, onChange]);
 
-  // Add a one-time migration effect to fix legacy regions
+  // Handle backward compatibility for regions without tray_id
   React.useEffect(() => {
     // Only run once when all conditions are met
     if (needsMigration && flatTrays.length > 0) {
@@ -1765,7 +1765,7 @@ export const RegionInput: React.FC<{
                   {regions.map((r, idx) => {
                     // Removed debug logging
 
-                    // MIGRATION LOGIC: Handle old regions that don't have tray_id set
+                    // Handle backward compatibility for regions without tray_id
                     let effectiveTrayId = r.tray_id;
 
                     // If tray_id is undefined/null, try to determine it from the region's position

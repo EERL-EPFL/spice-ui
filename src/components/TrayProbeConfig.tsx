@@ -17,7 +17,6 @@ import {
   FormDataConsumer,
   useInput,
 } from "react-admin";
-import ProbeLocationGrid from "./ProbeLocationGrid";
 import ProbeConfigurationEditor, { ProbeLocation } from "./ProbeConfigurationEditor";
 
 const TrayProbeConfig: React.FC = () => {
