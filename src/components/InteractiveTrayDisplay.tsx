@@ -181,7 +181,7 @@ const InteractiveTrayDisplay: React.FC<InteractiveTrayDisplayProps> = ({
     // Find next Excel column
     const nextColumnIndex = currentProbes.length > 0 
       ? Math.max(...currentProbes.map((p: ProbePosition) => p.column_index)) + 1 
-      : 2;
+      : 1;
 
     const newProbe: ProbePosition = {
       probe_number: nextProbeNumber,
@@ -206,14 +206,14 @@ const InteractiveTrayDisplay: React.FC<InteractiveTrayDisplayProps> = ({
   // Load default probes
   const loadDefaults = useCallback(() => {
     const defaultProbes: ProbePosition[] = [
-      { probe_number: 1, column_index: 2, position_x: 4.5, position_y: 13.5, name: "Probe 1" },
-      { probe_number: 2, column_index: 3, position_x: 49.5, position_y: 31.5, name: "Probe 2" },
-      { probe_number: 3, column_index: 4, position_x: 49.5, position_y: 67.5, name: "Probe 3" },
-      { probe_number: 4, column_index: 5, position_x: 4.5, position_y: 94.5, name: "Probe 4" },
-      { probe_number: 5, column_index: 6, position_x: 144.5, position_y: 94.5, name: "Probe 5" },
-      { probe_number: 6, column_index: 7, position_x: 99.5, position_y: 67.5, name: "Probe 6" },
-      { probe_number: 7, column_index: 8, position_x: 99.5, position_y: 31.5, name: "Probe 7" },
-      { probe_number: 8, column_index: 9, position_x: 144.5, position_y: 13.5, name: "Probe 8" },
+      { probe_number: 1, column_index: 1, position_x: 4.5, position_y: 13.5, name: "Probe 1" },
+      { probe_number: 2, column_index: 2, position_x: 49.5, position_y: 31.5, name: "Probe 2" },
+      { probe_number: 3, column_index: 3, position_x: 49.5, position_y: 67.5, name: "Probe 3" },
+      { probe_number: 4, column_index: 4, position_x: 4.5, position_y: 94.5, name: "Probe 4" },
+      { probe_number: 5, column_index: 5, position_x: 144.5, position_y: 94.5, name: "Probe 5" },
+      { probe_number: 6, column_index: 6, position_x: 99.5, position_y: 67.5, name: "Probe 6" },
+      { probe_number: 7, column_index: 7, position_x: 99.5, position_y: 31.5, name: "Probe 7" },
+      { probe_number: 8, column_index: 8, position_x: 144.5, position_y: 13.5, name: "Probe 8" },
     ];
     field.onChange(defaultProbes);
   }, [field]);
@@ -221,43 +221,32 @@ const InteractiveTrayDisplay: React.FC<InteractiveTrayDisplayProps> = ({
   const currentProbes = field.value || [];
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+    <Box sx={{ 
+      display: "flex", 
+      flexDirection: "column", 
+      alignItems: "center",
+      width: maxWidth,
+      minWidth: maxWidth,
+      maxWidth: maxWidth
+    }}>
       {/* Control Panel */}
       <Box sx={{ mb: 2, width: '100%' }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
           <Typography variant="caption" color="text.secondary">
             {currentProbes.length} probe{currentProbes.length !== 1 ? 's' : ''} configured
           </Typography>
-          <Box display="flex" gap={0.5}>
-            <Chip
-              size="small"
-              label="8-Probe Default"
-              variant="outlined"
-              clickable
-              onClick={loadDefaults}
-              color="primary"
-            />
-          </Box>
-        </Box>
-        
-        <Box display="flex" gap={1} mb={1}>
           <Button
             size="small"
             variant={isAddingProbe ? "contained" : "outlined"}
             color="secondary"
             startIcon={<AddIcon />}
             onClick={() => setIsAddingProbe(!isAddingProbe)}
-            fullWidth
+            sx={{ minWidth: 'auto', px: 1.5 }}
           >
-            {isAddingProbe ? "Click on tray to place probe" : "Add Probe"}
+            {isAddingProbe ? "Click on tray" : "Add Probe"}
           </Button>
         </Box>
 
-        {isAddingProbe && (
-          <Typography variant="caption" color="primary" sx={{ fontStyle: 'italic' }}>
-            Click anywhere on the tray below to place a new temperature probe
-          </Typography>
-        )}
       </Box>
 
       {/* Interactive SVG */}
@@ -408,36 +397,6 @@ const InteractiveTrayDisplay: React.FC<InteractiveTrayDisplayProps> = ({
         })}
       </svg>
 
-      {/* Probe List */}
-      {currentProbes.length > 0 && (
-        <Box sx={{ mt: 2, width: '100%' }}>
-          <Typography variant="caption" color="text.secondary" gutterBottom>
-            Configured Probes:
-          </Typography>
-          {currentProbes.map((probe: ProbePosition) => (
-            <Box
-              key={probe.probe_number}
-              sx={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                p: 0.5,
-                fontSize: '0.75rem',
-                bgcolor: 'background.paper',
-                borderRadius: 1,
-                mb: 0.5,
-              }}
-            >
-              <Typography variant="caption">
-                {probe.name || `Probe ${probe.probe_number}`}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                ({probe.position_x}, {probe.position_y}) {positionUnits}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
-      )}
     </Box>
   );
 };

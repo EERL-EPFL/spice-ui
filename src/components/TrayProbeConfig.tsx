@@ -53,74 +53,12 @@ const ProbeLocationsInput: React.FC<{
 
   return (
     <Box>
-      <Accordion sx={{ mt: 2 }} defaultExpanded>
-        <AccordionSummary 
-          expandIcon={<ExpandMoreIcon />}
-          sx={{ backgroundColor: 'action.hover' }}
-        >
-          <Box display="flex" alignItems="center" gap={1}>
-            <SettingsIcon color="primary" />
-            <Typography variant="subtitle2" color="primary">
-              Temperature Probes ({field.value?.length || 0} configured)
-            </Typography>
-          </Box>
-        </AccordionSummary>
-        
-        <AccordionDetails>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <NumberInput
-                source="probe_count"
-                label="Maximum Probes"
-                defaultValue={8}
-                min={1}
-                max={16}
-                fullWidth
-                size="small"
-              />
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <SelectInput
-                source="probe_position_units"
-                label="Position Units"
-                choices={[
-                  { id: "mm", name: "Millimeters (mm)" },
-                  { id: "cm", name: "Centimeters (cm)" },
-                  { id: "pixels", name: "Pixels" },
-                ]}
-                defaultValue="mm"
-                fullWidth
-                size="small"
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <ProbeConfigurationEditor
-                probeLocations={field.value || []}
-                onProbeLocationsChange={handleProbeLocationsChange}
-                maxProbes={probeCount}
-                positionUnits={positionUnits}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <Box 
-                sx={{ 
-                  p: 2, 
-                  bgcolor: 'info.main', 
-                  color: 'info.contrastText', 
-                  borderRadius: 1,
-                  fontSize: '0.875rem'
-                }}
-              >
-                💡 <strong>Tip:</strong> Use the interactive tray preview on the right to visually place probes by clicking, 
-                or configure them manually using the form above.
-              </Box>
-            </Grid>
-          </Grid>
-        </AccordionDetails>
-      </Accordion>
+      <ProbeConfigurationEditor
+        probeLocations={field.value || []}
+        onProbeLocationsChange={handleProbeLocationsChange}
+        maxProbes={16} // Fixed max probes
+        positionUnits="mm" // Fixed units
+      />
     </Box>
   );
 };
