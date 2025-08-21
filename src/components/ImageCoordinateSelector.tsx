@@ -52,6 +52,8 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
   const [coordinates, setCoordinates] = useState(value || {});
   const [hoverPosition, setHoverPosition] = useState<{ x: number; y: number } | null>(null);
   const [magnifiedCanvas, setMagnifiedCanvas] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState<'upper_left' | 'lower_right' | null>(null);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   
@@ -163,12 +165,61 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
     }
   };
 
+  // Helper function to get actual image bounds within container
+  const getImageBounds = useCallback(() => {
+    if (!imageRef.current) return null;
+    
+    const rect = imageRef.current.getBoundingClientRect();
+    const img = imageRef.current;
+    
+    // Calculate the actual displayed image dimensions and position due to object-fit: contain
+    const imgAspectRatio = img.naturalWidth / img.naturalHeight;
+    const containerAspectRatio = rect.width / rect.height;
+    
+    let actualWidth, actualHeight, offsetX, offsetY;
+    
+    if (imgAspectRatio > containerAspectRatio) {
+      // Image is wider - limited by container width
+      actualWidth = rect.width;
+      actualHeight = rect.width / imgAspectRatio;
+      offsetX = 0;
+      offsetY = (rect.height - actualHeight) / 2;
+    } else {
+      // Image is taller - limited by container height
+      actualWidth = rect.height * imgAspectRatio;
+      actualHeight = rect.height;
+      offsetX = (rect.width - actualWidth) / 2;
+      offsetY = 0;
+    }
+    
+    
+    return { actualWidth, actualHeight, offsetX, offsetY, containerRect: rect };
+  }, []);
+
   const handleImageClick = useCallback((event: React.MouseEvent<HTMLImageElement>) => {
     if (!selectionMode || !imageRef.current) return;
 
-    const rect = imageRef.current.getBoundingClientRect();
-    const x = Math.round(event.clientX - rect.left);
-    const y = Math.round(event.clientY - rect.top);
+    const bounds = getImageBounds();
+    if (!bounds) return;
+    
+    const { containerRect, offsetX, offsetY, actualWidth, actualHeight } = bounds;
+    const img = imageRef.current;
+    
+    // Get click position relative to the container
+    const containerX = event.clientX - containerRect.left;
+    const containerY = event.clientY - containerRect.top;
+    
+    // Check if click is within the actual image bounds
+    if (containerX < offsetX || containerX > offsetX + actualWidth ||
+        containerY < offsetY || containerY > offsetY + actualHeight) {
+      return; // Click was outside the actual image
+    }
+    
+    // For now, let's store display coordinates to fix the positioning issue
+    // We can convert to image coordinates later when needed for processing
+    const x = containerX;
+    const y = containerY;
+    
 
     // Update form fields directly
     if (selectionMode === 'upper_left') {
@@ -223,6 +274,137 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
     setHoverPosition(null);
     setMagnifiedCanvas(null);
   }, []);
+
+  // Handle dragging coordinate indicators
+  const handleCoordinateMouseDown = useCallback((event: React.MouseEvent, type: 'upper_left' | 'lower_right') => {
+    if (!imageRef.current) return;
+    
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const bounds = getImageBounds();
+    if (!bounds) return;
+    
+    const { containerRect, offsetX, offsetY, actualWidth, actualHeight } = bounds;
+    const img = imageRef.current;
+    
+    // Get current display coordinates (already stored as display coordinates)
+    const currentDisplayX = type === 'upper_left' ? upperLeftXField.field.value : lowerRightXField.field.value;
+    const currentDisplayY = type === 'upper_left' ? upperLeftYField.field.value : lowerRightYField.field.value;
+    
+    // Calculate offset from mouse to center of indicator
+    const dragOffsetX = event.clientX - containerRect.left - currentDisplayX;
+    const dragOffsetY = event.clientY - containerRect.top - currentDisplayY;
+    
+    setIsDragging(type);
+    setDragOffset({ x: dragOffsetX, y: dragOffsetY });
+  }, [upperLeftXField, upperLeftYField, lowerRightXField, lowerRightYField, getImageBounds]);
+
+  const handleMouseMove = useCallback((event: React.MouseEvent<HTMLImageElement>) => {
+    if (isDragging && imageRef.current) {
+      const bounds = getImageBounds();
+      if (!bounds) return;
+      
+      const { containerRect, offsetX, offsetY, actualWidth, actualHeight } = bounds;
+      const img = imageRef.current;
+      
+      // Get mouse position relative to container
+      const containerX = event.clientX - containerRect.left - dragOffset.x;
+      const containerY = event.clientY - containerRect.top - dragOffset.y;
+      
+      // Clamp to actual image display bounds
+      const clampedContainerX = Math.max(offsetX, Math.min(offsetX + actualWidth, containerX));
+      const clampedContainerY = Math.max(offsetY, Math.min(offsetY + actualHeight, containerY));
+      
+      // Convert to actual image pixel coordinates
+      const imageX = ((clampedContainerX - offsetX) / actualWidth) * img.naturalWidth;
+      const imageY = ((clampedContainerY - offsetY) / actualHeight) * img.naturalHeight;
+      
+      const clampedX = Math.round(imageX);
+      const clampedY = Math.round(imageY);
+      
+      // Update form fields
+      if (isDragging === 'upper_left') {
+        upperLeftXField.field.onChange(clampedX);
+        upperLeftYField.field.onChange(clampedY);
+      } else if (isDragging === 'lower_right') {
+        lowerRightXField.field.onChange(clampedX);
+        lowerRightYField.field.onChange(clampedY);
+      }
+      
+      // Update local state
+      const newCoordinates = {
+        ...coordinates,
+        [isDragging === 'upper_left' ? 'upper_left_corner_x' : 'lower_right_corner_x']: clampedX,
+        [isDragging === 'upper_left' ? 'upper_left_corner_y' : 'lower_right_corner_y']: clampedY,
+      };
+      setCoordinates(newCoordinates);
+      onChange(newCoordinates);
+    } else {
+      // Regular hover behavior
+      handleImageHover(event);
+    }
+  }, [isDragging, dragOffset, coordinates, onChange, upperLeftXField, upperLeftYField, lowerRightXField, lowerRightYField, handleImageHover, getImageBounds]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(null);
+    setDragOffset({ x: 0, y: 0 });
+  }, []);
+
+  // Add global mouse listeners to handle dragging anywhere
+  React.useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        setIsDragging(null);
+        setDragOffset({ x: 0, y: 0 });
+      }
+    };
+
+    const handleGlobalMouseMove = (event: MouseEvent) => {
+      if (isDragging && imageRef.current) {
+        const bounds = getImageBounds();
+        if (!bounds) return;
+        
+        const { containerRect, offsetX, offsetY, actualWidth, actualHeight } = bounds;
+        const img = imageRef.current;
+        
+        // Get mouse position relative to container  
+        const containerX = event.clientX - containerRect.left - dragOffset.x;
+        const containerY = event.clientY - containerRect.top - dragOffset.y;
+        
+        // Clamp to actual image display bounds and store as display coordinates
+        const clampedX = Math.max(offsetX, Math.min(offsetX + actualWidth, containerX));
+        const clampedY = Math.max(offsetY, Math.min(offsetY + actualHeight, containerY));
+        
+        // Update form fields
+        if (isDragging === 'upper_left') {
+          upperLeftXField.field.onChange(clampedX);
+          upperLeftYField.field.onChange(clampedY);
+        } else if (isDragging === 'lower_right') {
+          lowerRightXField.field.onChange(clampedX);
+          lowerRightYField.field.onChange(clampedY);
+        }
+        
+        // Update local state
+        const newCoordinates = {
+          ...coordinates,
+          [isDragging === 'upper_left' ? 'upper_left_corner_x' : 'lower_right_corner_x']: clampedX,
+          [isDragging === 'upper_left' ? 'upper_left_corner_y' : 'lower_right_corner_y']: clampedY,
+        };
+        setCoordinates(newCoordinates);
+        onChange(newCoordinates);
+      }
+    };
+
+    if (isDragging) {
+      document.addEventListener('mouseup', handleGlobalMouseUp);
+      document.addEventListener('mousemove', handleGlobalMouseMove);
+      return () => {
+        document.removeEventListener('mouseup', handleGlobalMouseUp);
+        document.removeEventListener('mousemove', handleGlobalMouseMove);
+      };
+    }
+  }, [isDragging, dragOffset, coordinates, onChange, upperLeftXField, upperLeftYField, lowerRightXField, lowerRightYField, getImageBounds]);
 
   const closeDialog = () => {
     setDialogOpen(false);
@@ -325,6 +507,11 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
                     <Button size="small" onClick={clearCoordinates} color="error">
                       Clear Coordinates
                     </Button>
+                    {uploadedImage && (
+                      <Button size="small" onClick={() => setDialogOpen(true)} color="warning">
+                        Adjust Coordinates
+                      </Button>
+                    )}
                     <Button size="small" onClick={() => fileInputRef.current?.click()}>
                       Upload New Image
                     </Button>
@@ -363,11 +550,9 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
           {uploadedImage && (
             <FormDataConsumer>
               {({ formData }) => {
-                console.log('FormData in ImageCoordinateSelector:', formData);
                 const qtyRows = parseInt(formData?.trays?.[0]?.qty_rows) || 8;
                 const qtyCols = parseInt(formData?.trays?.[0]?.qty_cols) || 12;
                 const rotation = parseInt(formData?.trays?.[0]?.rotation_degrees) || 0;
-                console.log('Parsed values:', { qtyRows, qtyCols, rotation, raw_rotation: formData?.rotation_degrees });
                 const { upperLeftWell, lowerRightWell } = getWellCoordinates(qtyRows, qtyCols, rotation);
                 
                 return (
@@ -376,62 +561,274 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
                     {/* Current step indicator */}
                     <Box mb={3}>
                       <Grid container spacing={2}>
-                        <Grid item xs={6}>
-                          <Button
-                            variant={selectionMode === 'upper_left' ? 'contained' : 'outlined'}
-                            size="large"
-                            fullWidth
-                            startIcon={<SelectIcon />}
-                            onClick={() => setSelectionMode('upper_left')}
-                            color={upperLeftXField.field.value !== undefined ? 'success' : 'primary'}
-                          >
-                            Step 1: Upper Left ({upperLeftWell})
-                          </Button>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Button
-                            variant={selectionMode === 'lower_right' ? 'contained' : 'outlined'}
-                            size="large" 
-                            fullWidth
-                            startIcon={<SelectIcon />}
-                            onClick={() => setSelectionMode('lower_right')}
-                            color={lowerRightXField.field.value !== undefined ? 'success' : 'primary'}
-                            disabled={upperLeftXField.field.value === undefined}
-                          >
-                            Step 2: Lower Right ({lowerRightWell})
-                          </Button>
-                        </Grid>
+                        {upperLeftXField.field.value === undefined || lowerRightXField.field.value === undefined ? (
+                          <>
+                            <Grid item xs={6}>
+                              <Button
+                                variant={selectionMode === 'upper_left' ? 'contained' : 'outlined'}
+                                size="large"
+                                fullWidth
+                                startIcon={<SelectIcon />}
+                                onClick={() => setSelectionMode('upper_left')}
+                                color={upperLeftXField.field.value !== undefined ? 'success' : 'primary'}
+                              >
+                                Step 1: Upper Left ({upperLeftWell})
+                              </Button>
+                            </Grid>
+                            <Grid item xs={6}>
+                              <Button
+                                variant={selectionMode === 'lower_right' ? 'contained' : 'outlined'}
+                                size="large" 
+                                fullWidth
+                                startIcon={<SelectIcon />}
+                                onClick={() => setSelectionMode('lower_right')}
+                                color={lowerRightXField.field.value !== undefined ? 'success' : 'primary'}
+                                disabled={upperLeftXField.field.value === undefined}
+                              >
+                                Step 2: Lower Right ({lowerRightWell})
+                              </Button>
+                            </Grid>
+                          </>
+                        ) : (
+                          <Grid item xs={12}>
+                            <Button
+                              variant={selectionMode ? 'outlined' : 'contained'}
+                              size="large"
+                              fullWidth
+                              color="warning"
+                              onClick={() => setSelectionMode(selectionMode ? null : 'upper_left')}
+                            >
+                              {selectionMode ? 'Exit Adjust Mode' : 'Adjust Coordinates'}
+                            </Button>
+                          </Grid>
+                        )}
                       </Grid>
                     </Box>
 
-                    {/* Full size image */}
+                    {/* Full size image container */}
                     <Box 
                       sx={{ 
                         flex: 1, 
                         display: 'flex', 
                         justifyContent: 'center', 
                         alignItems: 'center',
-                        position: 'relative',
-                        overflow: 'hidden'
+                        overflow: 'auto',
+                        minHeight: 0, // Important for flex children to shrink
+                        padding: 2
                       }}
                     >
-                      <img
-                        ref={imageRef}
-                        src={uploadedImage}
-                        alt="Tray setup"
-                        style={{
-                          maxWidth: '100%',
-                          maxHeight: '100%',
-                          objectFit: 'contain',
-                          cursor: selectionMode ? 'crosshair' : 'default',
-                          border: selectionMode ? '3px dashed #1976d2' : '2px solid #ddd',
-                          borderRadius: '8px',
-                          boxShadow: '0 4px 20px rgba(0,0,0,0.1)'
-                        }}
-                        onClick={handleImageClick}
-                        onMouseMove={handleImageHover}
-                        onMouseLeave={handleImageLeave}
-                      />
+                      {/* Image wrapper with relative positioning for crosshairs */}
+                      <Box sx={{ position: 'relative', maxWidth: '100%', maxHeight: '100%' }}>
+                        <img
+                          ref={imageRef}
+                          src={uploadedImage}
+                          alt="Tray setup"
+                          style={{
+                            width: 'auto',
+                            height: 'auto',
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            objectFit: 'contain',
+                            cursor: isDragging ? 'grabbing' : selectionMode ? 'crosshair' : 'default',
+                            border: selectionMode ? '3px dashed #1976d2' : '2px solid #ddd',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                            display: 'block'
+                          }}
+                          onClick={handleImageClick}
+                          onMouseMove={handleMouseMove}
+                          onMouseLeave={handleImageLeave}
+                          onMouseUp={handleMouseUp}
+                        />
+                      
+                      {/* Coordinate Indicators - Crosshairs */}
+                      {upperLeftXField.field.value !== undefined && upperLeftYField.field.value !== undefined && (() => {
+                        const bounds = getImageBounds();
+                        if (!bounds) return null;
+                        
+                        const { offsetX, offsetY, actualWidth, actualHeight } = bounds;
+                        const img = imageRef.current;
+                        
+                        // Use stored display coordinates directly
+                        const displayX = upperLeftXField.field.value;
+                        const displayY = upperLeftYField.field.value;
+                        
+                        return (
+                          <Box
+                            position="absolute"
+                            top={displayY}
+                            left={displayX}
+                          sx={{
+                            transform: 'translate(-50%, -50%)',
+                            zIndex: 5,
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          {/* Vertical line */}
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              left: '50%',
+                              top: '-40px',
+                              width: '3px',
+                              height: '80px',
+                              bgcolor: '#4caf50',
+                              transform: 'translateX(-50%)',
+                              boxShadow: '0 0 6px rgba(76, 175, 80, 0.6)',
+                            }}
+                          />
+                          {/* Horizontal line */}
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: '50%',
+                              left: '-40px',
+                              height: '3px',
+                              width: '80px',
+                              bgcolor: '#4caf50',
+                              transform: 'translateY(-50%)',
+                              boxShadow: '0 0 6px rgba(76, 175, 80, 0.6)',
+                            }}
+                          />
+                          {/* Center dot for dragging */}
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: '50%',
+                              left: '50%',
+                              width: '12px',
+                              height: '12px',
+                              bgcolor: '#4caf50',
+                              border: '2px solid white',
+                              borderRadius: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              cursor: 'grab',
+                              pointerEvents: 'auto',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                              '&:hover': {
+                                bgcolor: '#45a049',
+                                transform: 'translate(-50%, -50%) scale(1.2)',
+                              },
+                            }}
+                            onMouseDown={(e) => handleCoordinateMouseDown(e, 'upper_left')}
+                          />
+                          {/* Label */}
+                          <Box
+                            position="absolute"
+                            top={-50}
+                            left="50%"
+                            sx={{
+                              transform: 'translateX(-50%)',
+                              bgcolor: 'rgba(76, 175, 80, 0.9)',
+                              color: 'white',
+                              px: 1,
+                              py: 0.5,
+                              borderRadius: 1,
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              whiteSpace: 'nowrap',
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            {upperLeftWell}
+                          </Box>
+                        </Box>
+                        );
+                      })()}
+                      
+                      {lowerRightXField.field.value !== undefined && lowerRightYField.field.value !== undefined && (() => {
+                        const bounds = getImageBounds();
+                        if (!bounds) return null;
+                        
+                        const { offsetX, offsetY, actualWidth, actualHeight } = bounds;
+                        const img = imageRef.current;
+                        
+                        // Use stored display coordinates directly
+                        const displayX = lowerRightXField.field.value;
+                        const displayY = lowerRightYField.field.value;
+                        
+                        return (
+                          <Box
+                            position="absolute"
+                            top={displayY}
+                            left={displayX}
+                          sx={{
+                            transform: 'translate(-50%, -50%)',
+                            zIndex: 5,
+                            pointerEvents: 'none',
+                          }}
+                        >
+                          {/* Vertical line */}
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              left: '50%',
+                              top: '-40px',
+                              width: '3px',
+                              height: '80px',
+                              bgcolor: '#f44336',
+                              transform: 'translateX(-50%)',
+                              boxShadow: '0 0 6px rgba(244, 67, 54, 0.6)',
+                            }}
+                          />
+                          {/* Horizontal line */}
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: '50%',
+                              left: '-40px',
+                              height: '3px',
+                              width: '80px',
+                              bgcolor: '#f44336',
+                              transform: 'translateY(-50%)',
+                              boxShadow: '0 0 6px rgba(244, 67, 54, 0.6)',
+                            }}
+                          />
+                          {/* Center dot for dragging */}
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: '50%',
+                              left: '50%',
+                              width: '12px',
+                              height: '12px',
+                              bgcolor: '#f44336',
+                              border: '2px solid white',
+                              borderRadius: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              cursor: 'grab',
+                              pointerEvents: 'auto',
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                              '&:hover': {
+                                bgcolor: '#d32f2f',
+                                transform: 'translate(-50%, -50%) scale(1.2)',
+                              },
+                            }}
+                            onMouseDown={(e) => handleCoordinateMouseDown(e, 'lower_right')}
+                          />
+                          {/* Label */}
+                          <Box
+                            position="absolute"
+                            top={-50}
+                            left="50%"
+                            sx={{
+                              transform: 'translateX(-50%)',
+                              bgcolor: 'rgba(244, 67, 54, 0.9)',
+                              color: 'white',
+                              px: 1,
+                              py: 0.5,
+                              borderRadius: 1,
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              whiteSpace: 'nowrap',
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            {lowerRightWell}
+                          </Box>
+                        </Box>
+                        );
+                      })()}
                       
                       {/* Enhanced hover zoom bubble with magnified image */}
                       {hoverPosition && selectionMode && (
@@ -501,6 +898,7 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
                           </Box>
                         </Box>
                       )}
+                      </Box> {/* Close image wrapper */}
                     </Box>
 
                     {/* Instructions */}
