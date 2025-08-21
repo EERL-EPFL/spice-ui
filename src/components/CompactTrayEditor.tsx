@@ -43,16 +43,15 @@ const InteractiveTrayWrapper: React.FC<{ scopedFormData: any }> = ({ scopedFormD
   const handleTrayClick = (x: number, y: number) => {
     if (!isAddingProbe) return;
     
-    const newProbeNumber = currentProbes.length > 0 
-      ? Math.max(...currentProbes.map((p: any) => p.probe_number)) + 1 
+    const newDataColumnIndex = currentProbes.length > 0 
+      ? Math.max(...currentProbes.map((p: any) => p.data_column_index || 1)) + 1 
       : 1;
     
     const newProbe = {
-      probe_number: newProbeNumber,
-      column_index: newProbeNumber,
+      data_column_index: newDataColumnIndex,
       position_x: Math.round(x * 10) / 10, // Round to 1 decimal place
       position_y: Math.round(y * 10) / 10,
-      name: `Probe ${newProbeNumber}`,
+      name: `Probe ${newDataColumnIndex}`,
     };
     
     const updatedProbes = [...currentProbes, newProbe];
@@ -84,6 +83,17 @@ const InteractiveTrayWrapper: React.FC<{ scopedFormData: any }> = ({ scopedFormD
             {isAddingProbe ? "Click on tray" : "Add Probe"}
           </Button>
         </Box>
+        
+        {/* Coordinate System Note */}
+        <Typography variant="caption" color="text.secondary" sx={{ 
+          display: 'block', 
+          fontStyle: 'italic',
+          textAlign: 'center',
+          mt: 1,
+          px: 1 
+        }}>
+          💡 Probe coordinates are in mm relative to A1 well at 0° rotation
+        </Typography>
       </Box>
       
       {/* Interactive Tray Display */}
@@ -95,7 +105,7 @@ const InteractiveTrayWrapper: React.FC<{ scopedFormData: any }> = ({ scopedFormD
         wellDiameter={scopedFormData.well_relative_diameter || 6.4}
         maxWidth={400}
         maxHeight={500}
-        probePositions={currentProbes}
+        probeLocations={currentProbes}
         onProbePositionsChange={(positions) => {
           probeLocationsField.field.onChange(positions);
         }}

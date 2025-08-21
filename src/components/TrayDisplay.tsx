@@ -5,10 +5,9 @@ const BASE_CIRCLE_RADIUS = 12;
 const BASE_SPACING = 30;
 
 export interface ProbePosition {
-  probe_number: number;
-  column_index: number;
-  position_x: number;
-  position_y: number;
+  data_column_index?: number;
+  position_x: number | string;
+  position_y: number | string;
   name?: string;
 }
 
@@ -20,10 +19,13 @@ export interface TrayDisplayProps {
   wellDiameter?: string; // relative diameter (not used for display but could be)
   maxWidth?: number; // Maximum width constraint
   maxHeight?: number; // Maximum height constraint
-  probePositions?: ProbePosition[]; // Optional probe positions to display
+  probeLocations?: ProbePosition[]; // Optional probe locations to display
   onProbePositionsChange?: (positions: ProbePosition[]) => void; // Callback for probe position changes
   onTrayClick?: (x: number, y: number) => void; // Callback for clicking on tray to add probes
   isAddingProbe?: boolean; // Whether we're in probe adding mode
+  readOnly?: boolean; // Whether the component is read-only
+  hoveredProbe?: string | null; // Probe ID that is currently hovered
+  onProbeHover?: (probeId: string | null) => void; // Callback for probe hover
 }
 
 const TrayDisplay: React.FC<TrayDisplayProps> = ({
@@ -33,10 +35,13 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
   rotation,
   maxWidth = 500,
   maxHeight = 400,
-  probePositions = [],
+  probeLocations = [],
   onProbePositionsChange,
   onTrayClick,
   isAddingProbe = false,
+  readOnly = false,
+  hoveredProbe,
+  onProbeHover,
 }) => {
   // State for probe dragging
   const [dragState, setDragState] = useState<{
@@ -103,19 +108,97 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
     const wellAreaWidth = (displayCols - 1) * SPACING;
     const wellAreaHeight = (displayRows - 1) * SPACING;
     
-    // Convert SVG coordinates to normalized position within tray area
-    const normalizedX = (svgX - LABEL_MARGIN) / wellAreaWidth;
-    const normalizedY = (svgY - TITLE_HEIGHT - LABEL_MARGIN) / wellAreaHeight;
+    // Convert SVG coordinates to normalized display position
+    const displayNormalizedX = (svgX - LABEL_MARGIN) / wellAreaWidth;
+    const displayNormalizedY = (svgY - TITLE_HEIGHT - LABEL_MARGIN) / wellAreaHeight;
     
-    // Convert to tray coordinate system (mm)
+    // Apply inverse rotation to get back to original tray normalized coordinates
+    let normalizedX, normalizedY;
+    
+    switch (rotation) {
+      case 90:
+        // Inverse of clockwise 90°: (1-y, x) -> (y, 1-x)
+        normalizedX = displayNormalizedY;
+        normalizedY = 1 - displayNormalizedX;
+        break;
+      case 180:
+        normalizedX = 1 - displayNormalizedX;
+        normalizedY = 1 - displayNormalizedY;
+        break;
+      case 270:
+        // Inverse of clockwise 270°: (y, 1-x) -> (1-y, x)
+        normalizedX = 1 - displayNormalizedY;
+        normalizedY = displayNormalizedX;
+        break;
+      default: // 0 degrees
+        normalizedX = displayNormalizedX;
+        normalizedY = displayNormalizedY;
+        break;
+    }
+    
+    // Convert back to tray coordinate system (mm)
     const trayWidth = 150; // mm
     const trayHeight = 100; // mm
     
-    const trayX = Math.max(0, Math.min(trayWidth, normalizedX * trayWidth));
-    const trayY = Math.max(0, Math.min(trayHeight, normalizedY * trayHeight));
+    const trayX = normalizedX * trayWidth;
+    const trayY = normalizedY * trayHeight;
     
-    return { x: trayX, y: trayY };
-  }, [SPACING, LABEL_MARGIN, displayCols, displayRows]);
+    // Clamp to bounds
+    const clampedX = Math.max(0, Math.min(trayWidth, trayX));
+    const clampedY = Math.max(0, Math.min(trayHeight, trayY));
+    
+    return { x: clampedX, y: clampedY };
+  }, [SPACING, LABEL_MARGIN, displayCols, displayRows, rotation]);
+
+  // Convert tray coordinates to display coordinates for rendering
+  const convertTrayToSvgCoords = useCallback((trayX: number, trayY: number) => {
+    // The tray coordinate system should transform the same way wells transform
+    // Tray coordinates are in mm in a coordinate system where:
+    // - (0,0) is at one corner of the tray
+    // - (150,100) is at the opposite corner
+    
+    // First normalize the tray coordinates to 0-1 range
+    const trayWidth = 150; // mm
+    const trayHeight = 100; // mm
+    const normalizedX = trayX / trayWidth;
+    const normalizedY = trayY / trayHeight;
+    
+    // Now apply the same rotation logic as wells use
+    // Convert normalized coordinates to "logical" row/col equivalents
+    // Then apply the display transformation
+    
+    let displayNormalizedX, displayNormalizedY;
+    
+    switch (rotation) {
+      case 90:
+        // Clockwise 90°: (x,y) -> (y, 1-x) becomes (1-y, x) for correct direction
+        displayNormalizedX = 1 - normalizedY;
+        displayNormalizedY = normalizedX;
+        break;
+      case 180:
+        displayNormalizedX = 1 - normalizedX;
+        displayNormalizedY = 1 - normalizedY;
+        break;
+      case 270:
+        // Clockwise 270°: (x,y) -> (1-y, x) becomes (y, 1-x) for correct direction  
+        displayNormalizedX = normalizedY;
+        displayNormalizedY = 1 - normalizedX;
+        break;
+      default: // 0 degrees
+        displayNormalizedX = normalizedX;
+        displayNormalizedY = normalizedY;
+        break;
+    }
+    
+    // Convert to SVG coordinates
+    const wellAreaWidth = (displayCols - 1) * SPACING;
+    const wellAreaHeight = (displayRows - 1) * SPACING;
+    
+    const svgX = LABEL_MARGIN + displayNormalizedX * wellAreaWidth;
+    const svgY = TITLE_HEIGHT + LABEL_MARGIN + displayNormalizedY * wellAreaHeight;
+    
+    return { x: svgX, y: svgY };
+  }, [SPACING, LABEL_MARGIN, displayCols, displayRows, rotation]);
 
   // Drag handlers for probe interaction
   const handleProbeMouseDown = useCallback((event: React.MouseEvent, probeIndex: number) => {
@@ -145,7 +228,7 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
     const trayCoords = convertSvgToTrayCoords(svgX, svgY);
     
     // Update the probe position
-    const newPositions = [...probePositions];
+    const newPositions = [...probeLocations];
     newPositions[dragState.probeIndex] = {
       ...newPositions[dragState.probeIndex],
       position_x: Math.round(trayCoords.x * 10) / 10, // Round to 1 decimal place
@@ -153,7 +236,7 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
     };
     
     onProbePositionsChange(newPositions);
-  }, [dragState, onProbePositionsChange, probePositions, convertSvgToTrayCoords]);
+  }, [dragState, onProbePositionsChange, probeLocations, convertSvgToTrayCoords]);
 
   const handleProbeMouseUp = useCallback(() => {
     setDragState(null);
@@ -161,7 +244,7 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
 
   // Handle clicking on the SVG to add probes
   const handleSvgClick = useCallback((event: React.MouseEvent<SVGSVGElement>) => {
-    if (!isAddingProbe || !onTrayClick) return;
+    if (!isAddingProbe || !onTrayClick || readOnly) return;
 
     const svg = event.currentTarget;
     const rect = svg.getBoundingClientRect();
@@ -172,7 +255,7 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
     const trayCoords = convertSvgToTrayCoords(svgX, svgY);
     
     onTrayClick(trayCoords.x, trayCoords.y);
-  }, [isAddingProbe, onTrayClick, convertSvgToTrayCoords]);
+  }, [isAddingProbe, onTrayClick, readOnly, convertSvgToTrayCoords]);
 
   // Generate all label positions (no overlap with wells) - ALL 4 SIDES
   const getLabels = () => {
@@ -410,59 +493,55 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
         ))}
 
         {/* Draw temperature probes */}
-        {probePositions.map((probe, index) => {
-          // Scale probe positions to the SVG coordinate system
-          // We need to map from the probe coordinate system to our SVG coordinate system
-          // This assumes probe positions are in the same coordinate space as the wells
-          // The wells span from 0,0 to (qtyCols-1)*spacing, (qtyRows-1)*spacing in the display
-          
-          // Calculate the bounds of the well area
-          const wellAreaWidth = (displayCols - 1) * SPACING;
-          const wellAreaHeight = (displayRows - 1) * SPACING;
-          
-          // Map probe position from tray coordinate system (mm) to SVG coordinates
-          // Probe coordinates are in millimeters within the tray coordinate space
-          // Tray coordinate system: ~0-150mm × 0-100mm (based on freezing-droplets)
-          
+        {probeLocations.map((probe, index) => {
+          // Convert from fixed tray coordinates to rotated display coordinates
           let probeX, probeY;
           
           if (probe.position_x !== undefined && probe.position_y !== undefined) {
-            // Map from tray coordinate system to SVG display coordinates
-            // Tray coordinate space is approximately 150mm × 100mm
-            const trayWidth = 150; // mm
-            const trayHeight = 100; // mm
-            
-            probeX = LABEL_MARGIN + (probe.position_x / trayWidth) * wellAreaWidth;
-            probeY = TITLE_HEIGHT + LABEL_MARGIN + (probe.position_y / trayHeight) * wellAreaHeight;
+            // Use the new coordinate conversion function that accounts for rotation
+            const svgCoords = convertTrayToSvgCoords(Number(probe.position_x), Number(probe.position_y));
+            probeX = svgCoords.x;
+            probeY = svgCoords.y;
           } else {
             // Default center position if no coordinates
+            const wellAreaWidth = (displayCols - 1) * SPACING;
+            const wellAreaHeight = (displayRows - 1) * SPACING;
             probeX = LABEL_MARGIN + wellAreaWidth / 2;
             probeY = TITLE_HEIGHT + LABEL_MARGIN + wellAreaHeight / 2;
           }
           
-          // Clamp to stay within reasonable bounds
+          // Clamp to stay within reasonable bounds (allow some overflow for edge cases)
+          const wellAreaWidth = (displayCols - 1) * SPACING;
+          const wellAreaHeight = (displayRows - 1) * SPACING;
           probeX = Math.max(LABEL_MARGIN - 20, Math.min(LABEL_MARGIN + wellAreaWidth + 20, probeX));
           probeY = Math.max(TITLE_HEIGHT + LABEL_MARGIN - 20, Math.min(TITLE_HEIGHT + LABEL_MARGIN + wellAreaHeight + 20, probeY));
           
+          const probeId = `${name}-${index}`;
+          const isHovered = hoveredProbe === probeId;
+          
           return (
-            <g key={`probe-${probe.probe_number}`}>
+            <g key={`probe-${probe.name || index}`}>
               {/* Probe circle */}
               <circle
                 cx={probeX}
                 cy={probeY}
-                r={10 * scale}
-                fill={dragState?.probeIndex === index ? "#ff9800" : "#1976d2"}
+                r={12 * scale}
+                fill={dragState?.probeIndex === index ? "#ff9800" : (isHovered ? "#e53e3e" : "#1976d2")}
                 stroke="#fff"
-                strokeWidth={2 * scale}
-                opacity={0.9}
+                strokeWidth={isHovered ? 4 * scale : 3 * scale}
+                opacity={0.95}
                 style={{ 
-                  cursor: onProbePositionsChange ? 'grab' : 'default',
+                  cursor: (!readOnly && onProbePositionsChange) ? 'grab' : 'pointer',
                   userSelect: 'none',
+                  filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.3))',
+                  transition: 'all 0.2s ease',
                 }}
-                onMouseDown={onProbePositionsChange ? (e) => handleProbeMouseDown(e, index) : undefined}
+                onMouseDown={(!readOnly && onProbePositionsChange) ? (e) => handleProbeMouseDown(e, index) : undefined}
+                onMouseEnter={() => onProbeHover?.(probeId)}
+                onMouseLeave={() => onProbeHover?.(null)}
               />
               
-              {/* Probe number label */}
+              {/* Probe number label inside circle */}
               <text
                 x={probeX}
                 y={probeY + 3 * scale}
@@ -470,18 +549,22 @@ const TrayDisplay: React.FC<TrayDisplayProps> = ({
                 fontSize={11 * scale}
                 fontWeight="bold"
                 fill="white"
-                style={{ userSelect: "none", pointerEvents: "none" }}
+                style={{ 
+                  userSelect: "none", 
+                  pointerEvents: "none",
+                  textShadow: '1px 1px 2px rgba(0,0,0,0.7)',
+                }}
               >
-                {probe.probe_number}
+                {probe.data_column_index || index + 1}
               </text>
 
-              {/* Probe name label */}
+              {/* Probe name label above circle */}
               {probe.name && (
                 <text
                   x={probeX}
-                  y={probeY - 10 * scale}
+                  y={probeY - 16 * scale}
                   textAnchor="middle"
-                  fontSize={8 * scale}
+                  fontSize={10 * scale}
                   fill="#1976d2"
                   fontWeight="500"
                   style={{ userSelect: "none", pointerEvents: "none" }}

@@ -16,8 +16,7 @@ import {
 import { ArrayInput, SimpleFormIterator, TextInput, NumberInput } from "react-admin";
 
 export interface ProbeLocation {
-  probe_number: number;
-  column_index: number;
+  data_column_index: number;
   position_x: number;
   position_y: number;
   name?: string;
@@ -38,12 +37,11 @@ const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
 }) => {
   const addProbe = () => {
     const newDataColumn = (probeLocations.length > 0 
-      ? Math.max(...probeLocations.map(p => p.column_index)) + 1 
-      : 1); // Start from column 1, let Excel processor handle time column mapping
+      ? Math.max(...probeLocations.map(p => p.data_column_index)) + 1 
+      : 1); // Start from column 1
 
     const newProbe: ProbeLocation = {
-      probe_number: newDataColumn, // probe_number same as column_index
-      column_index: newDataColumn,
+      data_column_index: newDataColumn,
       position_x: 75, // Default center position in tray coordinate space (~150/2)
       position_y: 50, // Default center position in tray coordinate space (~100/2)
       name: `Probe ${newDataColumn}`,
@@ -60,12 +58,7 @@ const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
   const updateProbe = (index: number, updates: Partial<ProbeLocation>) => {
     const updated = probeLocations.map((probe, i) => {
       if (i === index) {
-        const updatedProbe = { ...probe, ...updates };
-        // Keep probe_number and column_index in sync
-        if (updates.column_index !== undefined) {
-          updatedProbe.probe_number = updates.column_index;
-        }
-        return updatedProbe;
+        return { ...probe, ...updates };
       }
       return probe;
     });
@@ -75,7 +68,7 @@ const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
   // Validation helpers
   const isDuplicateDataColumn = (dataColumn: number, currentIndex: number) => {
     return probeLocations.some((probe, i) => 
-      i !== currentIndex && probe.column_index === dataColumn
+      i !== currentIndex && probe.data_column_index === dataColumn
     );
   };
 
@@ -119,17 +112,17 @@ const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
                   helperText={isDuplicateName(probe.name || '', index) ? "Duplicate name" : ""}
                 />
               </Tooltip>
-              <Tooltip title="Data column order in Excel/CSV file (Excel processor will handle time column mapping)">
+              <Tooltip title="Data column order in CSV file">
                 <TextField
                   label="Data Column"
                   type="number"
-                  value={probe.column_index}
-                  onChange={(e) => updateProbe(index, { column_index: parseInt(e.target.value) || 1 })}
+                  value={probe.data_column_index}
+                  onChange={(e) => updateProbe(index, { data_column_index: parseInt(e.target.value) || 1 })}
                   size="small"
                   sx={{ width: 105, flexShrink: 0 }}
                   inputProps={{ min: 1, max: 50 }}
-                  error={isDuplicateDataColumn(probe.column_index, index)}
-                  helperText={isDuplicateDataColumn(probe.column_index, index) ? "Duplicate column" : ""}
+                  error={isDuplicateDataColumn(probe.data_column_index, index)}
+                  helperText={isDuplicateDataColumn(probe.data_column_index, index) ? "Duplicate column" : ""}
                 />
               </Tooltip>
               <TextField

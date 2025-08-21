@@ -36,8 +36,8 @@ const ProbeLocationGrid: React.FC<ProbeLocationGridProps> = ({
   }
 
   // Find bounds for scaling
-  const xPositions = locations.map(l => l.position_x);
-  const yPositions = locations.map(l => l.position_y);
+  const xPositions = locations.map(l => Number(l.position_x));
+  const yPositions = locations.map(l => Number(l.position_y));
   
   const minX = Math.min(...xPositions, 0);
   const maxX = Math.max(...xPositions, 100);
@@ -166,12 +166,12 @@ const ProbeLocationGrid: React.FC<ProbeLocationGridProps> = ({
           </text>
 
           {/* Probe locations */}
-          {locations.map((location) => (
-            <g key={`probe-${location.probe_number}`}>
+          {locations.map((location, index) => (
+            <g key={`probe-${location.name || index}`}>
               {/* Probe circle */}
               <circle
-                cx={transformX(location.position_x)}
-                cy={transformY(location.position_y)}
+                cx={transformX(Number(location.position_x))}
+                cy={transformY(Number(location.position_y))}
                 r={8}
                 fill="#1976d2"
                 stroke="#fff"
@@ -179,39 +179,39 @@ const ProbeLocationGrid: React.FC<ProbeLocationGridProps> = ({
                 opacity={0.8}
               />
               
-              {/* Probe number label */}
+              {/* Probe name label */}
               <text
-                x={transformX(location.position_x)}
-                y={transformY(location.position_y) + 3}
+                x={transformX(Number(location.position_x))}
+                y={transformY(Number(location.position_y)) + 3}
                 textAnchor="middle"
-                fontSize="10"
+                fontSize="9"
                 fontWeight="bold"
                 fill="white"
               >
-                {location.probe_number}
+                {location.name ? location.name.substring(0, 3) : location.data_column_index}
               </text>
 
               {/* Coordinate label */}
               <text
-                x={transformX(location.position_x)}
-                y={transformY(location.position_y) - 12}
+                x={transformX(Number(location.position_x))}
+                y={transformY(Number(location.position_y)) - 12}
                 textAnchor="middle"
                 fontSize="9"
                 fill="#333"
                 fontWeight="500"
               >
-                ({location.position_x.toFixed(1)}, {location.position_y.toFixed(1)})
+                ({Number(location.position_x).toFixed(1)}, {Number(location.position_y).toFixed(1)})
               </text>
 
-              {/* Excel column indicator */}
+              {/* Data column indicator */}
               <text
-                x={transformX(location.position_x) + 12}
-                y={transformY(location.position_y) + 3}
+                x={transformX(Number(location.position_x)) + 12}
+                y={transformY(Number(location.position_y)) + 3}
                 textAnchor="start"
                 fontSize="8"
                 fill="#666"
               >
-                Col{location.column_index}
+                Col{location.data_column_index}
               </text>
             </g>
           ))}

@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   Show,
   SimpleShowLayout,
@@ -18,6 +19,7 @@ import ProbeLocationGrid from "../components/ProbeLocationGrid";
 
 const TrayConfigurationDisplay = () => {
   const record = useRecordContext();
+  const [hoveredProbe, setHoveredProbe] = useState<string | null>(null);
 
   if (!record || !record.trays || record.trays.length === 0) {
     return <Typography>No tray configuration data available</Typography>;
@@ -37,8 +39,8 @@ const TrayConfigurationDisplay = () => {
               </Typography>
               
               <Grid container spacing={3}>
-                {/* Tray Display */}
-                <Grid item xs={12} md={6}>
+                {/* Tray Display with Probes */}
+                <Grid item xs={12}>
                   <Box>
                     <Typography variant="subtitle2" marginBottom={1}>
                       Tray Configuration
@@ -47,6 +49,9 @@ const TrayConfigurationDisplay = () => {
                       <Chip size="small" label={`${tray.qty_cols}×${tray.qty_rows} wells`} />
                       <Chip size="small" label={`${tray.rotation_degrees}° rotation`} />
                       <Chip size="small" label={`∅${tray.well_relative_diameter}mm wells`} />
+                      {tray.probe_locations && tray.probe_locations.length > 0 && (
+                        <Chip size="small" label={`${tray.probe_locations.length} probes`} />
+                      )}
                     </Box>
                     <Box display="flex" justifyContent="center">
                       <TrayDisplay
@@ -55,41 +60,14 @@ const TrayConfigurationDisplay = () => {
                         qtyRows={tray.qty_rows}
                         rotation={tray.rotation_degrees}
                         wellDiameter={tray.well_relative_diameter}
-                        maxWidth={300}
-                        maxHeight={250}
+                        probeLocations={tray.probe_locations}
+                        maxWidth={500}
+                        maxHeight={400}
+                        readOnly={true}
+                        hoveredProbe={hoveredProbe}
+                        onProbeHover={setHoveredProbe}
                       />
                     </Box>
-                  </Box>
-                </Grid>
-                
-                {/* Probe Configuration */}
-                <Grid item xs={12} md={6}>
-                  <Box>
-                    <Typography variant="subtitle2" marginBottom={1}>
-                      Temperature Probes
-                    </Typography>
-                    {tray.probe_count > 0 ? (
-                      <Box>
-                        <Box display="flex" gap={1} flexWrap="wrap" marginBottom={2}>
-                          <Chip size="small" label={`${tray.probe_count || 8} probes`} />
-                          <Chip size="small" label={`${tray.probe_position_units || "mm"} units`} />
-                          <Chip size="small" label={`${tray.probe_locations?.length || 0} locations`} />
-                        </Box>
-                        
-                        {tray.probe_locations && tray.probe_locations.length > 0 && (
-                          <ProbeLocationGrid
-                            locations={tray.probe_locations}
-                            positionUnits={tray.probe_position_units || "mm"}
-                            width={300}
-                            height={200}
-                          />
-                        )}
-                      </Box>
-                    ) : (
-                      <Alert severity="info" sx={{ mt: 1 }}>
-                        No temperature probes configured for this tray.
-                      </Alert>
-                    )}
                   </Box>
                 </Grid>
 
@@ -100,13 +78,175 @@ const TrayConfigurationDisplay = () => {
                     <Typography variant="subtitle2" marginBottom={1}>
                       Image Corner Coordinates
                     </Typography>
-                    <Box display="flex" gap={2} flexWrap="wrap">
+                    <Box display="flex" gap={2} flexWrap="wrap" marginBottom={2}>
                       {tray.upper_left_corner_x && (
-                        <Chip size="small" label={`UL: (${tray.upper_left_corner_x}, ${tray.upper_left_corner_y})`} />
+                        <Chip size="small" label={`A1: (${tray.upper_left_corner_x}, ${tray.upper_left_corner_y})`} />
                       )}
                       {tray.lower_right_corner_x && (
-                        <Chip size="small" label={`LR: (${tray.lower_right_corner_x}, ${tray.lower_right_corner_y})`} />
+                        <Chip size="small" label={`${String.fromCharCode(64 + tray.qty_rows)}${tray.qty_cols}: (${tray.lower_right_corner_x}, ${tray.lower_right_corner_y})`} />
                       )}
+                    </Box>
+                    
+                    {/* Probe Details underneath image coordinates */}
+                    {tray.probe_locations && tray.probe_locations.length > 0 && (
+                      <Box>
+                        <Typography variant="subtitle2" marginBottom={1}>
+                          Temperature Probe Locations (mm)
+                        </Typography>
+                        <Box 
+                          sx={{ 
+                            display: 'grid', 
+                            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+                            gap: 1,
+                            backgroundColor: 'background.default',
+                            padding: 2,
+                            borderRadius: 1,
+                            border: 1,
+                            borderColor: 'divider',
+                          }}
+                        >
+                          {tray.probe_locations.map((probe, index) => {
+                            const probeId = `${tray.name}-${index}`;
+                            const isHovered = hoveredProbe === probeId;
+                            
+                            return (
+                              <Box 
+                                key={index}
+                                sx={{ 
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1,
+                                  padding: 1,
+                                  borderRadius: 1,
+                                  backgroundColor: isHovered ? 'error.50' : 'background.paper',
+                                  border: 1,
+                                  borderColor: isHovered ? 'error.main' : 'divider',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  transform: isHovered ? 'translateY(-1px)' : 'none',
+                                  boxShadow: isHovered ? 2 : 0,
+                                  '&:hover': {
+                                    borderColor: 'error.main',
+                                    backgroundColor: 'error.50',
+                                    transform: 'translateY(-1px)',
+                                    boxShadow: 2,
+                                  }
+                                }}
+                                onMouseEnter={() => setHoveredProbe(probeId)}
+                                onMouseLeave={() => setHoveredProbe(null)}
+                              >
+                              <Box
+                                sx={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: '50%',
+                                  backgroundColor: 'primary.main',
+                                  color: 'white',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {probe.name ? probe.name.substring(0, 1) : probe.data_column_index}
+                              </Box>
+                              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                                <Typography variant="body2" fontWeight="500">
+                                  {probe.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Position: ({Number(probe.position_x).toFixed(1)}, {Number(probe.position_y).toFixed(1)}) • Column {probe.data_column_index}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          );
+                        })}
+                        </Box>
+                      </Box>
+                    )}
+                  </Grid>
+                )}
+
+                {/* Standalone Probe Details (if no image coordinates but probes exist) */}
+                {!(tray.upper_left_corner_x || tray.upper_left_corner_y || 
+                  tray.lower_right_corner_x || tray.lower_right_corner_y) && 
+                 tray.probe_locations && tray.probe_locations.length > 0 && (
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" marginBottom={1}>
+                      Temperature Probe Locations (mm)
+                    </Typography>
+                    <Box 
+                      sx={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+                        gap: 1,
+                        backgroundColor: 'background.default',
+                        padding: 2,
+                        borderRadius: 1,
+                        border: 1,
+                        borderColor: 'divider',
+                      }}
+                    >
+                      {tray.probe_locations.map((probe, index) => {
+                        const probeId = `${tray.name}-${index}`;
+                        const isHovered = hoveredProbe === probeId;
+                        
+                        return (
+                          <Box 
+                            key={index}
+                            sx={{ 
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1,
+                              padding: 1,
+                              borderRadius: 1,
+                              backgroundColor: isHovered ? 'error.50' : 'background.paper',
+                              border: 1,
+                              borderColor: isHovered ? 'error.main' : 'divider',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              transform: isHovered ? 'translateY(-1px)' : 'none',
+                              boxShadow: isHovered ? 2 : 0,
+                              '&:hover': {
+                                borderColor: 'error.main',
+                                backgroundColor: 'error.50',
+                                transform: 'translateY(-1px)',
+                                boxShadow: 2,
+                              }
+                            }}
+                            onMouseEnter={() => setHoveredProbe(probeId)}
+                            onMouseLeave={() => setHoveredProbe(null)}
+                          >
+                          <Box
+                            sx={{
+                              width: 20,
+                              height: 20,
+                              borderRadius: '50%',
+                              backgroundColor: 'primary.main',
+                              color: 'white',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {probe.name ? probe.name.substring(0, 1) : probe.data_column_index}
+                          </Box>
+                          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                            <Typography variant="body2" fontWeight="500">
+                              {probe.name}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Position: ({Number(probe.position_x).toFixed(1)}, {Number(probe.position_y).toFixed(1)}) • Column {probe.data_column_index}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      );
+                    })}
                     </Box>
                   </Grid>
                 )}

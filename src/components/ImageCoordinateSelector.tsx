@@ -463,34 +463,6 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
               
               return (
                 <Box>
-                  <Typography variant="body2" gutterBottom fontWeight="bold">
-                    Selected Coordinates:
-                  </Typography>
-                  <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
-                    {upperLeftX !== undefined && (
-                      <Chip 
-                        size="small" 
-                        label={`${upperLeftWell}: (${upperLeftX}, ${upperLeftY})`}
-                        color="success"
-                        variant="filled"
-                      />
-                    )}
-                    {lowerRightX !== undefined && (
-                      <Chip 
-                        size="small" 
-                        label={`${lowerRightWell}: (${lowerRightX}, ${lowerRightY})`}
-                        color="error" 
-                        variant="filled"
-                      />
-                    )}
-                  </Box>
-                  
-                  {upperLeftX !== undefined && lowerRightX !== undefined && (
-                    <Alert severity="success">
-                      ✓ Tray mapping complete! Your well coordinates are configured.
-                    </Alert>
-                  )}
-                  
                   <Box display="flex" gap={1} mt={2}>
                     <Button size="small" onClick={clearCoordinates} color="error">
                       Clear Coordinates
