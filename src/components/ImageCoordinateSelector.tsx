@@ -23,6 +23,9 @@ import { useInput, FormDataConsumer } from "react-admin";
 import { TransitionProps } from "@mui/material/transitions";
 import { transformCellToWellCoordinate } from "../utils/coordinateTransforms";
 
+// Freezing-droplets uses the actual image pixel coordinates (no scaling needed)
+// The coordinate system matches the full image dimensions
+
 const Transition = React.forwardRef(function Transition(
   props: TransitionProps & {
     children: React.ReactElement;
@@ -63,10 +66,12 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
   const lowerRightXField = useInput({ source: 'lower_right_corner_x' });
   const lowerRightYField = useInput({ source: 'lower_right_corner_y' });
 
-  // Calculate well coordinates by finding what wells appear at the visual corners
+  // Get the logical well coordinates for freezing-droplets library
   const getWellCoordinates = useCallback((qtyRows: number, qtyCols: number, rotation: number) => {
-    // Calculate which original wells appear at the visual display corners after rotation
-    let upperLeftWell: string, lowerRightWell: string;
+    // For freezing-droplets library, we ALWAYS need:
+    // - upper_left_corner: A1 (row=0, col=0) 
+    // - lower_right_corner: H12 (row=7, col=11) or last row/col
+    // The rotation is handled internally by the freezing-droplets library
     
     // Helper function to create well coordinate string
     const makeWellCoord = (row: number, col: number) => {
@@ -75,35 +80,9 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
       return `${letter}${number}`;
     };
     
-    switch (rotation) {
-      case 90:
-        // For 90° clockwise rotation:
-        // Upper left display corner shows original (qtyRows-1, 0) = bottom-left original
-        // Lower right display corner shows original (0, qtyCols-1) = top-right original
-        upperLeftWell = makeWellCoord(qtyRows - 1, 0); // Bottom row, first column
-        lowerRightWell = makeWellCoord(0, qtyCols - 1); // Top row, last column
-        break;
-      case 180:
-        // For 180° rotation:
-        // Upper left display shows original (qtyRows-1, qtyCols-1) = bottom-right original
-        // Lower right display shows original (0, 0) = top-left original  
-        upperLeftWell = makeWellCoord(qtyRows - 1, qtyCols - 1);
-        lowerRightWell = makeWellCoord(0, 0);
-        break;
-      case 270:
-        // For 270° clockwise rotation:
-        // Upper left display shows original (0, qtyCols-1) = top-right original
-        // Lower right display shows original (qtyRows-1, 0) = bottom-left original
-        upperLeftWell = makeWellCoord(0, qtyCols - 1);
-        lowerRightWell = makeWellCoord(qtyRows - 1, 0);
-        break;
-      default: // 0 degrees
-        // No rotation: upper left is A1, lower right is last row/column
-        upperLeftWell = makeWellCoord(0, 0); // A1
-        lowerRightWell = makeWellCoord(qtyRows - 1, qtyCols - 1); // e.g. H12
-        break;
-    }
-    
+    // Always select the logical grid corners regardless of visual rotation
+    const upperLeftWell = makeWellCoord(0, 0); // A1 (logical upper-left)
+    const lowerRightWell = makeWellCoord(qtyRows - 1, qtyCols - 1); // e.g. H12 (logical lower-right)
     
     return { upperLeftWell, lowerRightWell };
   }, []);
@@ -215,10 +194,13 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
       return; // Click was outside the actual image
     }
     
-    // For now, let's store display coordinates to fix the positioning issue
-    // We can convert to image coordinates later when needed for processing
-    const x = containerX;
-    const y = containerY;
+    // Convert container coordinates to actual image pixel coordinates
+    // Freezing-droplets expects actual image pixel coordinates directly
+    const imageX = ((containerX - offsetX) / actualWidth) * img.naturalWidth;
+    const imageY = ((containerY - offsetY) / actualHeight) * img.naturalHeight;
+    
+    const x = Math.round(imageX);
+    const y = Math.round(imageY);
     
 
     // Update form fields directly
@@ -288,9 +270,13 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
     const { containerRect, offsetX, offsetY, actualWidth, actualHeight } = bounds;
     const img = imageRef.current;
     
-    // Get current display coordinates (already stored as display coordinates)
-    const currentDisplayX = type === 'upper_left' ? upperLeftXField.field.value : lowerRightXField.field.value;
-    const currentDisplayY = type === 'upper_left' ? upperLeftYField.field.value : lowerRightYField.field.value;
+    // Get current stored coordinates and convert to display coordinates
+    const storedX = type === 'upper_left' ? upperLeftXField.field.value : lowerRightXField.field.value;
+    const storedY = type === 'upper_left' ? upperLeftYField.field.value : lowerRightYField.field.value;
+    
+    // No scaling needed - stored coordinates are already actual image pixels
+    const currentDisplayX = offsetX + (storedX / img.naturalWidth) * actualWidth;
+    const currentDisplayY = offsetY + (storedY / img.naturalHeight) * actualHeight;
     
     // Calculate offset from mouse to center of indicator
     const dragOffsetX = event.clientX - containerRect.left - currentDisplayX;
@@ -317,6 +303,7 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
       const clampedContainerY = Math.max(offsetY, Math.min(offsetY + actualHeight, containerY));
       
       // Convert to actual image pixel coordinates
+      // No additional scaling needed - freezing-droplets expects actual image pixels
       const imageX = ((clampedContainerX - offsetX) / actualWidth) * img.naturalWidth;
       const imageY = ((clampedContainerY - offsetY) / actualHeight) * img.naturalHeight;
       
@@ -468,7 +455,8 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
               if (!upperLeftX && !lowerRightX) {
                 return (
                   <Alert severity="info">
-                    Upload an image of your tray to visually select the corner coordinates of wells {upperLeftWell} and {lowerRightWell}.
+                    Upload an image of your tray to visually select the image coordinates of wells <strong>{upperLeftWell}</strong> and <strong>{lowerRightWell}</strong>. 
+                    <br />Find these specific wells in your image regardless of how the tray is visually rotated.
                   </Alert>
                 );
               }
@@ -572,7 +560,7 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
                                 onClick={() => setSelectionMode('upper_left')}
                                 color={upperLeftXField.field.value !== undefined ? 'success' : 'primary'}
                               >
-                                Step 1: Upper Left ({upperLeftWell})
+                                Step 1: Find well {upperLeftWell}
                               </Button>
                             </Grid>
                             <Grid item xs={6}>
@@ -585,7 +573,7 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
                                 color={lowerRightXField.field.value !== undefined ? 'success' : 'primary'}
                                 disabled={upperLeftXField.field.value === undefined}
                               >
-                                Step 2: Lower Right ({lowerRightWell})
+                                Step 2: Find well {lowerRightWell}
                               </Button>
                             </Grid>
                           </>
@@ -649,9 +637,9 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
                         const { offsetX, offsetY, actualWidth, actualHeight } = bounds;
                         const img = imageRef.current;
                         
-                        // Use stored display coordinates directly
-                        const displayX = upperLeftXField.field.value;
-                        const displayY = upperLeftYField.field.value;
+                        // Convert stored image pixel coordinates back to display coordinates
+                        const displayX = offsetX + (upperLeftXField.field.value / img.naturalWidth) * actualWidth;
+                        const displayY = offsetY + (upperLeftYField.field.value / img.naturalHeight) * actualHeight;
                         
                         return (
                           <Box
@@ -743,9 +731,9 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
                         const { offsetX, offsetY, actualWidth, actualHeight } = bounds;
                         const img = imageRef.current;
                         
-                        // Use stored display coordinates directly
-                        const displayX = lowerRightXField.field.value;
-                        const displayY = lowerRightYField.field.value;
+                        // Convert stored image pixel coordinates back to display coordinates
+                        const displayX = offsetX + (lowerRightXField.field.value / img.naturalWidth) * actualWidth;
+                        const displayY = offsetY + (lowerRightYField.field.value / img.naturalHeight) * actualHeight;
                         
                         return (
                           <Box
@@ -908,8 +896,8 @@ const ImageCoordinateSelector: React.FC<ImageCoordinateSelectorProps> = ({
                           <Typography variant="body2" fontWeight="bold" gutterBottom>
                             Step {selectionMode === 'upper_left' ? '1' : '2'}: Click on well {selectionMode === 'upper_left' ? upperLeftWell : lowerRightWell}
                           </Typography>
-                          Click precisely on the center of the {selectionMode === 'upper_left' ? upperLeftWell : lowerRightWell} well in the image above. 
-                          {selectionMode === 'upper_left' ? ' This is the top-left well of your tray.' : ' This is the bottom-right well of your tray.'}
+                          Find and click precisely on the center of well <strong>{selectionMode === 'upper_left' ? upperLeftWell : lowerRightWell}</strong> in the image above. 
+                          {selectionMode === 'upper_left' ? ' Look for the well labeled A1 (first row, first column).' : ` Look for the well labeled ${lowerRightWell} (last row, last column).`}
                         </Alert>
                       )}
                       

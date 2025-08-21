@@ -16,16 +16,95 @@ import {
   NumberInput,
   SelectInput,
   FormDataConsumer,
+  useInput,
   required,
 } from "react-admin";
 import {
   Settings as SettingsIcon,
   Image as ImageIcon,
+  Add as AddIcon,
 } from "@mui/icons-material";
 import TrayDisplay from "./TrayDisplay";
 import TrayProbeConfig from "./TrayProbeConfig";
 import ImageCoordinateSelector from "./ImageCoordinateSelector";
 import InteractiveTrayDisplay from "./InteractiveTrayDisplay";
+
+// Wrapper component to handle probe position updates with controls
+const InteractiveTrayWrapper: React.FC<{ scopedFormData: any }> = ({ scopedFormData }) => {
+  const probeLocationsField = useInput({ source: 'probe_locations', defaultValue: [] });
+  const [isAddingProbe, setIsAddingProbe] = useState(false);
+  
+  const currentProbes = scopedFormData.probe_locations || [];
+  
+  const addProbe = () => {
+    setIsAddingProbe(true);
+  };
+  
+  const handleTrayClick = (x: number, y: number) => {
+    if (!isAddingProbe) return;
+    
+    const newProbeNumber = currentProbes.length > 0 
+      ? Math.max(...currentProbes.map((p: any) => p.probe_number)) + 1 
+      : 1;
+    
+    const newProbe = {
+      probe_number: newProbeNumber,
+      column_index: newProbeNumber,
+      position_x: Math.round(x * 10) / 10, // Round to 1 decimal place
+      position_y: Math.round(y * 10) / 10,
+      name: `Probe ${newProbeNumber}`,
+    };
+    
+    const updatedProbes = [...currentProbes, newProbe];
+    probeLocationsField.field.onChange(updatedProbes);
+    setIsAddingProbe(false);
+  };
+  
+  const removeProbe = (index: number) => {
+    const updatedProbes = currentProbes.filter((_: any, i: number) => i !== index);
+    probeLocationsField.field.onChange(updatedProbes);
+  };
+  
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", width: 400 }}>
+      {/* Control Panel */}
+      <Box sx={{ mb: 2, width: '100%' }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+          <Typography variant="caption" color="text.secondary">
+            {currentProbes.length} probe{currentProbes.length !== 1 ? 's' : ''} configured
+          </Typography>
+          <Button
+            size="small"
+            variant={isAddingProbe ? "contained" : "outlined"}
+            color="secondary"
+            startIcon={<AddIcon />}
+            onClick={addProbe}
+            sx={{ minWidth: 'auto', px: 1.5 }}
+          >
+            {isAddingProbe ? "Click on tray" : "Add Probe"}
+          </Button>
+        </Box>
+      </Box>
+      
+      {/* Interactive Tray Display */}
+      <TrayDisplay
+        name={scopedFormData.name}
+        qtyCols={parseInt(scopedFormData.qty_cols) || 8}
+        qtyRows={parseInt(scopedFormData.qty_rows) || 12}
+        rotation={parseInt(scopedFormData.rotation_degrees) || 0}
+        wellDiameter={scopedFormData.well_relative_diameter || 6.4}
+        maxWidth={400}
+        maxHeight={500}
+        probePositions={currentProbes}
+        onProbePositionsChange={(positions) => {
+          probeLocationsField.field.onChange(positions);
+        }}
+        onTrayClick={handleTrayClick}
+        isAddingProbe={isAddingProbe}
+      />
+    </Box>
+  );
+};
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -238,16 +317,8 @@ const CompactTrayEditor: React.FC = () => {
                     scopedFormData?.qty_rows
                   ) {
                     return (
-                      <InteractiveTrayDisplay
-                        name={scopedFormData.name}
-                        qtyCols={parseInt(scopedFormData.qty_cols) || 8}
-                        qtyRows={parseInt(scopedFormData.qty_rows) || 12}
-                        rotation={parseInt(scopedFormData.rotation_degrees) || 0}
-                        wellDiameter={scopedFormData.well_relative_diameter || 6.4}
-                        maxWidth={400}
-                        maxHeight={500}
-                        probePositions={scopedFormData.probe_locations || []}
-                        positionUnits={scopedFormData.probe_position_units || "mm"}
+                      <InteractiveTrayWrapper 
+                        scopedFormData={scopedFormData}
                       />
                     );
                   }

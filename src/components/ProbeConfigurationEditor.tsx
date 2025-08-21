@@ -34,7 +34,7 @@ const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
   probeLocations,
   onProbeLocationsChange,
   maxProbes = 16,
-  positionUnits = "mm",
+  positionUnits = "mm", // Millimeters in tray coordinate system
 }) => {
   const addProbe = () => {
     const newDataColumn = (probeLocations.length > 0 
@@ -44,8 +44,8 @@ const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
     const newProbe: ProbeLocation = {
       probe_number: newDataColumn, // probe_number same as column_index
       column_index: newDataColumn,
-      position_x: 50, // Default center position
-      position_y: 50,
+      position_x: 75, // Default center position in tray coordinate space (~150/2)
+      position_y: 50, // Default center position in tray coordinate space (~100/2)
       name: `Probe ${newDataColumn}`,
     };
 
@@ -85,19 +85,6 @@ const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
     );
   };
 
-  const loadDefaults = () => {
-    const defaultProbes: ProbeLocation[] = [
-      { probe_number: 1, column_index: 1, position_x: 4.5, position_y: 13.5, name: "Probe 1" },
-      { probe_number: 2, column_index: 2, position_x: 49.5, position_y: 31.5, name: "Probe 2" },
-      { probe_number: 3, column_index: 3, position_x: 49.5, position_y: 67.5, name: "Probe 3" },
-      { probe_number: 4, column_index: 4, position_x: 4.5, position_y: 94.5, name: "Probe 4" },
-      { probe_number: 5, column_index: 5, position_x: 144.5, position_y: 94.5, name: "Probe 5" },
-      { probe_number: 6, column_index: 6, position_x: 99.5, position_y: 67.5, name: "Probe 6" },
-      { probe_number: 7, column_index: 7, position_x: 99.5, position_y: 31.5, name: "Probe 7" },
-      { probe_number: 8, column_index: 8, position_x: 144.5, position_y: 13.5, name: "Probe 8" },
-    ];
-    onProbeLocationsChange(defaultProbes);
-  };
 
   return (
     <Box>
@@ -146,22 +133,22 @@ const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
                 />
               </Tooltip>
               <TextField
-                label="X (mm)"
+                label={`X (${positionUnits})`}
                 type="number"
                 value={probe.position_x}
                 onChange={(e) => updateProbe(index, { position_x: parseFloat(e.target.value) || 0 })}
                 size="small"
                 sx={{ width: 90, flexShrink: 0 }}
-                inputProps={{ step: 0.1 }}
+                inputProps={{ step: 0.1, min: 0, max: 150 }}
               />
               <TextField
-                label="Y (mm)"
+                label={`Y (${positionUnits})`}
                 type="number"
                 value={probe.position_y}
                 onChange={(e) => updateProbe(index, { position_y: parseFloat(e.target.value) || 0 })}
                 size="small"
                 sx={{ width: 90, flexShrink: 0 }}
-                inputProps={{ step: 0.1 }}
+                inputProps={{ step: 0.1, min: 0, max: 100 }}
               />
               <Tooltip title="Remove probe">
                 <IconButton

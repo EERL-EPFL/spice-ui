@@ -57,7 +57,7 @@ const ProbeLocationsInput: React.FC<{
         probeLocations={field.value || []}
         onProbeLocationsChange={handleProbeLocationsChange}
         maxProbes={16} // Fixed max probes
-        positionUnits="mm" // Fixed units
+        positionUnits={positionUnits}
       />
     </Box>
   );
