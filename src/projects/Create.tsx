@@ -4,8 +4,10 @@ import {
   TextField,
   TextInput,
   required,
+  useInput,
 } from "react-admin";
 import { ColorInput } from "react-admin-color-picker";
+import { Box } from "@mui/material";
 
 // Extended ColorBrewer palette - colorblind-friendly and visually distinct
 const COLOR_PALETTE = [
@@ -48,6 +50,35 @@ const getRandomColor = () => {
   return COLOR_PALETTE[randomIndex];
 };
 
+const ColorInputWithInlinePreview = ({ source, label, defaultValue, helperText, ...props }) => {
+  const { field } = useInput({ source, defaultValue });
+  
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      <ColorInput
+        source={source}
+        label={label}
+        helperText={helperText}
+        defaultValue={defaultValue}
+        sx={{ flex: 1 }}
+        {...props}
+      />
+      {field.value && (
+        <Box
+          sx={{
+            width: 32,
+            height: 32,
+            backgroundColor: field.value,
+            border: "1px solid #ccc",
+            borderRadius: 1,
+            flexShrink: 0,
+          }}
+        />
+      )}
+    </Box>
+  );
+};
+
 const CreateComponent = () => {
   return (
     <Create redirect="show">
@@ -55,7 +86,7 @@ const CreateComponent = () => {
         <TextField source="id" />
         <TextInput source="name" validate={[required()]} />
         <TextInput source="note" multiline />
-        <ColorInput
+        <ColorInputWithInlinePreview
           source="colour"
           label="Colour"
           helperText="Used to differentiate projects on maps"
