@@ -55,6 +55,14 @@ const EditComponent = () => (
                 fullWidth
               />
 
+              <NumberInput
+                source="well_volume_litres"
+                label="Well Volume (L)"
+                defaultValue={0.00005}
+                helperText="Volume per well (default: 50μL)"
+                fullWidth
+              />
+
               {/* Volume and date fields - only for bulk and filter */}
               {(formData.type === "bulk" || formData.type === "filter") && (
                 <>
@@ -65,7 +73,13 @@ const EditComponent = () => (
                   />
                   <DateTimeInput
                     source="start_time"
-                    label="Collection Date & Time"
+                    label="Collection Start Time"
+                    parse={(value) => value ? new Date(value).toISOString() : null}
+                    fullWidth
+                  />
+                  <DateTimeInput
+                    source="stop_time"
+                    label="Collection Stop Time"
                     parse={(value) => value ? new Date(value).toISOString() : null}
                     fullWidth
                   />
@@ -89,14 +103,9 @@ const EditComponent = () => (
                     label="Total Volume (L)"
                     fullWidth
                   />
-                  <NumberInput
-                    source="filter_fraction"
-                    label="Filter Fraction"
-                    fullWidth
-                  />
                   <TextInput
-                    source="source"
-                    label="Source Information"
+                    source="filter_substrate"
+                    label="Filter Substrate"
                     fullWidth
                   />
                 </>
@@ -111,13 +120,18 @@ const EditComponent = () => (
                   </Typography>
                   <SampleCoordinateInput />
                   <NumberInput
-                    source="bulk_mass_mg"
-                    label="Bulk Mass (mg)"
+                    source="air_volume_litres"
+                    label="Air Volume (L)"
                     fullWidth
                   />
-                  <TextInput
-                    source="source"
-                    label="Source Information"
+                  <NumberInput
+                    source="water_volume_litres"
+                    label="Water Volume (L)"
+                    fullWidth
+                  />
+                  <NumberInput
+                    source="initial_concentration_gram_l"
+                    label="Initial Concentration (g/L)"
                     fullWidth
                   />
                 </>

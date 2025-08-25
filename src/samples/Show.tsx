@@ -265,10 +265,10 @@ const SampleInfo = () => {
   const record = useRecordContext();
   if (!record) return null;
 
-  // Convert coordinates for map
+  // Convert coordinates for map (only for bulk samples)
   const lat = typeof record.latitude === 'string' ? parseFloat(record.latitude) : record.latitude;
   const lng = typeof record.longitude === 'string' ? parseFloat(record.longitude) : record.longitude;
-  const hasValidCoordinates = lat && lng && !isNaN(lat) && !isNaN(lng);
+  const hasValidCoordinates = record.type === "bulk" && lat && lng && !isNaN(lat) && !isNaN(lng);
 
   return (
     <Card sx={{ mb: 3 }}>
@@ -280,18 +280,20 @@ const SampleInfo = () => {
           <SampleTypeChip sampleType={record.type} size="medium" />
         </Box>
 
-        <Box sx={{ display: "grid", gridTemplateColumns: hasValidCoordinates ? "1fr 1fr" : "1fr 1fr", gap: 2 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: hasValidCoordinates ? "1fr 1fr" : "1fr", gap: 2 }}>
           {/* Left column - Sample information */}
           <Box>
             <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 2 }}>
 
-              {record.start_time && (
+              {/* Collection date - only for bulk and filter */}
+              {(record.type === "bulk" || record.type === "filter") && record.start_time && (
                 <Labeled label="Collection Date">
                   <DateField source="start_time" showTime />
                 </Labeled>
               )}
 
-              {record.location_id && (
+              {/* Location - only for bulk and filter (not procedural_blank) */}
+              {record.type !== "procedural_blank" && record.location_id && (
                 <Labeled label="Location">
                   <ReferenceField
                     source="location_id"
@@ -303,15 +305,66 @@ const SampleInfo = () => {
                 </Labeled>
               )}
 
-              {record.well_volume_litres && (
-                <Labeled label="Well Volume (L)">
-                  <NumberField source="well_volume_litres" />
+              {/* Suspension volume - only for bulk and filter */}
+              {(record.type === "bulk" || record.type === "filter") && record.suspension_volume_litres && (
+                <Labeled label="Suspension Volume (L)">
+                  <NumberField source="suspension_volume_litres" />
                 </Labeled>
               )}
 
-              {record.suspension_volume_litres && (
-                <Labeled label="Suspension Volume (L)">
-                  <NumberField source="suspension_volume_litres" />
+              {/* Bulk-specific fields */}
+              {record.type === "bulk" && (
+                <>
+                  {record.air_volume_litres && (
+                    <Labeled label="Air Volume (L)">
+                      <NumberField source="air_volume_litres" />
+                    </Labeled>
+                  )}
+                  {record.water_volume_litres && (
+                    <Labeled label="Water Volume (L)">
+                      <NumberField source="water_volume_litres" />
+                    </Labeled>
+                  )}
+                  {record.initial_concentration_gram_l && (
+                    <Labeled label="Initial Concentration (g/L)">
+                      <NumberField source="initial_concentration_gram_l" />
+                    </Labeled>
+                  )}
+                </>
+              )}
+
+              {/* Filter-specific fields */}
+              {record.type === "filter" && (
+                <>
+                  {record.flow_litres_per_minute && (
+                    <Labeled label="Airflow (L/min)">
+                      <NumberField source="flow_litres_per_minute" />
+                    </Labeled>
+                  )}
+                  {record.total_volume && (
+                    <Labeled label="Total Volume (L)">
+                      <NumberField source="total_volume" />
+                    </Labeled>
+                  )}
+                  {record.filter_substrate && (
+                    <Labeled label="Filter Substrate">
+                      <TextField source="filter_substrate" />
+                    </Labeled>
+                  )}
+                </>
+              )}
+
+              {/* Fields for both bulk and filter samples */}
+              {(record.type === "bulk" || record.type === "filter") && record.stop_time && (
+                <Labeled label="Stop Time">
+                  <DateField source="stop_time" showTime />
+                </Labeled>
+              )}
+
+              {/* Legacy fields - keep for backward compatibility but only show if they exist */}
+              {record.well_volume_litres && (
+                <Labeled label="Well Volume (L)">
+                  <NumberField source="well_volume_litres" />
                 </Labeled>
               )}
 
@@ -338,9 +391,9 @@ const SampleInfo = () => {
             </Box>
           </Box>
 
-          {/* Right column - Map */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-            {hasValidCoordinates && (
+          {/* Right column - Map (only for bulk samples with coordinates) */}
+          {hasValidCoordinates && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Box sx={{ flex: 1, border: 1, borderColor: 'divider', borderRadius: 1, minHeight: 250 }}>
                 <SampleLocationMap
                   latitude={lat}
@@ -349,8 +402,8 @@ const SampleInfo = () => {
                   compact={true}
                 />
               </Box>
-            )}
-          </Box>
+            </Box>
+          )}
         </Box>
 
         {record.remarks && (

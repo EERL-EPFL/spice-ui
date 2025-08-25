@@ -65,17 +65,34 @@ const CreateComponent = () => {
                 fullWidth
               />
 
+              <NumberInput
+                source="well_volume_litres"
+                label="Well Volume (L)"
+                defaultValue={0.00005}
+                helperText="Volume per well (default: 50μL)"
+                fullWidth
+              />
+
               {/* Volume and date fields - only for bulk and filter */}
               {(formData.type === "bulk" || formData.type === "filter") && (
                 <>
                   <NumberInput
                     source="suspension_volume_litres"
                     label="Suspension Volume (L)"
+                    helperText="Amount of liquid (water) used to prepare the suspension"
                     fullWidth
                   />
                   <DateTimeInput
                     source="start_time"
-                    label="Collection Date & Time"
+                    label="Collection Start Time"
+                    helperText="Sampling start time (starttime in INSEKT)"
+                    parse={(value) => value ? new Date(value).toISOString() : null}
+                    fullWidth
+                  />
+                  <DateTimeInput
+                    source="stop_time"
+                    label="Collection Stop Time"
+                    helperText="Sampling stop time (stoptime in INSEKT)"
                     parse={(value) => value ? new Date(value).toISOString() : null}
                     fullWidth
                   />
@@ -99,14 +116,9 @@ const CreateComponent = () => {
                     label="Total Volume (L)"
                     fullWidth
                   />
-                  <NumberInput
-                    source="filter_fraction"
-                    label="Filter Fraction"
-                    fullWidth
-                  />
                   <TextInput
-                    source="source"
-                    label="Source Information"
+                    source="filter_substrate"
+                    label="Filter Substrate"
                     fullWidth
                   />
                 </>
@@ -121,13 +133,18 @@ const CreateComponent = () => {
                   </Typography>
                   <SampleCoordinateInput />
                   <NumberInput
-                    source="bulk_mass_mg"
-                    label="Bulk Mass (mg)"
+                    source="air_volume_litres"
+                    label="Air Volume (L)"
                     fullWidth
                   />
-                  <TextInput
-                    source="source"
-                    label="Source Information"
+                  <NumberInput
+                    source="water_volume_litres"
+                    label="Water Volume (L)"
+                    fullWidth
+                  />
+                  <NumberInput
+                    source="initial_concentration_gram_l"
+                    label="Initial Concentration (g/L)"
                     fullWidth
                   />
                 </>
