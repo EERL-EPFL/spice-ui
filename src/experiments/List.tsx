@@ -8,7 +8,7 @@ import {
   ExportButton,
   DateField,
 } from "react-admin";
-import { postFilters } from "../filters/list";
+import { ExperimentFilterForm } from "./filters";
 
 const ListComponentActions = () => {
   const { permissions } = usePermissions();
@@ -29,13 +29,12 @@ export const ListComponent = () => {
     <List
       actions={<ListComponentActions />}
       storeKey={false}
-      filters={postFilters}
+      filters={<ExperimentFilterForm />}
     >
       <Datagrid rowClick="show">
         <DateField source="performed_at" label="Performed at" showTime />
         <TextField source="name" label="Name" />
         <TextField source="username" label="Username" />
-
         <DateField source="last_updated" label="Last updated" showTime />
       </Datagrid>
     </List>

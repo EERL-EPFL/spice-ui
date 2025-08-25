@@ -287,6 +287,16 @@ const dataProvider = (
       },
     };
   },
+  getLocationSamples: async (resource, params) => {
+    const { locationId } = params;
+    const url = `${apiUrl}/${resource}/${locationId}/samples`;
+    return httpClient(url).then(({ json }) => ({ data: json }));
+  },
+  getLocationExperiments: async (resource, params) => {
+    const { locationId } = params;
+    const url = `${apiUrl}/${resource}/${locationId}/experiments`;
+    return httpClient(url).then(({ json }) => ({ data: json }));
+  },
 });
 
 export default dataProvider;

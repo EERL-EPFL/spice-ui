@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, GeoJSON, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from "react-leaflet";
 import { Box, Typography, Card, CardContent, Button } from "@mui/material";
-import { useGetOne, useRedirect } from "react-admin";
+import { useGetOne, useRedirect, useDataProvider } from "react-admin";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { SampleTypeChip } from "./SampleTypeChips";
@@ -13,6 +13,45 @@ L.Icon.Default.mergeOptions({
   iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
+
+// Component to handle map bounds fitting for location data
+const LocationMapBoundsHandler: React.FC<{ locationData: any; samplesWithCoords: any[] }> = ({ locationData, samplesWithCoords }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    const bounds: [number, number][] = [];
+    
+    // Add polygon coordinates if area exists
+    if (locationData?.area && locationData.area.coordinates) {
+      const coords = locationData.area.coordinates;
+      if (locationData.area.type === 'Polygon') {
+        coords[0].forEach(([lng, lat]: [number, number]) => {
+          bounds.push([lat, lng]);
+        });
+      } else if (locationData.area.type === 'MultiPolygon') {
+        coords.forEach((polygon: any) => {
+          polygon[0].forEach(([lng, lat]: [number, number]) => {
+            bounds.push([lat, lng]);
+          });
+        });
+      }
+    }
+    
+    // Add sample point coordinates
+    samplesWithCoords.forEach(sample => {
+      const lat = parseFloat(sample.latitude);
+      const lng = parseFloat(sample.longitude);
+      bounds.push([lat, lng]);
+    });
+    
+    if (bounds.length > 0) {
+      // Use Leaflet's fitBounds method with padding
+      map.fitBounds(bounds, { padding: [20, 20] });
+    }
+  }, [map, locationData, samplesWithCoords]);
+  
+  return null;
+};
 
 // Component for popup content to properly handle redirect
 interface SamplePopupContentProps {
@@ -76,14 +115,33 @@ export const LocationConvexHullMap: React.FC<LocationConvexHullMapProps> = ({
   locationName,
   compact = false,
 }) => {
-  const { data: locationData, isLoading: loading, error } = useGetOne(
-    'locations',
-    { id: locationId },
-    { enabled: !!locationId }
-  );
+  const dataProvider = useDataProvider();
+  // Use standard react-admin data fetching with caching for location
+  const { data: locationData, isLoading: loading, error } = useGetOne('locations', { id: locationId });
+  
+  // Fetch samples separately using the custom dataProvider method
+  const [samples, setSamples] = useState<any[]>([]);
+  const [samplesLoading, setSamplesLoading] = useState(true);
+
+  useEffect(() => {
+    if (locationId) {
+      dataProvider.getLocationSamples('locations', { locationId })
+        .then(response => {
+          console.log('Location samples API response:', response.data);
+          const samplesArray = Array.isArray(response.data) ? response.data : [];
+          setSamples(samplesArray);
+          setSamplesLoading(false);
+        })
+        .catch(error => {
+          console.error('Error fetching location samples:', error);
+          setSamples([]);
+          setSamplesLoading(false);
+        });
+    }
+  }, [locationId, dataProvider]);
 
   // Show loading state
-  if (loading) {
+  if (loading || samplesLoading) {
     if (compact) {
       return (
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
@@ -121,7 +179,7 @@ export const LocationConvexHullMap: React.FC<LocationConvexHullMapProps> = ({
   }
 
   // No data case
-  if (!locationData || (!locationData.area && (!locationData.samples || locationData.samples.length === 0))) {
+  if (!locationData || (!locationData.area && samples.length === 0)) {
     if (compact) {
       return null; // Don't render anything in compact mode if no data
     }
@@ -135,38 +193,29 @@ export const LocationConvexHullMap: React.FC<LocationConvexHullMapProps> = ({
     );
   }
 
-  // Calculate map center and zoom based on samples with coordinates
-  const samplesWithCoords = (locationData.samples || []).filter((sample: any) => 
+  // Filter samples with valid coordinates and set default map values
+  const samplesWithCoords = samples.filter((sample: any) => 
     sample.latitude && sample.longitude && 
     !isNaN(parseFloat(sample.latitude)) && !isNaN(parseFloat(sample.longitude))
   );
-  let mapCenter: [number, number] = [46.8182, 8.2275]; // Default to Switzerland
-  let mapZoom = 13;
-
-  if (samplesWithCoords.length > 0) {
-    // Calculate bounds of all sample points
-    const lats = samplesWithCoords.map((sample: any) => parseFloat(sample.latitude));
-    const lngs = samplesWithCoords.map((sample: any) => parseFloat(sample.longitude));
-    
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    
-    // Center on the middle of the bounds
-    mapCenter = [(minLat + maxLat) / 2, (minLng + maxLng) / 2];
-    
-    // Calculate appropriate zoom level based on bounds size
-    const latDiff = maxLat - minLat;
-    const lngDiff = maxLng - minLng;
-    const maxDiff = Math.max(latDiff, lngDiff);
-    
-    if (maxDiff < 0.001) mapZoom = 16;
-    else if (maxDiff < 0.01) mapZoom = 14;
-    else if (maxDiff < 0.1) mapZoom = 12;
-    else if (maxDiff < 1) mapZoom = 10;
-    else mapZoom = 8;
-  }
+  
+  console.log('LocationConvexHullMap Debug:', {
+    locationId,
+    samplesCount: samples.length,
+    samplesWithCoordsCount: samplesWithCoords.length,
+    locationHasArea: !!locationData?.area,
+    samplesWithCoords: samplesWithCoords.map(s => ({ id: s.id, name: s.name, lat: s.latitude, lng: s.longitude }))
+  });
+  
+  // Default map center and zoom - will be overridden by LocationMapBoundsHandler
+  const defaultCenter: [number, number] = [39.8283, -98.5795]; // Geographic center of USA
+  const defaultZoom = 4;
+  
+  // World bounds to prevent map wrapping/duplication and grey areas
+  const worldBounds: [[number, number], [number, number]] = [
+    [-85.051129, -180], // Southwest corner (south, west) - Web Mercator limit
+    [85.051129, 180]    // Northeast corner (north, east) - Web Mercator limit
+  ];
 
   const convexHullStyle = {
     fillColor: '#3f51b5',
@@ -179,8 +228,11 @@ export const LocationConvexHullMap: React.FC<LocationConvexHullMapProps> = ({
 
   const renderMap = () => (
     <MapContainer
-      center={mapCenter}
-      zoom={mapZoom}
+      center={defaultCenter}
+      zoom={defaultZoom}
+      minZoom={2}
+      maxBounds={worldBounds}
+      maxBoundsViscosity={1.0}
       style={{ height: "100%", width: "100%" }}
     >
       <TileLayer
@@ -188,8 +240,11 @@ export const LocationConvexHullMap: React.FC<LocationConvexHullMapProps> = ({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       
+      {/* Bounds handler to fit map to location data */}
+      <LocationMapBoundsHandler locationData={locationData} samplesWithCoords={samplesWithCoords} />
+      
       {/* Render area (convex hull) if available */}
-      {locationData.area && (
+      {locationData?.area && (
         <GeoJSON
           key={`area-${locationId}-${JSON.stringify(locationData.area).slice(0, 50)}`}
           data={locationData.area}

@@ -1,5 +1,5 @@
-import React from "react";
-import { MapContainer, TileLayer, GeoJSON, Popup, Marker } from "react-leaflet";
+import React, { useEffect } from "react";
+import { MapContainer, TileLayer, GeoJSON, Popup, Marker, useMap } from "react-leaflet";
 import { Box, Typography, Paper } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import "leaflet/dist/leaflet.css";
@@ -16,6 +16,44 @@ L.Icon.Default.mergeOptions({
 interface LocationsMapDashboardProps {
   locations: any[];
 }
+
+// Component to handle map bounds fitting
+const MapBoundsHandler: React.FC<{ locations: any[] }> = ({ locations }) => {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (!locations || locations.length === 0) return;
+    
+    // Calculate bounds from all polygon coordinates
+    const bounds: [number, number][] = [];
+    
+    locations.forEach(location => {
+      if (location.area && location.area.coordinates) {
+        const coords = location.area.coordinates;
+        if (location.area.type === 'Polygon') {
+          // Polygon has coordinates as [[[lng, lat], [lng, lat], ...]]
+          coords[0].forEach(([lng, lat]: [number, number]) => {
+            bounds.push([lat, lng]);
+          });
+        } else if (location.area.type === 'MultiPolygon') {
+          // MultiPolygon has coordinates as [[[[lng, lat], [lng, lat], ...]], ...]
+          coords.forEach((polygon: any) => {
+            polygon[0].forEach(([lng, lat]: [number, number]) => {
+              bounds.push([lat, lng]);
+            });
+          });
+        }
+      }
+    });
+    
+    if (bounds.length > 0) {
+      // Use Leaflet's fitBounds method for proper bounds fitting with padding
+      map.fitBounds(bounds, { padding: [20, 20] });
+    }
+  }, [map, locations]);
+  
+  return null;
+};
 
 export const LocationsMapDashboard: React.FC<LocationsMapDashboardProps> = ({ locations }) => {
   const theme = useTheme();
@@ -70,60 +108,16 @@ export const LocationsMapDashboard: React.FC<LocationsMapDashboardProps> = ({ lo
     );
   }
 
-  // Calculate map bounds based on all polygon features
-  const getAllCoordinates = () => {
-    const allCoords: [number, number][] = [];
-    
-    locationsWithArea.forEach(location => {
-      if (location.area && location.area.coordinates) {
-        const coords = location.area.coordinates;
-        if (location.area.type === 'Polygon') {
-          // Polygon has coordinates as [[[lng, lat], [lng, lat], ...]]
-          coords[0].forEach(([lng, lat]: [number, number]) => {
-            allCoords.push([lat, lng]);
-          });
-        } else if (location.area.type === 'MultiPolygon') {
-          // MultiPolygon has coordinates as [[[[lng, lat], [lng, lat], ...]], ...]
-          coords.forEach((polygon: any) => {
-            polygon[0].forEach(([lng, lat]: [number, number]) => {
-              allCoords.push([lat, lng]);
-            });
-          });
-        }
-      }
-    });
-    
-    return allCoords;
-  };
-
-  const allCoords = getAllCoordinates();
-  let mapCenter: [number, number] = [46.8182, 8.2275]; // Default to Switzerland
-  let mapZoom = 10;
-
-  if (allCoords.length > 0) {
-    // Calculate bounds
-    const lats = allCoords.map(coord => coord[0]);
-    const lngs = allCoords.map(coord => coord[1]);
-    
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLng = Math.min(...lngs);
-    const maxLng = Math.max(...lngs);
-    
-    // Center on the middle of the bounds
-    mapCenter = [(minLat + maxLat) / 2, (minLng + maxLng) / 2];
-    
-    // Calculate appropriate zoom level
-    const latDiff = maxLat - minLat;
-    const lngDiff = maxLng - minLng;
-    const maxDiff = Math.max(latDiff, lngDiff);
-    
-    if (maxDiff < 0.001) mapZoom = 16;
-    else if (maxDiff < 0.01) mapZoom = 14;
-    else if (maxDiff < 0.1) mapZoom = 12;
-    else if (maxDiff < 1) mapZoom = 10;
-    else mapZoom = 8;
-  }
+  // Default map center and zoom - will be overridden by MapBoundsHandler
+  const defaultCenter: [number, number] = [39.8283, -98.5795]; // Geographic center of USA
+  const defaultZoom = 4;
+  
+  // World bounds to prevent map wrapping/duplication and grey areas
+  // Using Web Mercator projection limits to prevent grey areas above/below
+  const worldBounds: [[number, number], [number, number]] = [
+    [-85.051129, -180], // Southwest corner (south, west) - Web Mercator limit
+    [85.051129, 180]    // Northeast corner (north, east) - Web Mercator limit
+  ];
 
   // Get polygon style based on location color
   const getPolygonStyle = (location: any) => {
@@ -198,14 +192,20 @@ export const LocationsMapDashboard: React.FC<LocationsMapDashboardProps> = ({ lo
   return (
     <div style={{ position: 'relative', height: '100%', width: '100%' }}>
       <MapContainer
-        center={mapCenter}
-        zoom={mapZoom}
+        center={defaultCenter}
+        zoom={defaultZoom}
+        minZoom={2}
+        maxBounds={worldBounds}
+        maxBoundsViscosity={1.0}
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        
+        {/* Bounds handler to fit map to all polygons */}
+        <MapBoundsHandler locations={visibleLocations} />
         
         {/* Render location polygons */}
         {visibleLocations.map((location, index) => {

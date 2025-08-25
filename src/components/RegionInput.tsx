@@ -227,7 +227,8 @@ const WellDetailsDisplay: React.FC<{
   well: any; // Use API data structure directly
   formatSeconds: (seconds: number) => string;
   onViewImage?: (well: any) => void;
-}> = ({ well, formatSeconds, onViewImage }) => {
+  trayConfiguration?: { trays: TrayConfig[] };
+}> = ({ well, formatSeconds, onViewImage, trayConfiguration }) => {
   const redirect = useRedirect();
 
   const handleTreatmentClick = () => {
@@ -258,7 +259,7 @@ const WellDetailsDisplay: React.FC<{
       <Typography variant="subtitle2" gutterBottom color="text.primary">
         {well.tray_name
           ? `${well.tray_name}: ${well.coordinate}`
-          : `Well ${well.coordinate}`}
+          : `Tray ${well.selectedTrayName}: ${well.coordinate}`}
       </Typography>
       {(well.first_phase_change_temperature_probes?.average || well.temperatures?.probe_readings?.length > 0) && (
         <Tooltip
@@ -269,18 +270,52 @@ const WellDetailsDisplay: React.FC<{
                   Individual Probe Temperatures:
                 </Typography>
                 {well.temperatures?.probe_readings ? (
-                  well.temperatures.probe_readings
-                    .sort((a, b) => a.probe.sequence - b.probe.sequence)
-                    .map((probe_data) => (
-                      <Typography key={probe_data.probe.id} variant="body2">
-                        {probe_data.probe.name}: {probe_data.probe_temperature_reading.temperature}°C
-                        {probe_data.probe.position_x && probe_data.probe.position_y && (
-                          <span style={{ opacity: 0.7, fontSize: '0.85em' }}>
-                            {' '}@ ({probe_data.probe.position_x}, {probe_data.probe.position_y})
-                          </span>
-                        )}
-                      </Typography>
-                    ))
+                  <>
+                    {(() => {
+                      // Group probes by tray based on data column index ranges
+                      // Map probe indices to actual tray names from the flatTrays configuration
+                      const probesByTray = well.temperatures.probe_readings.reduce((acc, probe) => {
+                        // Group by probe index ranges - probes 1-4 belong to first tray, 5-8 to second tray
+                        const trayGroup = probe.probe_data_column_index <= 4 ? 'tray1' : 'tray2';
+                        if (!acc[trayGroup]) acc[trayGroup] = [];
+                        acc[trayGroup].push(probe);
+                        return acc;
+                      }, {} as Record<string, any[]>);
+
+                      return Object.entries(probesByTray).map(([trayGroup, probes], index) => {
+                        // Map probe groups to actual tray names from configuration
+                        let trayName = 'Unknown Tray';
+                        if (trayConfiguration?.trays && trayConfiguration.trays.length >= 2) {
+                          const trayIndex = trayGroup === 'tray1' ? 0 : 1;
+                          const tray = trayConfiguration.trays[trayIndex];
+                          trayName = tray?.name || `Tray ${trayIndex + 1}`;
+                        }
+                        
+                        const displayName = `Tray ${trayName}`;
+                        const trayColor = trayGroup === 'tray1' ? 'primary.light' : 'secondary.light';
+                        
+                        return (
+                          <React.Fragment key={trayGroup}>
+                            <Typography variant="body2" sx={{ fontWeight: "medium", mt: 1, mb: 0.5, color: trayColor }}>
+                              {displayName}:
+                            </Typography>
+                            {probes
+                              .sort((a, b) => a.probe_data_column_index - b.probe_data_column_index)
+                              .map((probe_reading) => (
+                                <Typography key={probe_reading.probe_id} variant="body2" sx={{ pl: 1 }}>
+                                  {probe_reading.probe_name}: {probe_reading.temperature}°C
+                                  {probe_reading.probe_position_x && probe_reading.probe_position_y && (
+                                    <span style={{ opacity: 0.7, fontSize: '0.85em' }}>
+                                      {' '}@ ({probe_reading.probe_position_x}, {probe_reading.probe_position_y})
+                                    </span>
+                                  )}
+                                </Typography>
+                              ))}
+                          </React.Fragment>
+                        );
+                      });
+                    })()}
+                  </>
                 ) : (
                   <Typography variant="body2" color="text.secondary">
                     No individual probe data available
@@ -303,7 +338,7 @@ const WellDetailsDisplay: React.FC<{
             <strong>Freezing temperature (average):</strong>{" "}
             {well.first_phase_change_temperature_probes?.average || 
              (well.temperatures?.probe_readings && 
-              (well.temperatures.probe_readings.reduce((sum, p) => sum + parseFloat(p.probe_temperature_reading.temperature), 0) / 
+              (well.temperatures.probe_readings.reduce((sum, p) => sum + parseFloat(p.temperature), 0) / 
                well.temperatures.probe_readings.length).toFixed(1))}°C
           </Typography>
         </Tooltip>
@@ -411,41 +446,11 @@ const TreatmentDisplay: React.FC<{
   const [fullTreatment, setFullTreatment] = React.useState<SingleRegion["treatment"] | null>(null);
   const [loading, setLoading] = React.useState(false);
 
-  // Fetch treatment data with sample if we have treatment_id but no complete treatment data
+  // Use treatment data directly - no need for API calls since data is now embedded
   React.useEffect(() => {
-    const fetchTreatmentWithSample = async () => {
-      if (!treatmentId || (treatmentData?.sample?.name)) {
-        setFullTreatment(treatmentData || null);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        // Fetch the treatment
-        const { data: treatment } = await dataProvider.getOne("treatments", { id: treatmentId });
-        
-        // Fetch the sample if treatment has sample_id
-        let enrichedTreatment = { ...treatment };
-        if (treatment.sample_id) {
-          try {
-            const { data: sample } = await dataProvider.getOne("samples", { id: treatment.sample_id });
-            enrichedTreatment.sample = sample;
-          } catch (error) {
-            console.error("Error fetching sample for treatment:", error);
-          }
-        }
-        
-        setFullTreatment(enrichedTreatment);
-      } catch (error) {
-        console.error("Error fetching treatment:", error);
-        setFullTreatment(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTreatmentWithSample();
-  }, [treatmentId, treatmentData?.sample?.name, dataProvider]);
+    setFullTreatment(treatmentData || null);
+    setLoading(false);
+  }, [treatmentData]);
 
   const treatment = fullTreatment;
 
@@ -457,26 +462,14 @@ const TreatmentDisplay: React.FC<{
     }
   };
 
-  if (!treatmentId || !treatment) {
-    // Check if we have sample data to make clickable (could be a "none" treatment with a sample)
-    if (treatment?.sample?.id) {
-      return (
-        <MuiLink
-          component="button"
-          variant="caption"
-          onClick={handleSampleClick}
-          sx={{
-            cursor: "pointer",
-            textDecoration: "underline",
-            color: "primary.main",
-            fontSize: "0.8rem"
-          }}
-        >
-          {treatment.sample.name || "View Sample"}
-        </MuiLink>
-      );
+  const handleTreatmentClick = () => {
+    if (treatment?.id) {
+      redirect("show", "treatments", treatment.id);
     }
-    
+  };
+
+  // Check if we have no treatment data at all
+  if (!treatment && !treatmentId) {
     return (
       <Typography
         variant="caption"
@@ -485,6 +478,25 @@ const TreatmentDisplay: React.FC<{
       >
         No treatment
       </Typography>
+    );
+  }
+
+  // If we have treatment data but no treatmentId, still show the treatment
+  if (!treatmentId && treatment?.sample?.id) {
+    return (
+      <MuiLink
+        component="button"
+        variant="caption"
+        onClick={handleSampleClick}
+        sx={{
+          cursor: "pointer",
+          textDecoration: "underline",
+          color: "primary.main",
+          fontSize: "0.8rem"
+        }}
+      >
+        {treatment.sample.name || "View Sample"}
+      </MuiLink>
     );
   }
 
@@ -508,131 +520,54 @@ const TreatmentDisplay: React.FC<{
     );
   }
 
-  // Special handling for "none" treatments with samples - emphasize the sample
-  if (treatment.name === "none" && treatment.sample?.name) {
-    return (
-      <Button
-        variant="text"
-        size="small"
-        onClick={() => redirect("show", "samples", treatment.sample.id)}
-        sx={{
-          textTransform: "none",
-          justifyContent: "flex-start",
-          padding: "4px 8px",
-          minHeight: "48px",
-          width: "100%",
-          "&:hover": {
-            backgroundColor: "action.hover",
-          },
-        }}
-      >
-        <Box
+  // Format like the treatment selector: "Sample: treatment" in a clickable box
+  return (
+    <Box
+      onClick={treatment.sample?.id ? handleSampleClick : undefined}
+      sx={{
+        cursor: treatment.sample?.id ? "pointer" : "default",
+        padding: "4px 8px",
+        borderRadius: 1,
+        backgroundColor: "transparent",
+        "&:hover": treatment.sample?.id
+          ? {
+              backgroundColor: "action.hover",
+            }
+          : {},
+        minHeight: "32px",
+        display: "flex",
+        alignItems: "center",
+        border: "1px solid",
+        borderColor: "divider",
+        width: "100%",
+      }}
+    >
+      {treatment.sample?.name ? (
+        <Typography
+          variant="body2"
           sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
+            fontSize: "0.75rem",
+            lineHeight: 1.2,
+            textAlign: "left",
             width: "100%",
           }}
         >
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: "0.8rem",
-              lineHeight: 1.2,
-              fontWeight: "bold",
-              color: "primary.main",
-            }}
-          >
-            {treatment.sample.name}
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: "0.65rem",
-              lineHeight: 1.2,
-              color: "text.secondary",
-            }}
-          >
-            {treatmentName[treatment.name] || treatment.name}
-          </Typography>
-          {treatment.sample?.location?.name && (
-            <Typography
-              variant="caption"
-              sx={{
-                fontSize: "0.6rem",
-                lineHeight: 1.2,
-                color: "text.secondary",
-              }}
-            >
-              {treatment.sample.location.name}
-            </Typography>
-          )}
-        </Box>
-      </Button>
-    );
-  }
-
-  return (
-    <Button
-      variant="text"
-      size="small"
-      onClick={() => redirect("show", "samples", treatment.sample.id)}
-      sx={{
-        textTransform: "none",
-        justifyContent: "flex-start",
-        padding: "4px 8px",
-        minHeight: "48px",
-        width: "100%",
-        "&:hover": {
-          backgroundColor: "action.hover",
-        },
-      }}
-    >
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-start",
-          width: "100%",
-        }}
-      >
-        {treatment.sample?.name && (
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: "0.75rem",
-              lineHeight: 1.2,
-              fontWeight: "medium",
-              color: "primary.main",
-            }}
-          >
-            {treatment.sample.name}
-          </Typography>
-        )}
+          <span style={{ fontWeight: "bold" }}>{treatment.sample.name}</span>:{" "}
+          {treatmentName[treatment.name] || treatment.name}
+        </Typography>
+      ) : (
         <Typography
-          variant="caption"
+          variant="body2"
           sx={{
-            fontSize: "0.7rem",
-            lineHeight: 1.2,
             color: "text.secondary",
+            fontStyle: "italic",
+            fontSize: "0.75rem",
           }}
         >
           {treatmentName[treatment.name] || treatment.name}
         </Typography>
-        {treatment.sample?.location?.name && (
-          <Typography
-            variant="caption"
-            sx={{
-              fontSize: "0.65rem",
-              lineHeight: 1.2,
-              color: "text.secondary",
-            }}
-          >
-            {treatment.sample.location.name}
-          </Typography>
-        )}
-      </Box>
-    </Button>
+      )}
+    </Box>
   );
 };
 
@@ -1157,65 +1092,8 @@ export const RegionInput: React.FC<{
 
   React.useEffect(() => {
     const enhanceRegionsWithTreatmentData = async () => {
-      const enhanced = await Promise.all(
-        regions.map(async (region) => {
-          // If we already have treatment data, use it
-          if (region.treatment?.sample?.name) {
-            return region;
-          }
-
-          // If we have a treatment_id but no nested treatment data, fetch it
-          if (region.treatment_id && !region.treatment?.sample?.name) {
-            try {
-              const { data: treatment } = await dataProvider.getOne(
-                "treatments",
-                { id: region.treatment_id },
-              );
-
-              // Get the sample for this treatment
-              const { data: sample } = await dataProvider.getOne("samples", {
-                id: treatment.sample_id,
-              });
-
-              // If sample has location_id, fetch the location data
-              let enhancedSample = sample;
-              if (sample.location_id) {
-                try {
-                  const { data: location } = await dataProvider.getOne("locations", {
-                    id: sample.location_id,
-                  });
-                  enhancedSample = {
-                    ...sample,
-                    campaign: {
-                      location: location,
-                    },
-                  };
-                } catch (error) {
-                }
-              }
-
-              return {
-                ...region,
-                treatment: {
-                  ...treatment,
-                  sample: enhancedSample, // Now includes location data
-                },
-              };
-            } catch (error) {
-              console.error(
-                "Error fetching treatment data for region:",
-                region.name,
-                error,
-              );
-              return region;
-            }
-          }
-
-          return region;
-        }),
-      );
-
-      setEnhancedRegions(enhanced);
+      // Regions now come pre-enhanced with treatment/sample data from the API
+      setEnhancedRegions(regions);
     };
 
     if (regions.length > 0) {
@@ -1656,13 +1534,89 @@ export const RegionInput: React.FC<{
                       well,
                       trayName,
                     );
-                    setSelectedWell(wellWithRegionData);
+                    // Add tray information to the selected well
+                    const wellWithTray = {
+                      ...wellWithRegionData,
+                      selectedTrayName: trayName, // Add the tray where it was clicked
+                    };
+                    
+                    // If clicking the same well, deselect it
+                    if (selectedWell && selectedWell.coordinate === wellWithTray.coordinate && selectedWell.selectedTrayName === trayName) {
+                      setSelectedWell(null);
+                    } else {
+                      setSelectedWell(wellWithTray);
+                    }
                   }}
                   showTimePointVisualization={
                     showTimePointVisualization && viewMode === "results"
                   }
                   viewMode={viewMode}
                   selectedWell={selectedWell}
+                  probeLocations={(() => {
+                    if (selectedWell && trayConfiguration?.trays && selectedWell.temperatures?.probe_readings) {
+                      console.log('PROBE DEBUG - selectedWell:', selectedWell.coordinate, 'trayName:', trayName);
+                      console.log('PROBE DEBUG - probe_readings count:', selectedWell.temperatures.probe_readings.length);
+                      
+                      // Find the current tray configuration
+                      const currentTray = trayConfiguration.trays.find(t => t.name === trayName);
+                      if (!currentTray) {
+                        console.log('PROBE DEBUG - No tray config found for', trayName);
+                        return [];
+                      }
+                      
+                      console.log('PROBE DEBUG - Found tray config:', currentTray.name, 'with', currentTray.probe_locations?.length, 'probes');
+                      
+                      // Use tray configuration probe locations and match with temperature data
+                      const probesWithTemp = (currentTray.probe_locations || []).map((probeConfig) => {
+                        // Find matching temperature reading by probe ID first, then by data column index
+                        let tempReading = selectedWell.temperatures.probe_readings.find(
+                          p => p.probe_id === probeConfig.id
+                        );
+                        
+                        // Fallback to data column index matching if probe ID doesn't match
+                        if (!tempReading) {
+                          tempReading = selectedWell.temperatures.probe_readings.find(
+                            p => p.probe_data_column_index === probeConfig.data_column_index
+                          );
+                        }
+                        
+                        console.log('PROBE DEBUG - Probe', probeConfig.data_column_index, 'ID:', probeConfig.id, 'temp:', tempReading?.temperature);
+                        
+                        return {
+                          id: probeConfig.id,
+                          data_column_index: probeConfig.data_column_index,
+                          position_x: probeConfig.position_x,
+                          position_y: probeConfig.position_y,
+                          name: probeConfig.name,
+                          temperature: tempReading?.temperature || 'N/A',
+                        };
+                      });
+                      
+                      console.log('PROBE DEBUG - Final probes count:', probesWithTemp.length);
+                      return probesWithTemp;
+                    }
+                    return [];
+                  })()}
+                  showProbes={(() => {
+                    const currentTray = trayConfiguration?.trays?.find(t => t.name === trayName);
+                    const shouldShow = showTimePointVisualization && 
+                      viewMode === "results" && 
+                      selectedWell && 
+                      currentTray?.probe_locations?.length > 0 &&
+                      selectedWell.temperatures?.probe_readings &&
+                      selectedWell.temperatures.probe_readings.length > 0;
+                    
+                    console.log('PROBE DEBUG - showProbes for', trayName, ':', shouldShow, 'conditions:', {
+                      showTimePointVisualization,
+                      viewMode,
+                      hasSelectedWell: !!selectedWell,
+                      hasTrayProbeConfig: !!currentTray?.probe_locations?.length,
+                      hasProbeReadings: !!selectedWell?.temperatures?.probe_readings?.length,
+                      trayProbeCount: currentTray?.probe_locations?.length || 0
+                    });
+                    
+                    return shouldShow;
+                  })()}
                 />
               </Box>
             );
@@ -2166,6 +2120,7 @@ export const RegionInput: React.FC<{
                         well={selectedWell}
                         formatSeconds={formatSeconds}
                         onViewImage={props.onWellClick}
+                        trayConfiguration={trayConfiguration}
                       />
                     )}
                   </Box>

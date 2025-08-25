@@ -1,4 +1,4 @@
-import { usePermissions, useGetList } from "react-admin";
+import { usePermissions, useGetList, useRefresh } from "react-admin";
 import {
   Typography,
   Box,
@@ -30,10 +30,10 @@ const Dashboard = () => {
     sort: { field: "last_updated", order: "DESC" },
   });
 
-  // Fetch locations for the map and list
+  // Fetch locations using standard react-admin caching
   const { data: locations, isLoading: locationsLoading } = useGetList("locations", {
-    pagination: { page: 1, perPage: 100 }, // Get all locations for the map and recent list
-    sort: { field: "name", order: "ASC" }, // Keep name sorting for map, we'll slice recent ones separately
+    pagination: { page: 1, perPage: 100 },
+    sort: { field: "name", order: "ASC" },
   });
 
   if (!permissions) {

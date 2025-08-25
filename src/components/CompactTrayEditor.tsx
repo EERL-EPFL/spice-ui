@@ -29,7 +29,10 @@ import TrayProbeConfig from "./TrayProbeConfig";
 import ImageCoordinateSelector from "./ImageCoordinateSelector";
 
 // Wrapper component to handle probe position updates with controls
-const InteractiveTrayWrapper: React.FC<{ scopedFormData: any }> = ({ scopedFormData }) => {
+const InteractiveTrayWrapper: React.FC<{ scopedFormData: any; allTrays: any[] }> = ({ 
+  scopedFormData, 
+  allTrays 
+}) => {
   const probeLocationsField = useInput({ source: 'probe_locations', defaultValue: [] });
   const [isAddingProbe, setIsAddingProbe] = useState(false);
   
@@ -39,11 +42,28 @@ const InteractiveTrayWrapper: React.FC<{ scopedFormData: any }> = ({ scopedFormD
     setIsAddingProbe(true);
   };
   
+  // Helper function to get all existing probe column indices across all trays
+  const getAllExistingProbeIndices = (): number[] => {
+    const allIndices: number[] = [];
+    allTrays.forEach((tray) => {
+      if (tray?.probe_locations) {
+        tray.probe_locations.forEach((probe: any) => {
+          if (probe.data_column_index) {
+            allIndices.push(probe.data_column_index);
+          }
+        });
+      }
+    });
+    return allIndices;
+  };
+  
   const handleTrayClick = (x: number, y: number) => {
     if (!isAddingProbe) return;
     
-    const newDataColumnIndex = currentProbes.length > 0 
-      ? Math.max(...currentProbes.map((p: any) => p.data_column_index || 1)) + 1 
+    // Get the next available data column index across ALL trays
+    const allExistingIndices = getAllExistingProbeIndices();
+    const newDataColumnIndex = allExistingIndices.length > 0 
+      ? Math.max(...allExistingIndices) + 1 
       : 1;
     
     const newProbe = {
@@ -236,7 +256,11 @@ const CompactTrayEditor: React.FC = () => {
 
               <TabPanel value={activeTab} index={0}>
                 <Box sx={{ minHeight: 300 }}>
-                  <TrayProbeConfig />
+                  <FormDataConsumer>
+                    {({ formData }) => (
+                      <TrayProbeConfig allTrays={formData?.trays || []} />
+                    )}
+                  </FormDataConsumer>
                 </Box>
               </TabPanel>
 
@@ -319,7 +343,7 @@ const CompactTrayEditor: React.FC = () => {
                 Interactive Tray Preview
               </Typography>
               <FormDataConsumer>
-                {({ scopedFormData }) => {
+                {({ scopedFormData, formData }) => {
                   if (
                     scopedFormData?.name &&
                     scopedFormData?.qty_cols &&
@@ -328,6 +352,7 @@ const CompactTrayEditor: React.FC = () => {
                     return (
                       <InteractiveTrayWrapper 
                         scopedFormData={scopedFormData}
+                        allTrays={formData?.trays || []}
                       />
                     );
                   }

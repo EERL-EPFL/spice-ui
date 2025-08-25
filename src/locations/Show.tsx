@@ -1,3 +1,4 @@
+import React from "react";
 import {
   Show,
   SimpleShowLayout,
@@ -17,8 +18,9 @@ import {
   ReferenceField,
   useRecordContext,
   Labeled,
+  useDataProvider,
 } from "react-admin";
-import { Box, Typography, Card, CardContent, Chip, Button } from "@mui/material";
+import { Box, Typography, Card, CardContent, Chip, Button, TablePagination } from "@mui/material";
 import { Add as AddIcon } from "@mui/icons-material";
 import { treatmentName } from "../treatments";
 import { LocationConvexHullMap } from "../components/LocationConvexHullMap";
@@ -117,16 +119,59 @@ const TabLabelWithCount = ({ label, count }: { label: string; count: number }) =
   </Box>
 );
 
-// Samples tab content with create button
-const SamplesTabContent = () => {
+// Samples tab content with create button - uses data provider for JWT auth
+const SamplesTabContent = ({ onCountChange }: { onCountChange?: (count: number) => void }) => {
   const record = useRecordContext();
   const redirect = useRedirect();
   const createPath = useCreatePath();
+  const dataProvider = useDataProvider();
+  const [samples, setSamples] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+  const [totalSamples, setTotalSamples] = React.useState(0);
+
+  React.useEffect(() => {
+    if (record?.id) {
+      dataProvider.getLocationSamples('locations', { locationId: record.id })
+        .then(response => {
+          console.log('Samples API response:', response.data);
+          // Ensure data is always an array
+          const samplesArray = Array.isArray(response.data) ? response.data : [];
+          setSamples(samplesArray);
+          setTotalSamples(samplesArray.length);
+          // Update parent count
+          onCountChange?.(samplesArray.length);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Error fetching samples:', error);
+          setSamples([]); // Set empty array on error
+          setTotalSamples(0);
+          onCountChange?.(0);
+          setLoading(false);
+        });
+    }
+  }, [record?.id, dataProvider]);
 
   const handleCreateSample = () => {
     // Use redirect with state data to prefill the location_id
     redirect('create', 'samples', undefined, {}, { record: { location_id: record?.id } });
   };
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Calculate paginated samples
+  const paginatedSamples = samples.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  if (loading) return <div>Loading samples...</div>;
 
   return (
     <Box>
@@ -142,31 +187,173 @@ const SamplesTabContent = () => {
         </Button>
       </Box>
 
-      {/* Samples data grid */}
-      <ArrayField source="samples">
-        <Datagrid
-          bulkActionButtons={false}
-          rowClick={(id) => {
-            return createPath({ resource: "samples", id, type: "show" });
-          }}
-        >
-          <TextField source="name" />
-          <FunctionField
-            source="type"
-            label="Type"
-            render={(record) => (
-              <SampleTypeChip sampleType={record.type} />
-            )}
+      {/* Samples data grid - manual table since we're using custom data */}
+      <Box sx={{ mt: 2 }}>
+        {!Array.isArray(samples) || samples.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+            No samples found for this location
+          </Typography>
+        ) : (
+          <>
+            <Box sx={{ overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
+                    <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Name</th>
+                    <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Type</th>
+                    <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Treatments</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedSamples.map((sample: any) => (
+                    <tr 
+                      key={sample.id} 
+                      style={{ 
+                        borderBottom: '1px solid #f0f0f0',
+                        cursor: 'pointer',
+                        '&:hover': { backgroundColor: '#f5f5f5' }
+                      }}
+                      onClick={() => {
+                        const path = createPath({ resource: "samples", id: sample.id, type: "show" });
+                        redirect(path);
+                      }}
+                    >
+                      <td style={{ padding: '12px 8px' }}>{sample.name}</td>
+                      <td style={{ padding: '12px 8px' }}>
+                        <SampleTypeChip sampleType={sample.type} />
+                      </td>
+                      <td style={{ padding: '12px 8px' }}>
+                        <TreatmentChips treatments={sample.treatments} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </Box>
+            
+            {/* Pagination controls */}
+            <TablePagination
+              component="div"
+              count={totalSamples}
+              page={page}
+              onPageChange={handleChangePage}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+              rowsPerPageOptions={[5, 10, 25, 50]}
+              showFirstButton
+              showLastButton
+            />
+          </>
+        )}
+      </Box>
+    </Box>
+  );
+};
+
+// Experiments tab content - uses data provider for JWT auth
+const ExperimentsTabContent = ({ onCountChange }: { onCountChange?: (count: number) => void }) => {
+  const record = useRecordContext();
+  const redirect = useRedirect();
+  const createPath = useCreatePath();
+  const dataProvider = useDataProvider();
+  const [experiments, setExperiments] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+  const [totalExperiments, setTotalExperiments] = React.useState(0);
+
+  React.useEffect(() => {
+    if (record?.id) {
+      dataProvider.getLocationExperiments('locations', { locationId: record.id })
+        .then(response => {
+          console.log('Experiments API response:', response.data);
+          // Ensure data is always an array
+          const experimentsArray = Array.isArray(response.data) ? response.data : [];
+          setExperiments(experimentsArray);
+          setTotalExperiments(experimentsArray.length);
+          // Update parent count
+          onCountChange?.(experimentsArray.length);
+          setLoading(false);
+        })
+        .catch(error => {
+          console.error('Error fetching experiments:', error);
+          setExperiments([]); // Set empty array on error
+          setTotalExperiments(0);
+          onCountChange?.(0);
+          setLoading(false);
+        });
+    }
+  }, [record?.id, dataProvider]);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Calculate paginated experiments
+  const paginatedExperiments = experiments.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  if (loading) return <div>Loading experiments...</div>;
+
+  return (
+    <Box>
+      {!Array.isArray(experiments) || experiments.length === 0 ? (
+        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+          No experiments found for this location
+        </Typography>
+      ) : (
+        <>
+          <Box sx={{ overflow: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
+                  <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Date</th>
+                  <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Name</th>
+                  <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedExperiments.map((experiment: any) => (
+                  <tr 
+                    key={experiment.id} 
+                    style={{ 
+                      borderBottom: '1px solid #f0f0f0',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => {
+                      const path = createPath({ resource: "experiments", id: experiment.id, type: "show" });
+                      redirect(path);
+                    }}
+                  >
+                    <td style={{ padding: '12px 8px' }}>
+                      {experiment.performed_at ? new Date(experiment.performed_at).toLocaleString() : '-'}
+                    </td>
+                    <td style={{ padding: '12px 8px' }}>{experiment.name}</td>
+                    <td style={{ padding: '12px 8px' }}>{experiment.remarks || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Box>
+          
+          {/* Pagination controls */}
+          <TablePagination
+            component="div"
+            count={totalExperiments}
+            page={page}
+            onPageChange={handleChangePage}
+            rowsPerPage={rowsPerPage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            showFirstButton
+            showLastButton
           />
-          <FunctionField
-            source="treatments"
-            label="Treatments"
-            render={(record) => (
-              <TreatmentChips treatments={record.treatments} />
-            )}
-          />
-        </Datagrid>
-      </ArrayField>
+        </>
+      )}
     </Box>
   );
 };
@@ -174,6 +361,13 @@ const SamplesTabContent = () => {
 export const ShowComponent = () => {
   const redirect = useRedirect();
   const createPath = useCreatePath();
+  const record = useRecordContext();
+  const [samplesCount, setSamplesCount] = React.useState(0);
+  const [experimentsCount, setExperimentsCount] = React.useState(0);
+
+  // Wrapper components that pass count setters to content components
+  const SamplesTabWithCount = () => <SamplesTabContent onCountChange={setSamplesCount} />;
+  const ExperimentsTabWithCount = () => <ExperimentsTabContent onCountChange={setExperimentsCount} />;
   
   return (
     <Show actions={<ShowComponentActions />}>
@@ -181,47 +375,14 @@ export const ShowComponent = () => {
         <LocationInfo />
         <TabbedShowLayout>
           <TabbedShowLayout.Tab 
-            label={
-              <FunctionField
-                render={(record) => (
-                  <TabLabelWithCount 
-                    label="Samples" 
-                    count={record?.samples?.length || 0} 
-                  />
-                )}
-              />
-            }
+            label={<TabLabelWithCount label="Samples" count={samplesCount} />}
           >
-            <SamplesTabContent />
+            <SamplesTabWithCount />
           </TabbedShowLayout.Tab>
           <TabbedShowLayout.Tab 
-            label={
-              <FunctionField
-                render={(record) => (
-                  <TabLabelWithCount 
-                    label="Experiments" 
-                    count={record?.experiments?.length || 0} 
-                  />
-                )}
-              />
-            }
+            label={<TabLabelWithCount label="Experiments" count={experimentsCount} />}
           >
-            <ArrayField source="experiments">
-              <Datagrid
-                bulkActionButtons={false}
-                rowClick={(id) => {
-                  return createPath({
-                    resource: "experiments",
-                    id,
-                    type: "show",
-                  });
-                }}
-              >
-                <DateField source="performed_at" label="Date" showTime />
-                <TextField source="name" />
-                <TextField source="remarks" />
-              </Datagrid>
-            </ArrayField>
+            <ExperimentsTabWithCount />
           </TabbedShowLayout.Tab>
         </TabbedShowLayout>
       </SimpleShowLayout>

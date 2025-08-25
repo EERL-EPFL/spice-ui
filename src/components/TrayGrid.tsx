@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Tooltip } from "@mui/material";
 import { buildRotatedWellGrid } from "../utils/matrixTransform";
 
@@ -106,6 +106,15 @@ export interface WellSummary {
   };
 }
 
+// Probe position interface for visualization
+export interface ProbePosition {
+  data_column_index?: number;
+  position_x: number | string;
+  position_y: number | string;
+  name?: string;
+  temperature?: string; // Temperature value for selected well
+}
+
 export interface TrayGridProps {
   tray: string;
   qtyCols: number;
@@ -126,6 +135,9 @@ export interface TrayGridProps {
   showTimePointVisualization?: boolean;
   viewMode?: "regions" | "results";
   selectedWell?: WellSummary | null; // Add selected well for highlighting
+  // Probe visualization props
+  probeLocations?: ProbePosition[]; // Probe positions and data for this tray
+  showProbes?: boolean; // Whether to show probes on the visualization
 }
 
 const TrayGrid: React.FC<TrayGridProps> = ({
@@ -142,6 +154,8 @@ const TrayGrid: React.FC<TrayGridProps> = ({
   showTimePointVisualization = false,
   viewMode = "regions",
   selectedWell = null,
+  probeLocations = [],
+  showProbes = false,
 }) => {
   // Build well grid using matrix transformations with proper naming
   const wellGrid = React.useMemo(() => {
@@ -525,6 +539,53 @@ const TrayGrid: React.FC<TrayGridProps> = ({
 
   const { topLabels, leftLabels, bottomLabels, rightLabels } = getLabels();
 
+  // Convert tray coordinates to display coordinates for probe rendering (adapted from TrayDisplay)
+  const convertTrayToSvgCoords = useCallback((trayX: number, trayY: number) => {
+    // The tray coordinate system should transform the same way wells transform
+    // Tray coordinates are in mm in a coordinate system where:
+    // - (0,0) is at one corner of the tray
+    // - (150,100) is at the opposite corner
+    
+    // First normalize the tray coordinates to 0-1 range
+    const trayWidth = 150; // mm
+    const trayHeight = 100; // mm
+    const normalizedX = trayX / trayWidth;
+    const normalizedY = trayY / trayHeight;
+    
+    // Now apply the same rotation logic as wells use (same as TrayDisplay)
+    let displayNormalizedX, displayNormalizedY;
+    
+    switch (orientation) {
+      case 90:
+        // Clockwise 90°: (x,y) -> (y, 1-x) becomes (1-y, x) for correct direction
+        displayNormalizedX = 1 - normalizedY;
+        displayNormalizedY = normalizedX;
+        break;
+      case 180:
+        displayNormalizedX = 1 - normalizedX;
+        displayNormalizedY = 1 - normalizedY;
+        break;
+      case 270:
+        // Clockwise 270°: (x,y) -> (1-y, x) becomes (y, 1-x) for correct direction  
+        displayNormalizedX = normalizedY;
+        displayNormalizedY = 1 - normalizedX;
+        break;
+      default: // 0 degrees
+        displayNormalizedX = normalizedX;
+        displayNormalizedY = normalizedY;
+        break;
+    }
+    
+    // Convert to SVG coordinates using TrayGrid's layout constants
+    const wellAreaWidth = (displayCols - 1) * SPACING;
+    const wellAreaHeight = (displayRows - 1) * SPACING;
+    
+    const svgX = leftMargin + displayNormalizedX * wellAreaWidth;
+    const svgY = topMargin + displayNormalizedY * wellAreaHeight;
+    
+    return { x: svgX, y: svgY };
+  }, [SPACING, leftMargin, topMargin, displayCols, displayRows, orientation]);
+
   // Create wells render function to use in two places
   const renderWells = (onTop = false) =>
     Array.from({ length: qtyRows }).map((_, rowIdx) =>
@@ -611,6 +672,16 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                 cy={cy}
                 r={CIRCLE_RADIUS}
                 fill={fillColor}
+                opacity={(() => {
+                  // If a well is selected, make non-selected wells more transparent
+                  if (selectedWell) {
+                    const isThisWellSelected = well && 
+                      selectedWell.coordinate === well.coordinate &&
+                      selectedWell.selectedTrayName === tray;
+                    return isThisWellSelected ? 1.0 : 0.4; // Full opacity for selected, reduced for others
+                  }
+                  return 1.0; // Full opacity when no well is selected
+                })()}
                 stroke={(() => {
                   // Check if this well is selected for highlighting
                   // Match by coordinate AND ensure it's from the same tray
@@ -618,7 +689,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     selectedWell &&
                     well &&
                     selectedWell.coordinate === well.coordinate &&
-                    selectedWell.tray_name === tray; // Only highlight in the matching tray
+                    selectedWell.selectedTrayName === tray; // Check the tray where it was clicked
 
                   if (isSelected) {
                     return "#ff6b35"; // Bold orange border for selected well
@@ -635,7 +706,7 @@ const TrayGrid: React.FC<TrayGridProps> = ({
                     selectedWell &&
                     well &&
                     selectedWell.coordinate === well.coordinate &&
-                    selectedWell.tray_name === tray; // Only highlight in the matching tray
+                    selectedWell.selectedTrayName === tray; // Check the tray where it was clicked
 
                   if (isSelected) {
                     return 4; // Bold border width for selected well
@@ -889,6 +960,163 @@ const TrayGrid: React.FC<TrayGridProps> = ({
 
       {/* 7) Draw wells on top when in time point mode */}
       {showTimePointVisualization && renderWells(true)}
+
+      {/* 8) Draw temperature probes */}
+      {showProbes && (() => {
+        console.log('TRAYGRID DEBUG - Drawing probes, count:', probeLocations.length, 'showProbes:', showProbes);
+        return null; // Just for logging, actual rendering below
+      })()}
+      
+      {showProbes && probeLocations.map((probe, index) => {
+        console.log('TRAYGRID DEBUG - Probe', index, 'position:', probe.position_x, probe.position_y, 'temp:', probe.temperature);
+        // Convert from tray coordinates to rotated display coordinates
+        let probeX, probeY;
+        
+        if (probe.position_x !== undefined && probe.position_y !== undefined) {
+          const svgCoords = convertTrayToSvgCoords(Number(probe.position_x), Number(probe.position_y));
+          probeX = svgCoords.x;
+          probeY = svgCoords.y;
+        } else {
+          // Default center position if no coordinates
+          const wellAreaWidth = (displayCols - 1) * SPACING;
+          const wellAreaHeight = (displayRows - 1) * SPACING;
+          probeX = leftMargin + wellAreaWidth / 2;
+          probeY = topMargin + wellAreaHeight / 2;
+        }
+        
+        // Clamp to stay within reasonable bounds
+        const wellAreaWidth = (displayCols - 1) * SPACING;
+        const wellAreaHeight = (displayRows - 1) * SPACING;
+        probeX = Math.max(leftMargin - 20, Math.min(leftMargin + wellAreaWidth + 20, probeX));
+        probeY = Math.max(topMargin - 20, Math.min(topMargin + wellAreaHeight + 20, probeY));
+        
+        const scale = 1; // TrayGrid doesn't have scaling like TrayDisplay
+        
+        const probeTooltipContent = (
+          <div style={{ fontSize: "12px", lineHeight: "1.3" }}>
+            <div style={{ fontWeight: "bold" }}>
+              {probe.name || `Probe ${probe.data_column_index || index + 1}`}
+            </div>
+            {probe.temperature && (
+              <div>Temperature: {probe.temperature}°C</div>
+            )}
+            {probe.position_x !== undefined && probe.position_y !== undefined && (
+              <div>Position: ({probe.position_x}, {probe.position_y}) mm</div>
+            )}
+          </div>
+        );
+
+        return (
+          <Tooltip
+            key={`probe-tooltip-${probe.name || index}`}
+            title={probeTooltipContent}
+            enterDelay={300}
+            leaveDelay={100}
+            followCursor
+            placement="top"
+          >
+            <g>
+              {/* Invisible circle for better hover detection */}
+              <circle
+                cx={probeX}
+                cy={probeY}
+                r={12}
+                fill="transparent"
+                style={{ pointerEvents: "all", cursor: "help" }}
+              />
+              
+              {/* Probe circle - smaller size */}
+              <circle
+                cx={probeX}
+                cy={probeY}
+                r={8 * scale}
+                fill={"#ff0000"}
+                stroke={"#fff"}
+                strokeWidth={2 * scale}
+                opacity={0.95}
+                style={{ 
+                  filter: 'drop-shadow(1px 1px 2px rgba(0,0,0,0.3))',
+                  transition: 'all 0.2s ease',
+                  pointerEvents: "none",
+                }}
+              />
+              
+              {/* Probe number label inside circle */}
+              <text
+                x={probeX}
+                y={probeY + 2 * scale}
+                textAnchor="middle"
+                fontSize={9 * scale}
+                fontWeight="bold"
+                fill="white"
+                style={{ 
+                  userSelect: "none", 
+                  pointerEvents: "none",
+                  textShadow: '1px 1px 2px rgba(0,0,0,0.7)',
+                }}
+              >
+                {probe.data_column_index || index + 1}
+              </text>
+
+              {/* Probe name label above circle with background */}
+              {probe.name && (
+                <>
+                  <rect
+                    x={probeX - 22}
+                    y={probeY - 24 * scale}
+                    width={44}
+                    height={14}
+                    fill="rgba(255, 255, 255, 0.9)"
+                    stroke="rgba(0, 0, 0, 0.2)"
+                    strokeWidth="1"
+                    rx="2"
+                    style={{ pointerEvents: "none" }}
+                  />
+                  <text
+                    x={probeX}
+                    y={probeY - 14 * scale}
+                    textAnchor="middle"
+                    fontSize={10 * scale}
+                    fill="#1976d2"
+                    fontWeight="600"
+                    style={{ userSelect: "none", pointerEvents: "none" }}
+                  >
+                    {probe.name}
+                  </text>
+                </>
+              )}
+
+              {/* Temperature display when probe has temperature data with background */}
+              {probe.temperature && probe.temperature !== 'N/A' && (
+                <>
+                  <rect
+                    x={probeX - 20}
+                    y={probeY + 10 * scale}
+                    width={40}
+                    height={16}
+                    fill="rgba(255, 255, 255, 0.9)"
+                    stroke="rgba(0, 0, 0, 0.2)"
+                    strokeWidth="1"
+                    rx="2"
+                    style={{ pointerEvents: "none" }}
+                  />
+                  <text
+                    x={probeX}
+                    y={probeY + 20 * scale}
+                    textAnchor="middle"
+                    fontSize={10 * scale}
+                    fill="#d32f2f"
+                    fontWeight="700"
+                    style={{ userSelect: "none", pointerEvents: "none" }}
+                  >
+                    {probe.temperature}°C
+                  </text>
+                </>
+              )}
+            </g>
+          </Tooltip>
+        );
+      })}
     </svg>
   );
 };

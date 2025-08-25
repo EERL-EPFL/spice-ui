@@ -903,6 +903,7 @@ const AssetBulkDeleteButton = () => {
 
   return (
     <BulkDeleteButton
+      resource="assets"
       mutationMode="pessimistic"
       confirmTitle="Delete Assets"
       confirmContent="Are you sure you want to delete the selected assets? This action cannot be undone."

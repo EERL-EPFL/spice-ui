@@ -27,6 +27,7 @@ interface ProbeConfigurationEditorProps {
   onProbeLocationsChange: (locations: ProbeLocation[]) => void;
   maxProbes?: number;
   positionUnits?: string;
+  allTrays?: any[];
 }
 
 const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
@@ -34,11 +35,44 @@ const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
   onProbeLocationsChange,
   maxProbes = 16,
   positionUnits = "mm", // Millimeters in tray coordinate system
+  allTrays = [],
 }) => {
+  // Helper function to get all existing probe column indices across all trays
+  const getAllExistingProbeIndices = (): number[] => {
+    const allIndices: number[] = [];
+    allTrays.forEach((tray) => {
+      if (tray?.probe_locations) {
+        tray.probe_locations.forEach((probe: any) => {
+          if (probe.data_column_index) {
+            allIndices.push(probe.data_column_index);
+          }
+        });
+      }
+    });
+    return allIndices;
+  };
+
+  // Helper function to get all existing probe names across all trays
+  const getAllExistingProbeNames = (): string[] => {
+    const allNames: string[] = [];
+    allTrays.forEach((tray) => {
+      if (tray?.probe_locations) {
+        tray.probe_locations.forEach((probe: any) => {
+          if (probe.name) {
+            allNames.push(probe.name.toLowerCase());
+          }
+        });
+      }
+    });
+    return allNames;
+  };
+
   const addProbe = () => {
-    const newDataColumn = (probeLocations.length > 0 
-      ? Math.max(...probeLocations.map(p => p.data_column_index)) + 1 
-      : 1); // Start from column 1
+    // Get the next available data column index across ALL trays
+    const allExistingIndices = getAllExistingProbeIndices();
+    const newDataColumn = allExistingIndices.length > 0 
+      ? Math.max(...allExistingIndices) + 1 
+      : 1; // Start from column 1
 
     const newProbe: ProbeLocation = {
       data_column_index: newDataColumn,
@@ -65,17 +99,37 @@ const ProbeConfigurationEditor: React.FC<ProbeConfigurationEditorProps> = ({
     onProbeLocationsChange(updated);
   };
 
-  // Validation helpers
+  // Validation helpers - now check across ALL trays
   const isDuplicateDataColumn = (dataColumn: number, currentIndex: number) => {
-    return probeLocations.some((probe, i) => 
+    // First check within current tray (excluding current probe)
+    const localDuplicate = probeLocations.some((probe, i) => 
       i !== currentIndex && probe.data_column_index === dataColumn
     );
+    
+    if (localDuplicate) return true;
+    
+    // Then check across all other trays
+    const allExistingIndices = getAllExistingProbeIndices();
+    const currentProbeIndex = probeLocations[currentIndex]?.data_column_index;
+    
+    return allExistingIndices.filter(index => index !== currentProbeIndex).includes(dataColumn);
   };
 
   const isDuplicateName = (name: string, currentIndex: number) => {
-    return probeLocations.some((probe, i) => 
+    if (!name) return false;
+    
+    // First check within current tray (excluding current probe)
+    const localDuplicate = probeLocations.some((probe, i) => 
       i !== currentIndex && probe.name?.toLowerCase() === name.toLowerCase()
     );
+    
+    if (localDuplicate) return true;
+    
+    // Then check across all other trays
+    const allExistingNames = getAllExistingProbeNames();
+    const currentProbeName = probeLocations[currentIndex]?.name?.toLowerCase();
+    
+    return allExistingNames.filter(existingName => existingName !== currentProbeName).includes(name.toLowerCase());
   };
 
 

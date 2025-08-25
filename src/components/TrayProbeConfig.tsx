@@ -19,7 +19,7 @@ import {
 } from "react-admin";
 import ProbeConfigurationEditor, { ProbeLocation } from "./ProbeConfigurationEditor";
 
-const TrayProbeConfig: React.FC = () => {
+const TrayProbeConfig: React.FC<{ allTrays?: any[] }> = ({ allTrays = [] }) => {
   return (
     <FormDataConsumer>
       {({ formData, scopedFormData }) => {
@@ -32,6 +32,7 @@ const TrayProbeConfig: React.FC = () => {
             probeCount={probeCount}
             positionUnits={positionUnits}
             probeLocations={probeLocations}
+            allTrays={allTrays}
           />
         );
       }}
@@ -43,7 +44,8 @@ const ProbeLocationsInput: React.FC<{
   probeCount: number;
   positionUnits: string;
   probeLocations: ProbeLocation[];
-}> = ({ probeCount, positionUnits, probeLocations }) => {
+  allTrays: any[];
+}> = ({ probeCount, positionUnits, probeLocations, allTrays }) => {
   const { field } = useInput({ source: 'probe_locations', defaultValue: [] });
 
   const handleProbeLocationsChange = (locations: ProbeLocation[]) => {
@@ -57,6 +59,7 @@ const ProbeLocationsInput: React.FC<{
         onProbeLocationsChange={handleProbeLocationsChange}
         maxProbes={16} // Fixed max probes
         positionUnits={positionUnits}
+        allTrays={allTrays}
       />
     </Box>
   );

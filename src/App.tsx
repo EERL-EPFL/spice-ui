@@ -87,6 +87,7 @@ const App = () => {
       dashboard={Dashboard}
       title="SPICE"
       layout={(props) => <MyLayout {...props} deployment={deployment} />}
+      mutationMode="pessimistic"
     >
       {(permissions) => (
         <>
