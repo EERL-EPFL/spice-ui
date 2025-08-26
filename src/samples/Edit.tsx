@@ -145,7 +145,7 @@ const EditComponent = () => (
                 />
               )}
 
-              {formData.type === "bulk" && (
+              {(formData.type === "bulk" || formData.type === "filter") && (
                 <>
                   <Divider sx={{ my: 2 }} />
                   <Typography variant="h6" gutterBottom>

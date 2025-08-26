@@ -265,10 +265,10 @@ const SampleInfo = () => {
   const record = useRecordContext();
   if (!record) return null;
 
-  // Convert coordinates for map (only for bulk samples)
+  // Convert coordinates for map (for bulk and filter samples)
   const lat = typeof record.latitude === 'string' ? parseFloat(record.latitude) : record.latitude;
   const lng = typeof record.longitude === 'string' ? parseFloat(record.longitude) : record.longitude;
-  const hasValidCoordinates = record.type === "bulk" && lat && lng && !isNaN(lat) && !isNaN(lng);
+  const hasValidCoordinates = (record.type === "bulk" || record.type === "filter") && lat && lng && !isNaN(lat) && !isNaN(lng);
 
   return (
     <Card sx={{ mb: 3 }}>
@@ -391,7 +391,7 @@ const SampleInfo = () => {
             </Box>
           </Box>
 
-          {/* Right column - Map (only for bulk samples with coordinates) */}
+          {/* Right column - Map (for bulk and filter samples with coordinates) */}
           {hasValidCoordinates && (
             <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <Box sx={{ flex: 1, border: 1, borderColor: 'divider', borderRadius: 1, minHeight: 250 }}>

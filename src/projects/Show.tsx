@@ -43,9 +43,9 @@ export const ShowComponent = () => {
         >
           <Datagrid bulkActionButtons={false} rowClick="show">
             <TextField source="name" />
-            <TextField source="description" />
-            <DateField source="start_date" showTime />
-            <DateField source="end_date" showTime />
+            <TextField source="comment" />
+            <DateField source="created_at" showTime />
+            <DateField source="last_updated" showTime />
           </Datagrid>
         </ReferenceManyField>
       </SimpleShowLayout>
