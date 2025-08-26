@@ -1899,19 +1899,28 @@ export const RegionInput: React.FC<{
                                 filteredTreatments={props.filteredTreatments}
                                 existingRegionTreatments={enhancedRegions
                                   .map((region, index) => {
-                                    // Only include regions that have actual treatment data
-                                    if (!region.treatment || !region.treatment.id) {
+                                    // Include regions that have either treatment object or treatment_id
+                                    const hasTreatmentData = (region.treatment && region.treatment.id) || region.treatment_id;
+                                    
+                                    if (!hasTreatmentData) {
                                       return null;
                                     }
+                                    
+                                    // Create treatment object structure if it doesn't exist
+                                    const treatment = region.treatment || {
+                                      id: region.treatment_id,
+                                      name: 'Unknown Treatment',
+                                      sample: null
+                                    };
                                     
                                     return {
                                       regionName: region.name || `Region ${index + 1}`,
                                       regionIndex: index,
-                                      treatment: region.treatment,
+                                      treatment: treatment,
                                       dilution_factor: region.dilution_factor,
                                     };
                                   })
-                                  .filter((rt) => rt !== null)} // Only include valid region treatments
+                                  .filter((rt) => rt !== null)}
                                 currentRegionIndex={idx}
                                 currentRegionName={
                                   r.name || `Region ${idx + 1}`
