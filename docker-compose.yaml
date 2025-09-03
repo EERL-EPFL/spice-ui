@@ -13,7 +13,7 @@ services:
   spice-api:
     build:
       context: ../spice-api
-      dockerfile: Dockerfile.dev  # Uses the dockerfile containing cargo-watch
+      dockerfile: Dockerfile.dev # Uses the dockerfile containing cargo-watch
     environment:
       - DB_HOST=spice-db
       - DB_PORT=5432
@@ -21,22 +21,24 @@ services:
       - DB_PASSWORD=psql
       - DB_NAME=postgres
       - DB_PREFIX=postgresql
-      - KEYCLOAK_UI_ID=${KEYCLOAK_CLIENT_ID}
-      - KEYCLOAK_REALM=${KEYCLOAK_REALM}
-      - KEYCLOAK_URL=${KEYCLOAK_URL}
-      - S3_BUCKET_ID=${S3_BUCKET_ID}
-      - S3_URL=${S3_URL}
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
-      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - KEYCLOAK_UI_ID=aeea9d0c-97a9-4658-aee7-003dff8e9653
+      - KEYCLOAK_REALM=test
+      - KEYCLOAK_URL=http://spice-keycloak:8888/
+      - S3_BUCKET_ID=spice-dev
+      - S3_URL=http://mock-s3:9000
+      - S3_ACCESS_KEY=minioadmin
+      - S3_SECRET_KEY=minioadmin
       - DEPLOYMENT=local
       - APP_NAME=spice-api
     ports:
       - 3005:3000
     depends_on:
-        - spice-db
+      - spice-db
+      - spice-keycloak
+      - mock-s3
     volumes:
       - ../spice-api/src:/app/src
-      - spice-api-data:/app/target  # Store builds in docker volume
+      - spice-api-data:/app/target # Store builds in docker volume
       - ../spice-api/Cargo.toml:/app/Cargo.toml
       - ../spice-api/Cargo.lock:/app/Cargo.lock
       - ../crudcrate:/crudcrate
@@ -49,7 +51,11 @@ services:
   spice-ui:
     build:
       context: .
-      dockerfile: Dockerfile.dev  # Uses the dockerfile containing yarn dev
+      dockerfile: Dockerfile.dev # Uses the dockerfile containing yarn dev
+    environment:
+      - VITE_KEYCLOAK_CLIENT_ID=aeea9d0c-97a9-4658-aee7-003dff8e9653
+      - VITE_KEYCLOAK_REALM=test
+      - VITE_KEYCLOAK_URL=http://spice-keycloak:88/
     labels:
       - "traefik.http.routers.spice-ui.rule=Host(`spice`)"
       - "traefik.http.routers.spice-ui.priority=1"
@@ -73,6 +79,60 @@ services:
       timeout: 5s
       retries: 5
 
+  spice-keycloak:
+    image: quay.io/keycloak/keycloak:25.0.6
+    command:
+      - start-dev
+      - --import-realm
+    environment:
+      KC_DB: dev-file
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8888
+      KC_HOSTNAME: spice-keycloak
+      KC_HOSTNAME_PORT: 8888
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./keycloak-realm-dev.json:/opt/keycloak/data/import/realm-export.json:ro
+    labels:
+      - "traefik.http.routers.spice-keycloak.rule=Host(`spice-keycloak`)"
+      - "traefik.http.routers.spice-keycloak.priority=50"
+      - "traefik.http.services.spice-keycloak.loadbalancer.server.port=8888"
+
+  mock-s3:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - spice-s3-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # s3-setup:
+  #   image: minio/mc:latest
+  #   depends_on:
+  #     mock-s3:
+  #       condition: service_healthy
+  #   entrypoint: >
+  #     /bin/sh -c "
+  #     mc alias set local http://mock-s3:9000 minioadmin minioadmin;
+  #     mc mb local/spice-dev --ignore-existing;
+  #     mc anonymous set public local/spice-dev;
+  #     echo 'S3 bucket initialized';
+  #     "
+  #   restart: "no"
+
   # Test runner uses SQLite in memory for tests
 #  spice-test-runner:
 #    build:
@@ -85,3 +145,4 @@ volumes:
   spice-db-data:
   spice-api-data:
   spice-test-target:
+  spice-s3-data:

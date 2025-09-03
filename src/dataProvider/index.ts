@@ -297,6 +297,42 @@ const dataProvider = (
     const url = `${apiUrl}/${resource}/${locationId}/experiments`;
     return httpClient(url).then(({ json }) => ({ data: json }));
   },
+  downloadAsset: async (assetId: string) => {
+    const url = `${apiUrl}/assets/${assetId}/download`;
+    const response = await httpClient(url, { method: "GET" });
+    return response;
+  },
+  downloadExperimentAssets: async (experimentId: string) => {
+    const url = `${apiUrl}/experiments/${experimentId}/download-token`;
+    const response = await httpClient(url, { method: "POST" });
+    return { data: response.json };
+  },
+  bulkDownloadAssets: async (assetIds: string[]) => {
+    const url = `${apiUrl}/assets/bulk-download-token`;
+    const response = await httpClient(url, {
+      method: "POST",
+      body: JSON.stringify({ asset_ids: assetIds }),
+    });
+    return { data: response.json };
+  },
+  processAsset: async (experimentId: string, assetId: string) => {
+    const url = `${apiUrl}/experiments/${experimentId}/process-asset`;
+    return httpClient(url, {
+      method: "POST",
+      body: JSON.stringify({ assetId }),
+    }).then(({ json }) => ({ data: json }));
+  },
+  reprocessAsset: async (assetId: string) => {
+    const url = `${apiUrl}/assets/${assetId}/reprocess`;
+    return httpClient(url, { method: "POST" }).then(({ json }) => ({ data: json }));
+  },
+  clearExperimentResults: async (experimentId: string, assetId: string) => {
+    const url = `${apiUrl}/experiments/${experimentId}/clear-results`;
+    return httpClient(url, {
+      method: "POST",
+      body: JSON.stringify({ assetId }),
+    }).then(({ json }) => ({ data: json }));
+  },
 });
 
 export default dataProvider;

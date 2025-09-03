@@ -24,15 +24,13 @@ import {
   useGetList,
   ListContextProvider,
 } from "react-admin";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Button,
   Box,
   Card,
   CardContent,
   Typography,
-  Tabs,
-  Tab,
   ToggleButton,
   ToggleButtonGroup,
   Divider,
@@ -51,13 +49,6 @@ import {
   Switch,
   FormControlLabel,
   TextField as MuiTextField,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Checkbox,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
 import GetAppIcon from "@mui/icons-material/GetApp";
@@ -71,7 +62,6 @@ import ErrorIcon from "@mui/icons-material/Error";
 import DeleteIcon from "@mui/icons-material/Delete";
 import CloseIcon from "@mui/icons-material/Close";
 import { UppyUploader } from "../uploader/Uppy";
-import { PhaseChangeUploader } from "../uploader/PhaseChangeUploader";
 import RegionInput from "../components/RegionInput";
 
 // Helper functions for asset display
@@ -127,59 +117,29 @@ const ShowComponentActions = () => {
 };
 const DownloadAllButton = () => {
   const record = useRecordContext();
-  const authProvider = useAuthProvider();
-  const [isDownloading, setIsDownloading] = React.useState(false);
+  const dataProvider = useDataProvider();
+  const notify = useNotify();
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  // Get asset count directly from API
   const { total: assetCount = 0 } = useGetList("assets", {
     filter: { experiment_id: record?.id },
     pagination: { page: 1, perPage: 1 },
     sort: { field: "uploaded_at", order: "DESC" },
   });
 
-  if (!record || !authProvider) return null;
-  if (assetCount === 0) return null;
+  if (!record || assetCount === 0) return null;
 
   const handleDownload = async () => {
     if (!record) return;
 
     setIsDownloading(true);
-
     try {
-      const token = await authProvider.getToken();
-
-      // Step 1: Request a download token from the API
-      const tokenResponse = await fetch(
-        `/api/experiments/${record.id}/download-token`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        },
-      );
-
-      if (!tokenResponse.ok) {
-        const errorText = await tokenResponse.text();
-        throw new Error(
-          errorText ||
-            `Failed to create download token: HTTP ${tokenResponse.status}`,
-        );
-      }
-
-      const { download_url } = await tokenResponse.json();
-
-      // Step 2: Navigate browser directly to download URL
-      // This triggers immediate browser download with progress bar
-      window.location.href = download_url;
-
-      // Reset button after a short delay
-      setTimeout(() => {
-        setIsDownloading(false);
-      }, 1000);
-    } catch (error) {
+      const result = await dataProvider.downloadExperimentAssets(record.id);
+      window.location.href = result.data.download_url;
+      setTimeout(() => setIsDownloading(false), 1000);
+    } catch (error: any) {
       console.error("Error during download:", error);
+      notify(`Download failed: ${error.message || "Unknown error"}`, { type: "error" });
       setIsDownloading(false);
     }
   };
@@ -571,34 +531,137 @@ const ThinLineUploader: React.FC<{
   );
 };
 
-// Download function for individual assets
-const downloadAsset = async (record: any, authProvider: any) => {
-  try {
-    const token = await authProvider.getToken();
-    const response = await fetch(`/api/assets/${record.id}/download`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+// Create consolidated state interfaces
+interface UIState {
+  viewMode: string;
+  previousHasResults: boolean;
+  allowOverwrite: boolean;
+}
 
-    if (response.ok) {
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = record.original_filename;
-      a.click();
-      window.URL.revokeObjectURL(url);
-    } else {
-      console.error("Failed to download asset");
+interface ModalState {
+  imageViewerOpen: boolean;
+  selectedAsset: any;
+  selectedWellImage: {
+    imageAssetId: string | null;
+    wellCoordinate: string;
+  } | null;
+}
+
+interface FilterState {
+  assetTypeFilter: string;
+  assetRoleFilter: string;
+  filenameFilter: string;
+}
+
+// Generic API operation hook
+const useApiOperation = () => {
+  const dataProvider = useDataProvider();
+  const notify = useNotify();
+
+  const executeOperation = useCallback(async (
+    operation: string,
+    params: any,
+    successMessage?: string,
+    errorMessage?: string
+  ) => {
+    try {
+      const result = await (dataProvider as any)[operation](...params);
+      if (successMessage) {
+        notify(successMessage, { type: "success" });
+      }
+      return result;
+    } catch (error: any) {
+      const message = errorMessage || `Operation failed: ${error.message || "Unknown error"}`;
+      notify(message, { type: "error" });
+      throw error;
     }
-  } catch (error) {
-    console.error("Error during download:", error);
-  }
+  }, [dataProvider, notify]);
+
+  return executeOperation;
 };
 
-// Image viewer modal component
+// Consolidated Asset Actions Component
+const AssetActions = ({ record, onRefresh, onView }: {
+  record: any;
+  onRefresh: () => void;
+  onView?: (record: any) => void;
+}) => {
+  const executeOperation = useApiOperation();
+  const authProvider = useAuthProvider();
+  const [isDeleting, setIsDeleting] = useState(false);
+  const isImage = record.type === "image";
+
+  const handleDownload = async () => {
+    try {
+      const token = await authProvider.getToken();
+      const response = await fetch(`/api/assets/${record.id}/download`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = record.original_filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        console.error("Failed to download asset");
+      }
+    } catch (error) {
+      console.error("Download failed:", error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Are you sure you want to delete "${record.original_filename}"?`)) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await executeOperation('delete', ['assets', { id: record.id }], "File deleted successfully");
+      onRefresh();
+    } catch (error: any) {
+      console.error("Delete error:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+      <Tooltip title="Download file">
+        <IconButton size="small" onClick={handleDownload} color="primary">
+          <DownloadIcon />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Delete file">
+        <IconButton
+          size="small"
+          onClick={handleDelete}
+          disabled={isDeleting}
+          color="error"
+        >
+          {isDeleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+        </IconButton>
+      </Tooltip>
+      {isImage && onView && (
+        <Tooltip title="View image">
+          <IconButton size="small" onClick={() => onView(record)} color="primary">
+            <VisibilityIcon />
+          </IconButton>
+        </Tooltip>
+      )}
+    </div>
+  );
+};
+
+// Consolidated Image Viewer Component
 const AssetImageViewer = ({
   record,
   open,
@@ -610,17 +673,17 @@ const AssetImageViewer = ({
 }) => {
   const authProvider = useAuthProvider();
   const dataProvider = useDataProvider();
-  const [imageSrc, setImageSrc] = React.useState<string>("");
-  const [loading, setLoading] = React.useState(false);
+  const [imageSrc, setImageSrc] = useState<string>("");
+  const [loading, setLoading] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!record || !open) return;
 
     const loadImage = async () => {
       setLoading(true);
       try {
         const token = await authProvider.getToken();
-        const result = await dataProvider.loadAssetImage(record.id, token);
+        const result = await (dataProvider as any).loadAssetImage(record.id, token);
         setImageSrc(result.data.blobUrl);
       } catch (error) {
         console.error("Error loading image:", error);
@@ -632,8 +695,7 @@ const AssetImageViewer = ({
     loadImage();
   }, [record, open, authProvider, dataProvider]);
 
-  // Clean up the object URL when closing or changing record
-  React.useEffect(() => {
+  useEffect(() => {
     return () => {
       if (imageSrc && imageSrc.startsWith("blob:")) {
         window.URL.revokeObjectURL(imageSrc);
@@ -690,209 +752,8 @@ const AssetImageViewer = ({
   );
 };
 
-// Download button component for assets
-const AssetDownloadButton = ({ record }: { record: any }) => {
-  const authProvider = useAuthProvider();
 
-  return (
-    <Tooltip title="Download file">
-      <IconButton
-        size="small"
-        onClick={() => downloadAsset(record, authProvider)}
-        color="primary"
-      >
-        <DownloadIcon />
-      </IconButton>
-    </Tooltip>
-  );
-};
 
-// View button component for images
-const AssetViewButton = ({
-  record,
-  onView,
-}: {
-  record: any;
-  onView: (record: any) => void;
-}) => {
-  const isImage = record.type === "image";
-
-  if (!isImage) return null;
-
-  return (
-    <Tooltip title="View image">
-      <IconButton size="small" onClick={() => onView(record)} color="primary">
-        <VisibilityIcon />
-      </IconButton>
-    </Tooltip>
-  );
-};
-
-// Processing status indicator component
-const ProcessingStatusIndicator = ({ record }: { record: any }) => {
-  const isMergedXlsx =
-    (record.original_filename?.toLowerCase().includes("merged") ||
-      record.original_filename?.toLowerCase() === "merged.xlsx") &&
-    record.type === "tabular";
-
-  if (!isMergedXlsx) {
-    return null;
-  }
-
-  const status = record.processing_status;
-
-  if (status === "processing") {
-    return (
-      <Tooltip title="Processing experiment data...">
-        <Chip
-          icon={<CircularProgress size={16} />}
-          label="Processing"
-          color="info"
-          size="small"
-        />
-      </Tooltip>
-    );
-  }
-
-  if (status === "completed") {
-    return (
-      <Tooltip
-        title={record.processing_message || "Processing completed successfully"}
-      >
-        <Chip
-          icon={<CheckCircleIcon />}
-          label="Processed"
-          color="success"
-          size="small"
-        />
-      </Tooltip>
-    );
-  }
-
-  if (status === "error") {
-    return (
-      <Tooltip title={record.processing_message || "Processing failed"}>
-        <Chip icon={<ErrorIcon />} label="Error" color="error" size="small" />
-      </Tooltip>
-    );
-  }
-
-  return <Chip label="Ready" color="default" size="small" />;
-};
-
-// Reprocess button component for merged.xlsx files
-const AssetReprocessButton = ({
-  record,
-  onReprocess,
-}: {
-  record: any;
-  onReprocess: () => void;
-}) => {
-  const [isReprocessing, setIsReprocessing] = useState(false);
-  const dataProvider = useDataProvider();
-  const notify = useNotify();
-  const authProvider = useAuthProvider();
-
-  const isMergedXlsx =
-    (record.original_filename?.toLowerCase().includes("merged") ||
-      record.original_filename?.toLowerCase() === "merged.xlsx") &&
-    record.type === "tabular";
-
-  if (!isMergedXlsx || record.processing_status === "processing") {
-    return null;
-  }
-
-  const handleReprocess = async () => {
-    setIsReprocessing(true);
-    try {
-      const token = await authProvider.getToken();
-      const result = await fetch(`/api/assets/${record.id}/reprocess`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await result.json();
-
-      if (data.success) {
-        notify(`Reprocessing completed: ${data.message}`, { type: "success" });
-        onReprocess(); // Refresh the data
-      } else {
-        notify(`Reprocessing failed: ${data.message}`, { type: "error" });
-      }
-    } catch (error) {
-      notify("Reprocessing failed: Network error", { type: "error" });
-      console.error("Reprocess error:", error);
-    } finally {
-      setIsReprocessing(false);
-    }
-  };
-
-  return (
-    <Button
-      size="small"
-      startIcon={
-        isReprocessing ? <CircularProgress size={16} /> : <RefreshIcon />
-      }
-      onClick={handleReprocess}
-      disabled={isReprocessing}
-    >
-      {isReprocessing ? "Reprocessing..." : "Reprocess"}
-    </Button>
-  );
-};
-
-// Delete button component for assets
-const AssetDeleteButton = ({
-  record,
-  onDelete,
-}: {
-  record: any;
-  onDelete: () => void;
-}) => {
-  const [isDeleting, setIsDeleting] = useState(false);
-  const dataProvider = useDataProvider();
-  const notify = useNotify();
-
-  const handleDelete = async () => {
-    if (
-      !window.confirm(
-        `Are you sure you want to delete "${record.original_filename}"?`,
-      )
-    ) {
-      return;
-    }
-
-    setIsDeleting(true);
-    try {
-      await dataProvider.delete("assets", { id: record.id });
-      notify("File deleted successfully", { type: "success" });
-      onDelete();
-    } catch (error: any) {
-      console.error("Delete error:", error);
-      notify(`Failed to delete file: ${error.message || "Unknown error"}`, {
-        type: "error",
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  return (
-    <Tooltip title="Delete file">
-      <IconButton
-        size="small"
-        onClick={handleDelete}
-        disabled={isDeleting}
-        color="error"
-      >
-        {isDeleting ? <CircularProgress size={16} /> : <DeleteIcon />}
-      </IconButton>
-    </Tooltip>
-  );
-};
 
 // React-admin bulk action components for assets
 const AssetBulkDeleteButton = () => {
@@ -914,66 +775,31 @@ const AssetBulkDeleteButton = () => {
 const AssetBulkDownloadButton = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const { selectedIds } = useListContext();
-  const notify = useNotify();
-  const authProvider = useAuthProvider();
+  const executeOperation = useApiOperation();
 
   if (selectedIds.length === 0) return null;
+
+  const handleBulkDownload = async () => {
+    setIsDownloading(true);
+    try {
+      const result = await executeOperation(
+        'bulkDownloadAssets',
+        [selectedIds],
+        `Downloading ${selectedIds.length} selected files...`
+      );
+      window.location.href = result.data.download_url;
+      setTimeout(() => setIsDownloading(false), 500);
+    } catch (error) {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <Button
       variant="contained"
       color="primary"
-      startIcon={
-        isDownloading ? <CircularProgress size={16} /> : <GetAppIcon />
-      }
-      onClick={async () => {
-        setIsDownloading(true);
-        try {
-          const token = await authProvider.getToken();
-
-          // Step 1: Request a download token from the API
-          const tokenResponse = await fetch("/api/assets/bulk-download-token", {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              asset_ids: selectedIds,
-            }),
-          });
-
-          if (!tokenResponse.ok) {
-            const errorText = await tokenResponse.text();
-            throw new Error(
-              errorText ||
-                `Failed to create download token: HTTP ${tokenResponse.status}`,
-            );
-          }
-
-          const { download_url } = await tokenResponse.json();
-
-          // Step 2: Navigate browser directly to download URL
-          // This triggers immediate browser download with progress bar
-          window.location.href = download_url;
-
-          // Show notification after a short delay
-          setTimeout(() => {
-            notify(`Downloading ${selectedIds.length} selected files...`, {
-              type: "info",
-            });
-            setIsDownloading(false);
-          }, 500);
-        } catch (error: any) {
-          console.error("Bulk download error:", error);
-          notify(
-            `Failed to download files: ${error.message || "Unknown error"}`,
-            { type: "error" },
-          );
-        } finally {
-          setIsDownloading(false);
-        }
-      }}
+      startIcon={isDownloading ? <CircularProgress size={16} /> : <GetAppIcon />}
+      onClick={handleBulkDownload}
       disabled={isDownloading}
       size="small"
       sx={{ mr: 1 }}
@@ -991,164 +817,78 @@ const AssetBulkActions = () => (
   </Box>
 );
 
-// Processing status/actions for tabular files (icons only)
-const ProcessingColumn = ({
+// Consolidated Processing Actions Component
+const ProcessingActions = ({
   record,
   onProcess,
 }: {
   record: any;
   onProcess: () => void;
 }) => {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isClearingResults, setIsClearingResults] = useState(false);
-  const dataProvider = useDataProvider();
-  const notify = useNotify();
-  const authProvider = useAuthProvider();
+  const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
+  const executeOperation = useApiOperation();
 
   const isTabular = record.type === "tabular";
-  const status = record.processing_status;
-  const hasProcessedData = status === "completed";
-
-  // Check if file is Excel format (.xlsx, .xls)
   const filename = record.original_filename || "";
   const fileExtension = filename.toLowerCase().split(".").pop() || "";
   const isExcel = fileExtension === "xlsx" || fileExtension === "xls";
+  const status = record.processing_status;
 
-  if (!isTabular || !isExcel) {
-    return null;
-  }
+  if (!isTabular || !isExcel) return null;
+
+  const setLoading = (operation: string, loading: boolean) => {
+    setLoadingStates(prev => ({ ...prev, [operation]: loading }));
+  };
 
   const handleProcess = async () => {
-    setIsProcessing(true);
+    setLoading('process', true);
     try {
-      // Call the dedicated processing endpoint directly
-      const token = await authProvider.getToken();
-
-      const response = await fetch(
-        `/api/experiments/${record.experiment_id}/process-asset`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            assetId: record.id,
-          }),
-        },
+      await executeOperation(
+        'processAsset',
+        [record.experiment_id, record.id],
+        "✅ Processing completed successfully"
       );
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          notify(`✅ ${result.message}`, { type: "success" });
-          onProcess(); // Refresh to show updated status
-        } else {
-          throw new Error(result.message || "Processing failed");
-        }
-      } else {
-        // Handle error responses - read once and try to parse as JSON
-        const responseText = await response.text();
-        let errorMessage = "Processing failed";
-
-        try {
-          const errorResult = JSON.parse(responseText);
-          errorMessage =
-            errorResult.message || errorResult.error || "Processing failed";
-        } catch {
-          // If JSON parsing fails, use the plain text response
-          errorMessage = responseText || "Processing failed";
-        }
-        throw new Error(errorMessage);
-      }
-    } catch (error: any) {
+      onProcess();
+    } catch (error) {
       console.error("Processing error:", error);
-      notify(`❌ Processing failed: ${error.message || "Unknown error"}`, {
-        type: "error",
-      });
-      onProcess(); // Refresh to show error status
     } finally {
-      setIsProcessing(false);
+      setLoading('process', false);
     }
   };
 
   const handleClearResults = async () => {
-    if (
-      !window.confirm(
-        "Are you sure you want to clear all processed experiment data? This will remove temperature readings, well transitions, and results from the database.",
-      )
-    ) {
-      return;
-    }
+    if (!window.confirm(
+      "Are you sure you want to clear all processed experiment data? This will remove temperature readings, well transitions, and results from the database."
+    )) return;
 
-    setIsClearingResults(true);
+    setLoading('clear', true);
     try {
-      // Call the dedicated clear results endpoint directly
-      const token = await authProvider.getToken();
-
-      const response = await fetch(
-        `/api/experiments/${record.experiment_id}/clear-results`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            assetId: record.id,
-          }),
-        },
+      await executeOperation(
+        'clearExperimentResults',
+        [record.experiment_id, record.id],
+        "🗑️ Experiment data cleared successfully"
       );
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success) {
-          notify(`🗑️ ${result.message}`, { type: "success" });
-          onProcess(); // Refresh to show updated status
-        } else {
-          throw new Error(result.message || "Failed to clear data");
-        }
-      } else {
-        // Handle error responses - read once and try to parse as JSON
-        const responseText = await response.text();
-        let errorMessage = "Failed to clear data";
-
-        try {
-          const errorResult = JSON.parse(responseText);
-          errorMessage =
-            errorResult.message || errorResult.error || "Failed to clear data";
-        } catch {
-          // If JSON parsing fails, use the plain text response
-          errorMessage = responseText || "Failed to clear data";
-        }
-        throw new Error(errorMessage);
-      }
-    } catch (error: any) {
+      onProcess();
+    } catch (error) {
       console.error("Clear results error:", error);
-      notify(`❌ Failed to clear data: ${error.message || "Unknown error"}`, {
-        type: "error",
-      });
     } finally {
-      setIsClearingResults(false);
+      setLoading('clear', false);
     }
   };
 
-  if (status === "processing" || isProcessing) {
+  if (status === "processing" || loadingStates.process) {
     return (
       <Tooltip title="Processing...">
         <CircularProgress size={20} color="info" />
       </Tooltip>
     );
-  } else if (status === "completed") {
+  }
+
+  if (status === "completed") {
     return (
       <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
         <Tooltip title="Reprocess data">
-          <IconButton
-            size="small"
-            onClick={handleProcess}
-            disabled={isProcessing}
-            color="success"
-          >
+          <IconButton size="small" onClick={handleProcess} color="success">
             <ScienceIcon />
           </IconButton>
         </Tooltip>
@@ -1156,44 +896,27 @@ const ProcessingColumn = ({
           <IconButton
             size="small"
             onClick={handleClearResults}
-            disabled={isClearingResults}
+            disabled={loadingStates.clear}
             color="error"
           >
-            {isClearingResults ? <CircularProgress size={16} /> : <CloseIcon />}
+            {loadingStates.clear ? <CircularProgress size={16} /> : <CloseIcon />}
           </IconButton>
         </Tooltip>
       </div>
-    );
-  } else if (status === "error") {
-    return (
-      <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-        <Tooltip title="Retry processing">
-          <IconButton
-            size="small"
-            onClick={handleProcess}
-            disabled={isProcessing}
-            color="error"
-          >
-            <ScienceIcon />
-          </IconButton>
-        </Tooltip>
-      </div>
-    );
-  } else {
-    // No processing status - show process button
-    return (
-      <Tooltip title="Process experiment data">
-        <IconButton
-          size="small"
-          onClick={handleProcess}
-          disabled={isProcessing}
-          color="warning"
-        >
-          {isProcessing ? <CircularProgress size={20} /> : <ScienceIcon />}
-        </IconButton>
-      </Tooltip>
     );
   }
+
+  return (
+    <Tooltip title={status === "error" ? "Retry processing" : "Process experiment data"}>
+      <IconButton
+        size="small"
+        onClick={handleProcess}
+        color={status === "error" ? "error" : "warning"}
+      >
+        <ScienceIcon />
+      </IconButton>
+    </Tooltip>
+  );
 };
 
 // Condensed experiment details component
@@ -1372,10 +1095,9 @@ const TabularDataSection = ({ onRefresh }: { onRefresh: () => void }) => {
 
               {/* Actions section */}
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <ProcessingColumn record={asset} onProcess={handleRefresh} />
+                <ProcessingActions record={asset} onProcess={handleRefresh} />
                 <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
-                <AssetDownloadButton record={asset} />
-                <AssetDeleteButton record={asset} onDelete={handleRefresh} />
+                <AssetActions record={asset} onRefresh={handleRefresh} />
               </Box>
             </Box>
           </Card>
@@ -1541,11 +1263,7 @@ const AssetsList = ({
         <FunctionField
           label="Actions"
           render={(record) => (
-            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <AssetDownloadButton record={record} />
-              <AssetDeleteButton record={record} onDelete={() => refetch()} />
-              <AssetViewButton record={record} onView={onAssetView} />
-            </div>
+            <AssetActions record={record} onRefresh={() => refetch()} onView={onAssetView} />
           )}
         />
       </Datagrid>
@@ -1557,15 +1275,26 @@ const AssetsList = ({
 const TabbedContent = () => {
   const record = useRecordContext();
   const refresh = useRefresh();
-  const [viewMode, setViewMode] = useState("regions");
-  const [previousHasResults, setPreviousHasResults] = useState(false);
-  const [imageViewerOpen, setImageViewerOpen] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState(null);
-  const [assetTypeFilter, setAssetTypeFilter] = useState("all");
-  const [assetRoleFilter, setAssetRoleFilter] = useState("all");
-  const [filenameFilter, setFilenameFilter] = useState("");
-  const [allowOverwrite, setAllowOverwrite] = useState(false);
   const assetsRefreshRef = useRef(() => {});
+  
+  // Consolidated state objects
+  const [uiState, setUiState] = useState<UIState>({
+    viewMode: "regions",
+    previousHasResults: false,
+    allowOverwrite: false,
+  });
+  
+  const [modalState, setModalState] = useState<ModalState>({
+    imageViewerOpen: false,
+    selectedAsset: null,
+    selectedWellImage: null,
+  });
+  
+  const [filterState, setFilterState] = useState<FilterState>({
+    assetTypeFilter: "all",
+    assetRoleFilter: "all",
+    filenameFilter: "",
+  });
 
   // Use direct API call to get asset count for tab label
   const { total: assetCount = 0 } = useGetList("assets", {
@@ -1580,26 +1309,43 @@ const TabbedContent = () => {
 
   // Auto-switch to Results view when results become newly available
   useEffect(() => {
-    if (hasResults && !previousHasResults) {
-      // Results just became available, switch to results view
-      setViewMode("results");
+    if (hasResults && !uiState.previousHasResults) {
+      setUiState(prev => ({ ...prev, viewMode: "results" }));
     }
-    setPreviousHasResults(hasResults);
-  }, [hasResults, previousHasResults]);
+    setUiState(prev => ({ ...prev, previousHasResults: hasResults }));
+  }, [hasResults, uiState.previousHasResults]);
 
-  const handleViewModeChange = (newViewMode: string) => {
-    setViewMode(newViewMode);
-  };
+  const handleViewModeChange = useCallback((newViewMode: string) => {
+    setUiState(prev => ({ ...prev, viewMode: newViewMode }));
+  }, []);
 
-  const handleAssetView = (asset: any) => {
-    setSelectedAsset(asset);
-    setImageViewerOpen(true);
-  };
+  const handleAssetView = useCallback((asset: any) => {
+    setModalState({
+      imageViewerOpen: true,
+      selectedAsset: asset,
+      selectedWellImage: null,
+    });
+  }, []);
 
-  const handleCloseImageViewer = () => {
-    setImageViewerOpen(false);
-    setSelectedAsset(null);
-  };
+  const handleCloseImageViewer = useCallback(() => {
+    setModalState({
+      imageViewerOpen: false,
+      selectedAsset: null,
+      selectedWellImage: null,
+    });
+  }, []);
+
+  const updateFilter = useCallback((updates: Partial<FilterState>) => {
+    setFilterState(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilterState({
+      assetTypeFilter: "all",
+      assetRoleFilter: "all",
+      filenameFilter: "",
+    });
+  }, []);
 
   return (
     <>
@@ -1610,7 +1356,7 @@ const TabbedContent = () => {
         <TabbedShowLayout.Tab label="Regions & Results">
           <Box sx={{ mb: 2, display: "flex", alignItems: "center", gap: 2 }}>
             <RegionsResultsToggle
-              viewMode={viewMode}
+              viewMode={uiState.viewMode}
               onViewModeChange={handleViewModeChange}
               hasResults={hasResults}
             />
@@ -1621,7 +1367,7 @@ const TabbedContent = () => {
               </Typography>
             </Box>
           </Box>
-          <RegionsDisplay viewMode={viewMode} />
+          <RegionsDisplay viewMode={uiState.viewMode} />
         </TabbedShowLayout.Tab>
 
         <TabbedShowLayout.Tab
@@ -1635,13 +1381,13 @@ const TabbedContent = () => {
                 component={
                   <UppyUploader
                     compact={true}
-                    allowOverwrite={allowOverwrite}
+                    allowOverwrite={uiState.allowOverwrite}
                   />
                 }
                 icon={<CloudUploadIcon />}
                 color="secondary"
-                allowOverwrite={allowOverwrite}
-                onOverwriteChange={setAllowOverwrite}
+                allowOverwrite={uiState.allowOverwrite}
+                onOverwriteChange={(enabled) => setUiState(prev => ({ ...prev, allowOverwrite: enabled }))}
               />
             </Box>
           </Box>
@@ -1661,19 +1407,17 @@ const TabbedContent = () => {
             <MuiTextField
               size="small"
               label="Filename"
-              value={filenameFilter}
-              onChange={(e) => setFilenameFilter(e.target.value)}
+              value={filterState.filenameFilter}
+              onChange={(e) => updateFilter({ filenameFilter: e.target.value })}
               sx={{ minWidth: 160 }}
               placeholder="Search by filename..."
             />
             <FormControl size="small" sx={{ minWidth: 100 }}>
               <InputLabel>Type</InputLabel>
               <Select
-                value={assetTypeFilter}
+                value={filterState.assetTypeFilter}
                 label="Type"
-                onChange={(e: SelectChangeEvent) =>
-                  setAssetTypeFilter(e.target.value)
-                }
+                onChange={(e: SelectChangeEvent) => updateFilter({ assetTypeFilter: e.target.value })}
               >
                 <MenuItem value="all">All</MenuItem>
                 <MenuItem value="image">Images</MenuItem>
@@ -1685,11 +1429,9 @@ const TabbedContent = () => {
             <FormControl size="small" sx={{ minWidth: 100 }}>
               <InputLabel>Role</InputLabel>
               <Select
-                value={assetRoleFilter}
+                value={filterState.assetRoleFilter}
                 label="Role"
-                onChange={(e: SelectChangeEvent) =>
-                  setAssetRoleFilter(e.target.value)
-                }
+                onChange={(e: SelectChangeEvent) => updateFilter({ assetRoleFilter: e.target.value })}
               >
                 <MenuItem value="all">All</MenuItem>
                 <MenuItem value="camera_image">Camera</MenuItem>
@@ -1698,17 +1440,13 @@ const TabbedContent = () => {
                 <MenuItem value="configuration">Config</MenuItem>
               </Select>
             </FormControl>
-            {(assetTypeFilter !== "all" ||
-              assetRoleFilter !== "all" ||
-              filenameFilter.trim()) && (
+            {(filterState.assetTypeFilter !== "all" ||
+              filterState.assetRoleFilter !== "all" ||
+              filterState.filenameFilter.trim()) && (
               <Button
                 variant="text"
                 size="small"
-                onClick={() => {
-                  setAssetTypeFilter("all");
-                  setAssetRoleFilter("all");
-                  setFilenameFilter("");
-                }}
+                onClick={clearFilters}
                 sx={{ whiteSpace: "nowrap" }}
               >
                 Clear
@@ -1717,10 +1455,10 @@ const TabbedContent = () => {
           </Box>
           <AssetsList
             filter={{
-              ...(assetTypeFilter !== "all" && { type: assetTypeFilter }),
-              ...(assetRoleFilter !== "all" && { role: assetRoleFilter }),
-              ...(filenameFilter.trim() && {
-                original_filename: filenameFilter.trim(),
+              ...(filterState.assetTypeFilter !== "all" && { type: filterState.assetTypeFilter }),
+              ...(filterState.assetRoleFilter !== "all" && { role: filterState.assetRoleFilter }),
+              ...(filterState.filenameFilter.trim() && {
+                original_filename: filterState.filenameFilter.trim(),
               }),
             }}
             onAssetView={handleAssetView}
@@ -1729,8 +1467,8 @@ const TabbedContent = () => {
         </TabbedShowLayout.Tab>
       </TabbedShowLayout>
       <AssetImageViewer
-        record={selectedAsset}
-        open={imageViewerOpen}
+        record={modalState.selectedAsset}
+        open={modalState.imageViewerOpen}
         onClose={handleCloseImageViewer}
       />
     </>
