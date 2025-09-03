@@ -75,6 +75,20 @@ an admin user with:
 **Note: Do not use the docker-compose.yaml or keycloak-realm-dev.json for production**. They
 may, however, be used to understand the deployment structure. Follow the production guidelines below.
 
+### Seed database
+
+In the `spice-api` repository, there is a database seed application to fill
+the database with pseudo data. It can be run with:
+
+```bash
+cargo run --bin seed_database -- --url http://spice:88/`
+```
+
+It will prompt for username and password. Use in this case,
+the ones defined above for admin. To run this script you will
+need [Rust and cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html)
+installed.
+
 ## Production
 
 ### Keycloak
