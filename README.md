@@ -81,7 +81,7 @@ In the `spice-api` repository, there is a database seed application to fill
 the database with pseudo data. It can be run with:
 
 ```bash
-cargo run --bin seed_database -- --url http://spice:88/`
+cargo run --bin seed_database -- --url http://spice:88/
 ```
 
 It will prompt for username and password. Use in this case,
@@ -201,10 +201,38 @@ button at the bottom. Probes are auto
 
 ![Locations](./docs/screenshots/locations-list.png)
 
+Locations represent geographical sampling sites where samples are collected. Each location is associated with a specific project and contains metadata about the sampling site.
+
+Individual location records display:
+
+- Geographic coordinates and elevation data
+- Associated project information
+- A map visualization showing the location boundary (convex hull around all sample coordinates)
+- Complete list of samples collected from the location
+- Collection dates and sample types
+
+![Location details](./docs/screenshots/locations-show.png)
+
+The location map shows the geographical boundary encompassing all samples collected from the site, providing spatial context for the sampling activities.
+
 #### Samples
 
-![Samples](./docs/screenshots/sample-list.png)
+![Samples](./docs/screenshots/samples-list.png)
+
+Samples represent individual specimens collected from specific locations. Each sample contains detailed metadata about collection conditions and subsequent laboratory processing.
+
+##### Treatments
+
+Samples can be subjected to laboratory treatments to study ice nucleation characteristics:
+
+- **none**
+- **heat**
+- **h2o2**
+
+Treatment records track the specific conditions, timing, and results of each processing step.
 
 #### Experiments
 
 ![Experiments](./docs/screenshots/experiment-list.png)
+
+Experiments represent individual ice nucleation tests. Each experiment can process multiple samples simultaneously across configured tray layouts.

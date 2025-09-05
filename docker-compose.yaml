@@ -42,7 +42,6 @@ services:
       - ../spice-api/Cargo.toml:/app/Cargo.toml
       - ../spice-api/Cargo.lock:/app/Cargo.lock
       - ../crudcrate:/crudcrate
-      - ../crudcrate-derive:/crudcrate-derive
     labels:
       - "traefik.http.routers.spice-api.rule=Host(`spice`) && PathPrefix(`/api`)"
       - "traefik.http.routers.spice-api.priority=100"
