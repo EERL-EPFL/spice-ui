@@ -3,7 +3,7 @@
 The SPICE project manages the data produced from ice nucleating particle
 experiments. It manages the samples, locations, experiments, and their results.
 
-There are three components to the project:
+There are four components to the project:
 
 1. The [API](https://github.com/EERL-EPFL/spice-api)
    - Abstracts the database and file storage,
@@ -23,32 +23,38 @@ There are three components to the project:
      results, the results processing pipeline is based on its exported outputs
      and its employed methodology.
 
-   ## Table of Contents
-   - [Installation](#installation)
-     - [Dependencies](#dependencies)
-     - [Development](#development)
-       - [Seed database](#seed-database)
-     - [Production](#production)
-       - [Keycloak](#keycloak)
-   - [Usage](#usage)
-     - [API](#api)
-     - [UI](#ui)
-       - [Dashboard](#dashboard)
-       - [Projects](#projects)
-       - [Trays](#trays)
-         - [Creating a tray configuration](#creating-a-tray-configuration)
-           - [Probes](#probes)
-           - [Image coordinates](#image-coordinates)
-       - [Locations](#locations)
-       - [Samples](#samples)
-         - [Treatments](#treatments)
-       - [Experiments](#experiments)
+## Table of Contents
+
+- [Installation](#installation)
+  - [Dependencies](#dependencies)
+  - [Development](#development)
+    - [Seed database](#seed-database)
+  - [Production](#production)
+    - [Keycloak](#keycloak)
+- [Usage](#usage)
+  - [API](#api)
+  - [UI](#ui)
+    - [Dashboard](#dashboard)
+    - [Projects](#projects)
+    - [Trays](#trays)
+      - [Creating a tray configuration](#creating-a-tray-configuration)
+        - [Probes](#probes)
+        - [Image coordinates](#image-coordinates)
+    - [Locations](#locations)
+    - [Samples](#samples)
+      - [Treatments](#treatments)
+    - [Experiments](#experiments)
+      - [Creating an experiment](#creating-an-experiment)
+        - [Treatment selector](#treatment-selector)
+      - [Viewing an experiment](#viewing-an-experiment)
+      - [Results](#results)
+      - [Results (In sample view)](#results-in-sample-view)
 
 # Installation
 
 ## Dependencies
 
-The following external dependencies are required for this project
+The following external dependencies are required for this project:
 
 - PostgreSQL with PostGIS extensions
 - S3, or S3 compatible storage
@@ -84,7 +90,7 @@ the UI and API.
 By default, the traefik reverse proxy will listen on port `88`, at `spice`.
 Also there is the local development keycloak that needs a separate host, it is
 exposed on port 8888, and the development setup requires it to be at
-spice-keycloak, Therefore, you should edit your `/etc/hosts` file to include
+spice-keycloak. Therefore, you should edit your `/etc/hosts` file to include
 the following lines:
 
 ```
@@ -111,7 +117,7 @@ the database with pseudo data. It can be run with:
 cargo run --bin seed_database -- --url http://spice:88/
 ```
 
-It will prompt for username and password. Use in this case, the ones defined
+It will prompt for username and password. Use, in this case, the ones defined
 above for admin. To run this script you will need [Rust and
 cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html)
 installed.
@@ -120,7 +126,7 @@ installed.
 
 ### Keycloak
 
-A realm must be setup according to keycloak, with admin users assigned to
+A realm must be set up according to Keycloak, with admin users assigned to
 the **spice-admin** role.
 
 ## Usage
@@ -128,7 +134,7 @@ the **spice-admin** role.
 ### API
 
 The API documentation is served by the API at runtime, providing an
-openapi.json (or yaml). It can be found at:
+openapi.json (or YAML). It can be found at:
 
 `https://<root-url>/api/docs`
 
@@ -186,13 +192,13 @@ An individual project will display all of the associated locations within it.
 The application considers a tray within the definition of a [standard
 microplate](https://en.wikipedia.org/wiki/Microplate), therefore, the tray
 configuration component defines the size, arrangement, and rotation of a
-microplate trays inside each experiment.
+microplate tray inside each experiment.
 
 The temperature probe locations are defined in each tray, as well as the
 location of wells in image coordinates.
 
 Once a tray configuration has been added to an experiment, it can no longer
-be modified. Should the tray arrangement of probe locations change, a new tray
+be modified. Should the tray arrangement or probe locations change, a new tray
 configuration must be created and associated with subsequent experiments.
 
 ![Trays show](./docs/screenshots/tray-configuration-show-1.png)
@@ -215,9 +221,9 @@ In the creation of a tray configuration, one must first define the:
 4. The quantity of columns and rows. The UI will render rows as characters and
    columns as numbers (for example, A2 for row 1, column 2).
 
-A visualisation will appear with the tray in this configuration, to add probes,
-click the `+ ADD PROBE` button above the tray, and selecting the location on
-the tray where this specific
+A visualisation will appear with the tray in this configuration. To add probes,
+click the `+ ADD PROBE` button above the tray, and select the location on
+the tray where this specific probe should be placed.
 
 ![Trays create 2](./docs/screenshots/tray-configuration-create-2.png)
 
@@ -234,12 +240,12 @@ There are four fields related to each probe:
 2. **Data column**: This is the numeric order of the probe in the column of the
    result data. This will be used to link result data to the probes in an
    experiment. For example, in these results `Channel 1` and `Channel 2` would
-   be given `Data Column` values`1`and`2` respectively:
+   be given `Data Column` values `1` and `2` respectively:
 
    ![Trays create probe list results](./docs/screenshots/tray-configuration-create-probelist-results.png)
 
 3. **X position/Y position**: The X and Y coordinates of the probe in
-   millimeters, relative to the first well and disregarding rotation(A1). The
+   millimeters, relative to the first well and disregarding rotation (A1). The
    probes can also be moved by clicking and dragging them to set new coordinate
    values.
 
@@ -266,7 +272,7 @@ comment for context.
 Once a sample (or experiment associated with the sample) is created and linked
 to a location. Their records are available from the location details page.
 
-The map is generated by using the geogrphic coordinates of all samples
+The map is generated by using the geographic coordinates of all samples
 associated with the location, and drawing the convex hull around them.
 
 ![Location details](./docs/screenshots/locations-show.png)
@@ -279,19 +285,19 @@ Samples represent individual specimens collected from specific locations. Each
 sample contains detailed metadata about collection conditions and subsequent
 laboratory processing.
 
-A sample is the broken up into three types:
+A sample is broken up into three types:
 
 - Bulk samples: These are the original samples collected from the field.
 - Filter samples
 - Procedural Blank: Representing samples that are used as background controls.
-  There is minimal metadata associated with these samples, and are not
-  explicitly linked to a location or project, however, they still must require,
-  as others, treatment information (see below).
+  There is minimal metadata associated with these samples, and they are not
+  explicitly linked to a location or project. However, they still require,
+  like others, treatment information (see below).
 
 ##### Treatments
 
-A sample is associated with an experiment by its treatment, therefore, each
-sample must have at least one treatment record -- when creating one, by
+A sample is associated with an experiment by its treatment. Therefore, each
+sample must have at least one treatment record. When creating one, by
 default, a `None` treatment is added.
 
 The available treatment types are:
@@ -310,12 +316,14 @@ process multiple samples simultaneously across configured tray layouts.
 
 ##### Creating an experiment
 
+![Experiments](./docs/screenshots/experiment-create-1.png)
+
 When creating an experiment, the following fields are required:
 
 - **Name**: An arbitrary name to identify the experiment.
 - **Date**: The date when the experiment was conducted.
 - **Tray configuration**: The tray configuration that defines the arrangement
-  of wells and probes for this. Setup in the `Trays` component above.
+  of wells and probes for this experiment. Set up in the `Trays` component above.
 
 Otherwise, the following optional fields can be filled:
 
@@ -324,15 +332,15 @@ Otherwise, the following optional fields can be filled:
 - **Temperature start**: The starting temperature of the experiment, in °C.
 - **Temperature end**: The ending temperature of the experiment, in °C.
 - **Username**: An optional field for identifying the conductor of the
-  experiment. It does not necessarily mean a person, perhaps it's an
-  autogenerated ID, can be empty or arbitrary.
+  experiment. It does not necessarily mean a person; perhaps it's an
+  auto-generated ID, can be empty or arbitrary.
 - **Remarks**: Any additional notes or comments about the experiment.
 - **Is calibration**: A boolean flag to indicate if the experiment is a
   calibration run.
 
-After selecting the Tray configuration, the UI will display this corresponding
+After selecting the tray configuration, the UI will display this corresponding
 configuration. By default, the tray configuration that is set as the default in
-the `Trays` component will already be preselected (see below).
+the `Trays` component will already be pre-selected.
 
 ![Experiments create](./docs/screenshots/experiment-create-regions-2.png)
 
@@ -356,8 +364,8 @@ show up to the right with the following fields:
 
 After clicking the `Select treatment` button on the region a small window will
 appear. If selecting a sample with a treatment, select first the `location`,
-then the `sample` related to it. All of the treatments will be shown beanath.
-Select one and then click either `APPLY TO ALL` of `SELECT`, which will set the
+then the `sample` related to it. All of the treatments will be shown beneath.
+Select one and then click either `APPLY TO ALL` or `SELECT`, which will set the
 treatment to all regions in the experiment, or just the one selected.
 
 ![Experiments create](./docs/screenshots/experiment-create-treatment-selector.png)
@@ -368,8 +376,8 @@ this experiment. Here you can change the treatment and add, again, to all
 regions, or just the one selected.
 
 Finally, the `PROCEDURAL BLANK` tab will show all of the procedural blanks
-available. Unlike `Project samples`, they do not cary location information,
-however, the selecting of treatment is the same.
+available. Unlike `Project samples`, they do not carry location information;
+however, the selection of treatment is the same.
 
 ![Experiments create 2](./docs/screenshots/experiment-create-treatment-selector-2.png)
 
@@ -388,13 +396,13 @@ already been processed with the `freezing-droplets` library.
 
 Clicking on the `ASSETS` tab will allow uploading of the project assets. These
 may be anything related to the experiment, including metadata, raw camera
-images, temperatures recording and analysis outputs.
+images, temperature recordings, and analysis outputs.
 
 The server will automatically detect the file types, and if a `merged.xlsx`
 file is uploaded, will consider it the output results file, and parse it
 accordingly. It may take some time to process the results file (~20 seconds).
 
-The files are able to be filtered by type and purpose with the dropdowns, if
+The files can be filtered by type and purpose with the dropdowns. If
 the file is an image, it can be previewed with the icon. All files can be
 downloaded and deleted.
 
@@ -415,7 +423,7 @@ and the image at that point in time is able to be displayed with the view icon.
 ![Experiments show results](./docs/screenshots/experiment-show-with-results-well-view.png)
 
 As the results have been populated for these regions, it is now possible to
-view consolidated results per sample, but going to the respective sample page
+view consolidated results per sample by going to the respective sample page
 (we can click the link directly from this well view).
 
 ##### Results (In sample view)
