@@ -141,18 +141,70 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
     }>;
   }>>([]);
 
+  // State to track which treatment is displayed for each sample (for the dropdown changes)
+  const [displayedTreatmentBySample, setDisplayedTreatmentBySample] = useState<Map<string, string>>(new Map());
+
   // Load all treatments for each unique sample from existing regions
   const loadAllTreatmentsForSamples = useCallback(async () => {
     const filteredTreatments = existingRegionTreatments
       .filter(regionTreatment => regionTreatment.regionIndex !== currentRegionIndex);
 
-    // Get unique samples from existing regions
+    // First, enhance any treatments that only have IDs but no sample data
+    const enhancedRegionTreatments = await Promise.all(
+      filteredTreatments.map(async (regionTreatment) => {
+        // If treatment has full data, use it as-is
+        if (regionTreatment.treatment.sample && regionTreatment.treatment.name !== 'Unknown Treatment') {
+          return regionTreatment;
+        }
+
+        // If treatment is missing data, fetch it from API
+        try {
+          const { data: fullTreatment } = await dataProvider.getOne("treatments", { 
+            id: regionTreatment.treatment.id 
+          });
+          
+          // Get the sample for this treatment
+          const { data: sample } = await dataProvider.getOne("samples", { 
+            id: fullTreatment.sample_id 
+          });
+          
+          // Get the location for this sample (if not procedural blank)
+          let sampleWithLocation = sample;
+          if (sample.location_id) {
+            try {
+              const { data: location } = await dataProvider.getOne("locations", { 
+                id: sample.location_id 
+              });
+              sampleWithLocation = {
+                ...sample,
+                campaign: { location: location }
+              };
+            } catch (error) {
+              console.warn("Could not load location for sample:", sample.id);
+            }
+          }
+
+          return {
+            ...regionTreatment,
+            treatment: {
+              ...fullTreatment,
+              sample: sampleWithLocation
+            }
+          };
+        } catch (error) {
+          console.error(`Error loading treatment data for ${regionTreatment.treatment.id}:`, error);
+          return regionTreatment; // Return original if fetch fails
+        }
+      })
+    );
+
+    // Get unique samples from enhanced regions
     const uniqueSamples = new Map<string, {
       sample: ExistingRegionTreatment['treatment']['sample'];
       usedTreatments: Map<string, string[]>; // treatmentId -> region names
     }>();
 
-    filteredTreatments.forEach(regionTreatment => {
+    enhancedRegionTreatments.forEach(regionTreatment => {
       const sampleId = regionTreatment.treatment.sample?.id;
       const sampleName = regionTreatment.treatment.sample?.name;
       
@@ -227,6 +279,18 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
     );
 
     setTreatmentsBySample(enhancedGroups.filter(group => group !== null));
+    
+    // Initialize displayed treatment map with first treatment used for each sample
+    const initialDisplayMap = new Map<string, string>();
+    enhancedGroups.filter(group => group !== null).forEach(sampleGroup => {
+      if (sampleGroup && sampleGroup.treatments.length > 0) {
+        const firstUsedTreatment = sampleGroup.treatments.find(t => t.usedInRegions.length > 0);
+        if (firstUsedTreatment) {
+          initialDisplayMap.set(sampleGroup.sample.id, firstUsedTreatment.id);
+        }
+      }
+    });
+    setDisplayedTreatmentBySample(initialDisplayMap);
   }, [existingRegionTreatments, currentRegionIndex, dataProvider]);
 
   // Load treatments when existing regions change
@@ -691,10 +755,17 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
           onClose={() => setOpen(false)}
           maxWidth="sm"
           fullWidth
+          PaperProps={{
+            sx: {
+              minHeight: 400,
+              maxHeight: 600,
+              height: 'auto'
+            }
+          }}
         >
           <DialogTitle sx={{ pb: 2 }}>Select Treatment for {currentRegionName}</DialogTitle>
-          <DialogContent sx={{ py: 1 }}>
-            <Box display="flex" flexDirection="column" gap={2}>
+          <DialogContent sx={{ py: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <Box display="flex" flexDirection="column" gap={2} sx={{ flex: 1, minHeight: 0 }}>
               {/* Existing Treatments Section - Grouped by Sample or Fallback to Simple List */}
               {(treatmentsBySample.length > 0 || uniqueExistingTreatments.length > 0) && (
                 <Box>
@@ -704,101 +775,127 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                     sx={{ color: "primary.main", fontWeight: 'medium' }}
                   >
                     <CopyIcon sx={{ mr: 0.5, fontSize: '1rem', verticalAlign: "middle" }} />
-                    Available Treatments by Sample
+                    Already chosen samples
                   </Typography>
-                  <Alert severity="info" sx={{ mb: 1, py: 0.5, fontSize: '0.875rem' }}>
-                    Click any treatment to apply it to {currentRegionName}
-                  </Alert>
                   <Paper variant="outlined" sx={{ maxHeight: 200, overflow: "auto" }}>
                     <List dense>
                       {treatmentsBySample.length > 0 ? (
-                        // Grouped by Sample Display
-                        treatmentsBySample.map((sampleGroup, sampleIndex) => (
-                          <React.Fragment key={sampleGroup.sample?.id || sampleIndex}>
-                            {/* Sample Header */}
-                            <ListItem>
-                              <ListItemText
-                                primary={
-                                  <Typography variant="subtitle2" color="text.secondary" fontWeight="bold">
-                                    {sampleGroup.sample?.campaign?.location?.name && (
-                                      <>{sampleGroup.sample.campaign.location.name} → </>
-                                    )}
-                                    {sampleGroup.sample?.name}
-                                    {sampleGroup.sample?.type && (
-                                      <Chip 
-                                        label={sampleGroup.sample.type} 
-                                        size="small" 
-                                        variant="outlined" 
-                                        sx={{ ml: 1, fontSize: '0.7rem' }}
-                                      />
-                                    )}
-                                  </Typography>
-                                }
-                              />
-                            </ListItem>
+                        // Compact Sample + Treatment Display - One row per sample
+                        treatmentsBySample
+                          .filter(sampleGroup => sampleGroup.treatments.some(t => t.usedInRegions.length > 0))
+                          .map((sampleGroup) => {
+                            // Get the currently displayed treatment for this sample
+                            const displayedTreatmentId = displayedTreatmentBySample.get(sampleGroup.sample.id);
+                            const displayedTreatment = sampleGroup.treatments.find(t => t.id === displayedTreatmentId) ||
+                              sampleGroup.treatments.find(t => t.usedInRegions.length > 0); // Fallback to first used treatment
                             
-                            {/* Treatment Buttons for this Sample */}
-                            <ListItem sx={{ pt: 0, pb: 1, pl: 3 }}>
-                              <ButtonGroup variant="outlined" size="small">
-                                {sampleGroup.treatments.map((treatment) => (
-                                  <Button
-                                    key={treatment.id}
-                                    onClick={() => handleExistingTreatmentSelect(treatment)}
-                                    variant={treatmentId === treatment.id ? "contained" : "outlined"}
-                                    size="small"
+                            const isSelected = treatmentId === displayedTreatment?.id;
+                            
+                            return (
+                              <ListItem 
+                                key={`${sampleGroup.sample.id}-${displayedTreatment?.id}`}
+                                sx={{ 
+                                  py: 0.125,
+                                  px: 1,
+                                  display: 'flex', 
+                                  alignItems: 'center',
+                                  gap: 0.75,
+                                  minHeight: 28,
+                                  backgroundColor: isSelected ? 'primary.50' : 'transparent',
+                                  border: isSelected ? '1px solid' : '1px solid transparent',
+                                  borderColor: isSelected ? 'primary.main' : 'transparent',
+                                  borderRadius: 1,
+                                  mb: 0.25,
+                                  '&:hover': {
+                                    backgroundColor: isSelected ? 'primary.100' : 'action.hover'
+                                  }
+                                }}
+                              >
+                                {/* Sample info (left side) */}
+                                <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                                  <Typography 
+                                    variant="body2" 
+                                    fontWeight="medium" 
+                                    noWrap 
                                     sx={{ 
-                                      textTransform: "none",
-                                      minWidth: "140px",
-                                      maxWidth: "140px",
-                                      px: 1,
-                                      py: 1.5,
-                                      height: "auto"
+                                      fontSize: '0.8rem',
+                                      maxWidth: 200,
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis'
                                     }}
                                   >
-                                    <Box display="flex" flexDirection="column" alignItems="center" sx={{ width: "100%" }}>
-                                      <Typography variant="caption" fontWeight="medium" sx={{ textAlign: "center" }}>
-                                        {treatmentName[treatment.name] || treatment.name}
-                                      </Typography>
-                                      {/* Show enzyme volume */}
-                                      {treatment.enzyme_volume_litres && (
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', textAlign: "center" }}>
-                                          {formatEnzymeVolume(treatment.enzyme_volume_litres)}L enzyme
-                                        </Typography>
-                                      )}
-                                      {/* Show notes */}
-                                      {treatment.notes && (
-                                        <Typography 
-                                          variant="caption" 
-                                          color="text.secondary" 
-                                          sx={{ 
-                                            fontSize: '0.6rem',
-                                            textAlign: "center",
-                                            maxWidth: '130px',
-                                            overflow: 'hidden',
-                                            textOverflow: 'ellipsis',
-                                            whiteSpace: 'nowrap',
-                                            mt: 0.2
-                                          }}
-                                          title={treatment.notes} // Show full notes on hover
-                                        >
-                                          {treatment.notes}
-                                        </Typography>
-                                      )}
-                                      {/* Show placeholder if no details */}
-                                      {!treatment.enzyme_volume_litres && !treatment.notes && (
-                                        <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.6rem', fontStyle: 'italic' }}>
-                                          No details
-                                        </Typography>
-                                      )}
-                                    </Box>
+                                    {sampleGroup.sample?.name}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem', flexShrink: 0 }}>
+                                    ({displayedTreatment?.usedInRegions.join(', ')})
+                                  </Typography>
+                                </Box>
+
+                                {/* Treatment dropdown (center) - shows current treatment as default */}
+                                <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                                  <FormControl size="small" sx={{ minWidth: 100 }}>
+                                    <Select
+                                      value={displayedTreatment?.id || ""}
+                                      onChange={(event) => {
+                                        const selectedTreatmentId = event.target.value;
+                                        const selectedTreatment = sampleGroup.treatments.find(t => t.id === selectedTreatmentId);
+                                        if (selectedTreatment) {
+                                          // Update the displayed treatment for this sample
+                                          setDisplayedTreatmentBySample(prev => {
+                                            const newMap = new Map(prev);
+                                            newMap.set(sampleGroup.sample.id, selectedTreatmentId);
+                                            return newMap;
+                                          });
+                                          // Also select this treatment
+                                          handleExistingTreatmentSelect(selectedTreatment);
+                                        }
+                                      }}
+                                      sx={{ 
+                                        '& .MuiSelect-select': { 
+                                          py: 0.125,
+                                          fontSize: '0.8rem',
+                                          minHeight: 'unset',
+                                          fontWeight: 'medium'
+                                        }
+                                      }}
+                                    >
+                                      {sampleGroup.treatments.map((treatment) => (
+                                        <MenuItem key={treatment.id} value={treatment.id}>
+                                          <Typography variant="body2" fontWeight="medium" sx={{ fontSize: '0.8rem' }}>
+                                            {treatmentName[treatment.name] || treatment.name}
+                                          </Typography>
+                                        </MenuItem>
+                                      ))}
+                                    </Select>
+                                  </FormControl>
+                                  
+                                  <Button
+                                    variant={isSelected ? "contained" : "outlined"}
+                                    size="small"
+                                    onClick={() => {
+                                      if (isSelected) {
+                                        // Deselect - clear the current selection
+                                        setTreatmentId(null);
+                                        setSelectedTreatment(null);
+                                      } else if (displayedTreatment) {
+                                        // Select this treatment
+                                        handleExistingTreatmentSelect(displayedTreatment);
+                                      }
+                                    }}
+                                    sx={{ 
+                                      minWidth: 45,
+                                      height: 24,
+                                      fontSize: '0.7rem',
+                                      textTransform: 'none',
+                                      py: 0.25
+                                    }}
+                                  >
+                                    {isSelected ? "Selected" : "Select"}
                                   </Button>
-                                ))}
-                              </ButtonGroup>
-                            </ListItem>
-                            
-                            {sampleIndex < treatmentsBySample.length - 1 && <Divider />}
-                          </React.Fragment>
-                        ))
+                                </Box>
+                              </ListItem>
+                            );
+                          })
                       ) : (
                         // Fallback Simple List Display
                         uniqueExistingTreatments.map((regionTreatment, index) => (
@@ -934,6 +1031,12 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                               label="Sample"
                               disabled={loading || !locationId}
                               aria-label="Sample"
+                              renderValue={(selected) => {
+                                if (!selected) return '';
+                                const selectedSample = sampleOptions.find(s => s.id === selected);
+                                const displayName = selectedSample?.name || '';
+                                return displayName.length > 25 ? `${displayName.substring(0, 25)}...` : displayName;
+                              }}
                             >
                               <MenuItem value="">
                                 <em>{!locationId ? "Select location first..." : "Select sample..."}</em>
@@ -963,92 +1066,52 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                       Treatment
                     </Typography>
                     
-                    {/* Show message when no treatments available */}
-                    {!filteredTreatments && !sampleId ? (
-                      <Paper
-                        variant="outlined"
-                        sx={{
-                          p: 2,
-                          textAlign: 'center',
-                          backgroundColor: 'action.hover',
-                          border: '1px dashed',
-                          borderColor: 'divider'
-                        }}
+                    {/* Treatment dropdown like procedural blank */}
+                    <FormControl fullWidth variant="outlined">
+                      <InputLabel>Treatment</InputLabel>
+                      <Select
+                        value={treatmentId || ""}
+                        onChange={handleTreatmentChange}
+                        label="Treatment"
+                        disabled={loading || (!sampleId && !filteredTreatments) || treatmentOptions.length === 0}
+                        aria-label="Treatment"
                       >
-                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                          Select location and sample to see available treatments
-                        </Typography>
-                      </Paper>
-                    ) : treatmentOptions.length === 0 && (sampleId || filteredTreatments) ? (
-                      <Paper
-                        variant="outlined"
-                        sx={{
-                          p: 2,
-                          textAlign: 'center',
-                          backgroundColor: 'warning.50',
-                          border: '1px solid',
-                          borderColor: 'warning.200'
-                        }}
-                      >
-                        <Typography variant="body2" color="warning.dark">
-                          No treatments available for this sample
-                        </Typography>
-                      </Paper>
-                    ) : (
-                      /* Treatment cards */
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {treatmentOptions.map((treatment) => (
-                          <Paper
-                            key={treatment.id}
-                            variant={treatmentId === treatment.id ? "elevation" : "outlined"}
-                            sx={{
-                              p: 1.5,
-                              minWidth: 120,
-                              cursor: 'pointer',
-                              border: treatmentId === treatment.id ? '2px solid' : '1px solid',
-                              borderColor: treatmentId === treatment.id ? 'primary.main' : 'divider',
-                              backgroundColor: treatmentId === treatment.id ? 'primary.50' : 'background.paper',
-                              '&:hover': {
-                                borderColor: 'primary.main',
-                                backgroundColor: 'primary.50',
-                              },
-                              transition: 'all 0.2s ease',
-                            }}
-                            onClick={() => {
-                              setTreatmentId(treatment.id);
-                              setSelectedTreatment(treatment);
-                            }}
-                          >
-                            <Typography variant="body2" fontWeight="bold" sx={{ mb: 0.5 }}>
-                              {treatmentName[treatment.name] || treatment.name}
+                        <MenuItem value="">
+                          <Box sx={{ minHeight: 40 }}>
+                            <Typography variant="body2" fontWeight="medium" sx={{ fontStyle: 'italic' }}>
+                              {!sampleId && !filteredTreatments 
+                                ? "Select location and sample first..." 
+                                : treatmentOptions.length === 0 
+                                  ? "No treatments available for this sample"
+                                  : "Select a treatment..."}
                             </Typography>
-                            {treatment.enzyme_volume_litres && (
-                              <Typography variant="caption" color="text.secondary" display="block">
-                                {formatEnzymeVolume(treatment.enzyme_volume_litres)}L enzyme
+                            <Typography variant="caption" color="transparent" display="block" sx={{ height: '1.2em' }}>
+                              &nbsp;
+                            </Typography>
+                          </Box>
+                        </MenuItem>
+                        {treatmentOptions.map((treatment) => (
+                          <MenuItem key={treatment.id} value={treatment.id}>
+                            <Box sx={{ minHeight: 40 }}>
+                              <Typography variant="body2" fontWeight="medium">
+                                {treatmentName[treatment.name] || treatment.name}
                               </Typography>
-                            )}
-                            {treatment.notes && (
-                              <Typography 
-                                variant="caption" 
-                                color="text.secondary" 
-                                display="block"
-                                sx={{ 
-                                  mt: 0.5,
-                                  fontStyle: 'italic',
-                                  overflow: 'hidden',
-                                  textOverflow: 'ellipsis',
-                                  whiteSpace: 'nowrap',
-                                  maxWidth: 100
-                                }}
-                                title={treatment.notes}
-                              >
-                                {treatment.notes}
+                              <Typography variant="caption" color="text.secondary" display="block" sx={{ height: '1.2em' }}>
+                                {(treatment.enzyme_volume_litres || treatment.notes) ? (
+                                  <>
+                                    {treatment.enzyme_volume_litres && `${formatEnzymeVolume(treatment.enzyme_volume_litres)}L enzyme`}
+                                    {treatment.enzyme_volume_litres && treatment.notes && ' • '}
+                                    {treatment.notes && treatment.notes.length > 50 ? `${treatment.notes.substring(0, 50)}...` : treatment.notes}
+                                  </>
+                                ) : (
+                                  '\u00A0' // Non-breaking space to maintain height
+                                )}
                               </Typography>
-                            )}
-                          </Paper>
+                            </Box>
+                          </MenuItem>
                         ))}
-                      </Box>
-                    )}
+                      </Select>
+                    </FormControl>
                   </Box>
                 </>
               ) : (
