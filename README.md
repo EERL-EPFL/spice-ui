@@ -420,3 +420,11 @@ and the image at that point in time is able to be displayed with the view icon.
 As the results have been populated for these regions, it is now possible to
 view consolidated results per sample, but going to the respective sample page
 (we can click the link directly from this well view).
+
+##### Results (In sample view)
+
+After going to the sample we were just viewing, the sample display now shows
+the associated treatments, the amount of wells it has been assigned to, the
+experiments it belongs in, and a summary of its results per dilution (mean
+freezing temperature, and median freezing time).
+![Samples show with result](./docs/screenshots/samples-show-with-result.png)
