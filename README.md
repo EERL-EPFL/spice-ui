@@ -250,8 +250,7 @@ the top left of the image. Adding an image from the camera, click the location
 of the A1 well, and then subsequently the final well (H12 in an 8x12 layout).
 The application will then interpolate the locations of all wells in between.
 
-_Note: This functionality is not yet utilised in the application, but will be
-used in future releases to set parameters for experiment analysis._
+![Tray configuration image coordinates](./docs/screenshots/tray-configuration-create-3.png)
 
 After creating the first tray, subsequent trays can be added, and repeated with
 the add tray button at the bottom.
@@ -305,8 +304,6 @@ A sample can have many treatments, and the dilution of these treatments in an
 experiment is managed in the `Experiment` component (see below).
 
 #### Experiments
-
-![Experiments](./docs/screenshots/experiment-list.png)
 
 Experiments represent individual ice nucleation tests. Each experiment can
 process multiple samples simultaneously across configured tray layouts.
@@ -427,4 +424,5 @@ After going to the sample we were just viewing, the sample display now shows
 the associated treatments, the amount of wells it has been assigned to, the
 experiments it belongs in, and a summary of its results per dilution (mean
 freezing temperature, and median freezing time).
+
 ![Samples show with result](./docs/screenshots/samples-show-with-result.png)
