@@ -28,27 +28,16 @@ There are four components to the project:
 - [Installation](#installation)
   - [Dependencies](#dependencies)
   - [Development](#development)
-    - [Seed database](#seed-database)
   - [Production](#production)
-    - [Keycloak](#keycloak)
 - [Usage](#usage)
   - [API](#api)
   - [UI](#ui)
     - [Dashboard](#dashboard)
     - [Projects](#projects)
     - [Trays](#trays)
-      - [Creating a tray configuration](#creating-a-tray-configuration)
-        - [Probes](#probes)
-        - [Image coordinates](#image-coordinates)
     - [Locations](#locations)
     - [Samples](#samples)
-      - [Treatments](#treatments)
-    - [Experiments](#experiments)
-      - [Creating an experiment](#creating-an-experiment)
-        - [Treatment selector](#treatment-selector)
-      - [Viewing an experiment](#viewing-an-experiment)
-      - [Results](#results)
-      - [Results (In sample view)](#results-in-sample-view)
+    - [Experiments and results](#experiments)
 
 # Installation
 
@@ -323,7 +312,8 @@ When creating an experiment, the following fields are required:
 - **Name**: An arbitrary name to identify the experiment.
 - **Date**: The date when the experiment was conducted.
 - **Tray configuration**: The tray configuration that defines the arrangement
-  of wells and probes for this experiment. Set up in the `Trays` component above.
+  of wells and probes for this experiment. Set up in the `Trays` component
+  above.
 
 Otherwise, the following optional fields can be filled:
 
@@ -342,7 +332,7 @@ After selecting the tray configuration, the UI will display this corresponding
 configuration. By default, the tray configuration that is set as the default in
 the `Trays` component will already be pre-selected.
 
-![Experiments create](./docs/screenshots/experiment-create-regions-2.png)
+![Experiments create](./docs/screenshots/experiment-create-regions-1.png)
 
 According to the experiment setup, draw the regions associated with the tray
 wells by clicking and dragging the mouse over the tray image. The region will
@@ -434,3 +424,9 @@ experiments it belongs in, and a summary of its results per dilution (mean
 freezing temperature, and median freezing time).
 
 ![Samples show with result](./docs/screenshots/samples-show-with-result.png)
+
+## Attribution
+
+This project was developed by [Evan Thomas](https://github.com/evanjt) for the
+[Environmental Engineering Research Laboratory (EERL)](https://eerl.epfl.ch/)
+at EPFL.
