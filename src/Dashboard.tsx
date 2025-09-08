@@ -30,8 +30,14 @@ const Dashboard = () => {
     sort: { field: "last_updated", order: "DESC" },
   });
 
-  // Fetch locations using standard react-admin caching
-  const { data: locations, isLoading: locationsLoading } = useGetList("locations", {
+  // Fetch recent locations for quick access
+  const { data: recentLocations, isLoading: locationsLoading } = useGetList("locations", {
+    pagination: { page: 1, perPage: 3 },
+    sort: { field: "last_updated", order: "DESC" },
+  });
+
+  // Fetch all locations for the map
+  const { data: allLocations, isLoading: mapLocationsLoading } = useGetList("locations", {
     pagination: { page: 1, perPage: 100 },
     sort: { field: "name", order: "ASC" },
   });
@@ -250,9 +256,9 @@ const Dashboard = () => {
               <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
                 {locationsLoading ? (
                   <Typography variant="body2" color="text.secondary">Loading...</Typography>
-                ) : locations && locations.length > 0 ? (
+                ) : recentLocations && recentLocations.length > 0 ? (
                   <Box>
-                    {locations.slice(0, 3).map((location: any) => (
+                    {recentLocations.map((location: any) => (
                       <Box
                         key={location.id}
                         component="a"
@@ -278,7 +284,7 @@ const Dashboard = () => {
                             {location.name}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {location.latitude && location.longitude ? `${location.latitude?.toFixed(3)}, ${location.longitude?.toFixed(3)}` : 'No coordinates'}
+                            {new Date(location.last_updated).toLocaleDateString()}
                           </Typography>
                         </Box>
                       </Box>
@@ -304,11 +310,11 @@ const Dashboard = () => {
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
               Click on a location polygon to view its details
             </Typography>
-            {locationsLoading ? (
+            {mapLocationsLoading ? (
               <Typography>Loading locations...</Typography>
-            ) : locations && locations.length > 0 ? (
+            ) : allLocations && allLocations.length > 0 ? (
               <Box sx={{ flex: 1, minHeight: 0, width: '100%' }}>
-                <LocationsMapDashboard locations={locations} />
+                <LocationsMapDashboard locations={allLocations} />
               </Box>
             ) : (
               <Alert severity="info">
