@@ -14,7 +14,7 @@ export default {
 };
 
 export const sampleType = {
+  blank: "Blank",
   bulk: "Bulk",
   filter: "Filter",
-  procedural_blank: "Procedural Blank",
 };

@@ -292,8 +292,8 @@ const SampleInfo = () => {
                 </Labeled>
               )}
 
-              {/* Location - only for bulk and filter (not procedural_blank) */}
-              {record.type !== "procedural_blank" && record.location_id && (
+              {/* Location - only for bulk and filter (not blank) */}
+              {record.type !== "blank" && record.location_id && (
                 <Labeled label="Location">
                   <ReferenceField
                     source="location_id"

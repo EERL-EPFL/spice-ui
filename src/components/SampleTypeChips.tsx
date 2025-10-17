@@ -6,7 +6,7 @@ import { sampleType } from "../samples";
 const sampleTypeColors = {
   bulk: "#4caf50",             // Green
   filter: "#ff9800",           // Orange  
-  procedural_blank: "#9c27b0",  // Purple
+  blank: "#9c27b0",  // Purple
   pure_water: "#2196f3",       // Blue (in case this type exists)
 } as const;
 

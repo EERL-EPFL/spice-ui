@@ -80,7 +80,7 @@ const ControlSamplesTable = () => {
   const { data, isLoading } = useListContext();
 
   const controlSamples =
-    data?.filter((sample) => sample.type === "procedural_blank") || [];
+    data?.filter((sample) => sample.type === "blank") || [];
 
   if (isLoading) return null;
 

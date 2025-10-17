@@ -278,7 +278,7 @@ A sample is broken up into three types:
 
 - Bulk samples: These are the original samples collected from the field.
 - Filter samples
-- Procedural Blank: Representing samples that are used as background controls.
+- Blank: Representing samples that are used as background controls.
   There is minimal metadata associated with these samples, and they are not
   explicitly linked to a location or project. However, they still require,
   like others, treatment information (see below).
@@ -345,7 +345,7 @@ show up to the right with the following fields:
 - **Dilution factor**: The dilution factor applied to the samples in this
   region.
 - **Treatment**: A selector to choose the sample and its treatment to apply to
-  this region. Keep in mind that procedural blanks are selected here as well.
+  this region. Keep in mind that blanks are selected here as well.
   The selector is further described below.
 - **Background key**: An optional checkbox to denote that the sample is a
   background control.
@@ -365,7 +365,7 @@ again will show a list of all samples that have previously been selected in
 this experiment. Here you can change the treatment and add, again, to all
 regions, or just the one selected.
 
-Finally, the `PROCEDURAL BLANK` tab will show all of the procedural blanks
+Finally, the `BLANK` tab will show all of the blanks
 available. Unlike `Project samples`, they do not carry location information;
 however, the selection of treatment is the same.
 

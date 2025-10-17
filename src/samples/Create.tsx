@@ -31,9 +31,9 @@ const CreateComponent = () => {
         <SelectInput
           source="type"
           choices={[
+            { id: "blank", name: "Blank" },
             { id: "bulk", name: "Bulk" },
             { id: "filter", name: "Filter" },
-            { id: "procedural_blank", name: "Procedural Blank" },
           ]}
           validate={required()}
           defaultValue="bulk"
@@ -43,8 +43,8 @@ const CreateComponent = () => {
         <FormDataConsumer>
           {({ formData }) => (
             <>
-              {/* Location - hidden for procedural blank */}
-              {formData.type !== "procedural_blank" && (
+              {/* Location - hidden for blank */}
+              {formData.type !== "blank" && (
                 <ReferenceInput 
                   source="location_id" 
                   reference="locations"

@@ -97,7 +97,7 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
   const dataProvider = useDataProvider();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState<"project" | "procedural_blank">("project");
+  const [mode, setMode] = useState<"project" | "blank">("project");
   const [locationId, setLocationId] = useState<string | null>(null);
   const [sampleId, setSampleId] = useState<string | null>(null);
   const [treatmentId, setTreatmentId] = useState<string | null>(null);
@@ -115,7 +115,7 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
   const [treatmentOptions, setTreatmentOptions] = useState<Array<Treatment>>(
     [],
   );
-  const [proceduralBlankSampleOptions, setProceduralBlankSampleOptions] =
+  const [blankSampleOptions, setBlankSampleOptions] =
     useState<Array<{ id: string; name: string }>>([]);
 
   // Get unique existing treatments (excluding current region) - fallback for old logic
@@ -168,7 +168,7 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
             id: fullTreatment.sample_id 
           });
           
-          // Get the location for this sample (if not procedural blank)
+          // Get the location for this sample (if not blank)
           let sampleWithLocation = sample;
           if (sample.location_id) {
             try {
@@ -388,7 +388,7 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
         return { location: "", sample: "", treatment: treatment.name, sampleType: "" };
       }
 
-      // Get the location for this sample (if not procedural blank)
+      // Get the location for this sample (if not blank)
       let locationName = "";
       if (sample.location_id) {
         try {
@@ -454,18 +454,18 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
     }
   }, [dataProvider]);
 
-  const loadProceduralBlankSamples = useCallback(async () => {
+  const loadBlankSamples = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await dataProvider.getList("samples", {
         pagination: { page: 1, perPage: 500 },
         sort: { field: "name", order: "ASC" },
-        filter: { type: "procedural_blank" },
+        filter: { type: "blank" },
       });
-      setProceduralBlankSampleOptions(data);
+      setBlankSampleOptions(data);
     } catch (error) {
-      console.error("Error loading procedural blank samples:", error);
-      setProceduralBlankSampleOptions([]);
+      console.error("Error loading blank samples:", error);
+      setBlankSampleOptions([]);
     } finally {
       setLoading(false);
     }
@@ -561,7 +561,7 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
     if (mode === "project") {
       loadLocations();
     } else {
-      loadProceduralBlankSamples();
+      loadBlankSamples();
     }
   };
 
@@ -570,7 +570,7 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
     newMode: string | null,
   ) => {
     if (newMode !== null) {
-      setMode(newMode as "project" | "procedural_blank");
+      setMode(newMode as "project" | "blank");
       // Reset selections when mode changes
       setLocationId(null);
       setSampleId(null);
@@ -580,7 +580,7 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
       if (newMode === "project") {
         loadLocations();
       } else {
-        loadProceduralBlankSamples();
+        loadBlankSamples();
       }
     }
   };
@@ -961,10 +961,10 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                       Project Samples
                     </ToggleButton>
                     <ToggleButton
-                      value="procedural_blank"
-                      aria-label="procedural blank samples"
+                      value="blank"
+                      aria-label="blank samples"
                     >
-                      Procedural Blank
+                      Blank
                     </ToggleButton>
                   </ToggleButtonGroup>
                 </Box>
@@ -1066,7 +1066,7 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                       Treatment
                     </Typography>
                     
-                    {/* Treatment dropdown like procedural blank */}
+                    {/* Treatment dropdown like blank */}
                     <FormControl fullWidth variant="outlined">
                       <InputLabel>Treatment</InputLabel>
                       <Select
@@ -1116,23 +1116,23 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
                 </>
               ) : (
                 <>
-                  {/* Procedural Blank mode - Sample -> Treatment */}
+                  {/* Blank mode - Sample -> Treatment */}
                   <Box>
                     <Typography variant="subtitle2" gutterBottom>
-                      1. Select procedural blank sample
+                      1. Select blank sample
                     </Typography>
                     <FormControl fullWidth variant="outlined">
-                      <InputLabel>Procedural blank sample</InputLabel>
+                      <InputLabel>Blank sample</InputLabel>
                       <Select
                         value={sampleId || ""}
                         onChange={handleSampleChange}
-                        label="Procedural blank sample"
+                        label="Blank sample"
                         disabled={loading}
                       >
                         <MenuItem value="">
-                          <em>Select a procedural blank sample...</em>
+                          <em>Select a blank sample...</em>
                         </MenuItem>
-                        {proceduralBlankSampleOptions.map((sample) => (
+                        {blankSampleOptions.map((sample) => (
                           <MenuItem key={sample.id} value={sample.id}>
                             {sample.name}
                           </MenuItem>
@@ -1266,10 +1266,10 @@ export const TreatmentSelector: React.FC<TreatmentSelectorProps> = ({
         </Typography>
         {displayValue.treatment ? (
           <Box>
-            {displayValue.sampleType === "procedural_blank" ? (
+            {displayValue.sampleType === "blank" ? (
               <>
                 <Typography variant="body2" color="primary.main">
-                  Type: Procedural Blank
+                  Type: Blank
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Sample: {displayValue.sample}
