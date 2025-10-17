@@ -51,7 +51,8 @@ const EditComponent = () => (
               <Box sx={{ display: 'flex', gap: 2 }}>
                 <TextInput
                   source="name"
-                  label="Material/Name"
+                  label="Sample ID"
+                  helperText="Name written on physical sample"
                   validate={required()}
                   sx={{ flex: 2 }}
                 />
@@ -82,12 +83,6 @@ const EditComponent = () => (
                           helperText="Volume of air in sample"
                           sx={{ flex: 1 }}
                         />
-                        <NumberInput
-                          source="water_volume_litres"
-                          label="Water Volume (L)"
-                          helperText="Volume of water used for suspension"
-                          sx={{ flex: 1 }}
-                        />
                       </>
                     )}
                     {formData.type === "filter" && (
@@ -111,25 +106,29 @@ const EditComponent = () => (
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <DateTimeInput
                       source="start_time"
-                      label="Collection Start Time"
-                      helperText="When sample collection started"
+                      label={formData.type === "filter" ? "Start Time" : "Collection Date"}
+                      helperText={formData.type === "bulk" ? "Collection date for bulk sample" : "When sampling began"}
                       parse={(value) => value ? new Date(value).toISOString() : null}
                       sx={{ flex: 1 }}
                     />
-                    <DateTimeInput
-                      source="stop_time"
-                      label="Collection Stop Time"
-                      helperText="When sample collection finished"
-                      parse={(value) => value ? new Date(value).toISOString() : null}
-                      sx={{ flex: 1 }}
-                    />
-                    {formData.type === "bulk" && (
-                      <NumberInput
-                        source="initial_concentration_gram_l"
-                        label="Initial Concentration (g/L)"
-                        helperText="Initial particle concentration in suspension"
+                    {formData.type === "filter" && (
+                      <DateTimeInput
+                        source="stop_time"
+                        label="End Time"
+                        helperText="When sampling completed (duration will be calculated)"
+                        parse={(value) => value ? new Date(value).toISOString() : null}
                         sx={{ flex: 1 }}
                       />
+                    )}
+                    {formData.type === "bulk" && (
+                      <>
+                        <NumberInput
+                          source="initial_concentration_gram_l"
+                          label="Initial Concentration (g/L)"
+                          helperText="Initial particle concentration in suspension"
+                          sx={{ flex: 1 }}
+                        />
+                      </>
                     )}
                   </Box>
                 </>

@@ -53,7 +53,7 @@ const ExperimentalSamplesTable = () => {
         rowClick="show"
         bulkActionButtons={false}
       >
-        <TextField source="name" label="Name" />
+        <TextField source="name" label="Sample ID" />
         <FunctionField
           source="type"
           label="Type"
@@ -90,7 +90,7 @@ const ControlSamplesTable = () => {
         Control Samples ({controlSamples.length})
       </Typography>
       <Datagrid data={controlSamples} rowClick="show" bulkActionButtons={false}>
-        <TextField source="name" label="Name" />
+        <TextField source="name" label="Sample ID" />
         <FunctionField
           source="type"
           label="Type"

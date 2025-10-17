@@ -42,6 +42,33 @@ import { SampleLocationMap } from "../components/SampleLocationMap";
 import { TreatmentChips, SingleTreatmentChip } from "../components/TreatmentChips";
 import { SampleTypeChip } from "../components/SampleTypeChips";
 
+// Helper function to calculate duration between two dates
+const calculateDuration = (startTime: string, stopTime: string): string => {
+  if (!startTime || !stopTime) return 'N/A';
+
+  const start = new Date(startTime);
+  const stop = new Date(stopTime);
+
+  if (isNaN(start.getTime()) || isNaN(stop.getTime())) return 'N/A';
+
+  const diffMs = stop.getTime() - start.getTime();
+
+  if (diffMs < 0) return 'Invalid dates';
+
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffHours / 24);
+  const remainingHours = diffHours % 24;
+
+  if (diffDays > 0) {
+    return `${diffDays}d ${remainingHours}h`;
+  } else if (diffHours > 0) {
+    return `${diffHours}h`;
+  } else {
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    return `${diffMinutes}m`;
+  }
+};
+
 const ShowActions = () => {
   const { permissions } = usePermissions();
   return (
@@ -274,9 +301,14 @@ const SampleInfo = () => {
     <Card sx={{ mb: 3 }}>
       <CardContent>
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 2, flexWrap: "wrap" }}>
-          <Typography variant="h5">
-            {record.name}
-          </Typography>
+          <Box>
+            <Typography variant="h5" component="span">
+              {record.name}
+            </Typography>
+            <Typography variant="caption" display="block" color="text.secondary">
+              Sample ID
+            </Typography>
+          </Box>
           <SampleTypeChip sampleType={record.type} size="medium" />
         </Box>
 
@@ -286,10 +318,31 @@ const SampleInfo = () => {
             <Box sx={{ display: "grid", gridTemplateColumns: "1fr", gap: 2 }}>
 
               {/* Collection date - only for bulk and filter */}
-              {(record.type === "bulk" || record.type === "filter") && record.start_time && (
+              {record.type === "bulk" && record.start_time && (
                 <Labeled label="Collection Date">
                   <DateField source="start_time" showTime />
                 </Labeled>
+              )}
+
+              {/* Sampling period - only for filter samples */}
+              {record.type === "filter" && record.start_time && (
+                <>
+                  <Labeled label="Start Time">
+                    <DateField source="start_time" showTime />
+                  </Labeled>
+                  {record.stop_time && (
+                    <>
+                      <Labeled label="End Time">
+                        <DateField source="stop_time" showTime />
+                      </Labeled>
+                      <Labeled label="Duration">
+                        <Typography variant="body2">
+                          {calculateDuration(record.start_time, record.stop_time)}
+                        </Typography>
+                      </Labeled>
+                    </>
+                  )}
+                </>
               )}
 
               {/* Location - only for bulk and filter (not blank) */}
@@ -318,11 +371,6 @@ const SampleInfo = () => {
                   {record.air_volume_litres && (
                     <Labeled label="Air Volume (L)">
                       <NumberField source="air_volume_litres" />
-                    </Labeled>
-                  )}
-                  {record.water_volume_litres && (
-                    <Labeled label="Water Volume (L)">
-                      <NumberField source="water_volume_litres" />
                     </Labeled>
                   )}
                   {record.initial_concentration_gram_l && (
@@ -354,13 +402,7 @@ const SampleInfo = () => {
                 </>
               )}
 
-              {/* Fields for both bulk and filter samples */}
-              {(record.type === "bulk" || record.type === "filter") && record.stop_time && (
-                <Labeled label="Stop Time">
-                  <DateField source="stop_time" showTime />
-                </Labeled>
-              )}
-
+    
               {/* Legacy fields - keep for backward compatibility but only show if they exist */}
               {record.well_volume_litres && (
                 <Labeled label="Well Volume (L)">
