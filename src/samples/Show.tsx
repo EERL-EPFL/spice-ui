@@ -368,7 +368,7 @@ const SampleInfo = () => {
               {/* Suspension volume - for bulk, filter, and filter_blank */}
               {(record.type === "bulk" || record.type === "filter" || record.type === "filter_blank") && record.suspension_volume_litres && (
                 <Labeled label="Suspension Volume (L)">
-                  <NumberField source="suspension_volume_litres" />
+                  <NumberField source="suspension_volume_litres" options={{ maximumSignificantDigits: 6 }} />
                 </Labeled>
               )}
 
@@ -377,12 +377,12 @@ const SampleInfo = () => {
                 <>
                   {record.air_volume_litres && (
                     <Labeled label="Air Volume (L)">
-                      <NumberField source="air_volume_litres" />
+                      <NumberField source="air_volume_litres" options={{ maximumSignificantDigits: 6 }} />
                     </Labeled>
                   )}
                   {record.initial_concentration_gram_l && (
                     <Labeled label="Initial Concentration (g/L)">
-                      <NumberField source="initial_concentration_gram_l" />
+                      <NumberField source="initial_concentration_gram_l" options={{ maximumSignificantDigits: 6 }} />
                     </Labeled>
                   )}
                 </>
@@ -393,12 +393,12 @@ const SampleInfo = () => {
                 <>
                   {record.flow_litres_per_minute && (
                     <Labeled label="Airflow (L/min)">
-                      <NumberField source="flow_litres_per_minute" />
+                      <NumberField source="flow_litres_per_minute" options={{ maximumSignificantDigits: 6 }} />
                     </Labeled>
                   )}
                   {record.total_volume && (
                     <Labeled label="Total Volume (L)">
-                      <NumberField source="total_volume" />
+                      <NumberField source="total_volume" options={{ maximumSignificantDigits: 6 }} />
                     </Labeled>
                   )}
                 </>
@@ -415,7 +415,7 @@ const SampleInfo = () => {
               {/* Legacy fields - keep for backward compatibility but only show if they exist */}
               {record.well_volume_litres && (
                 <Labeled label="Well Volume (L)">
-                  <NumberField source="well_volume_litres" />
+                  <NumberField source="well_volume_litres" options={{ maximumSignificantDigits: 6 }} />
                 </Labeled>
               )}
 
