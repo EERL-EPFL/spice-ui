@@ -17,4 +17,5 @@ export const sampleType = {
   blank: "Blank",
   bulk: "Bulk",
   filter: "Filter",
+  filter_blank: "Filter Blank",
 };

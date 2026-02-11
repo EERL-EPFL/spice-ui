@@ -8,15 +8,10 @@ import {
   CreateButton,
   ExportButton,
   DateField,
-  NumberField,
-  ReferenceManyCount,
   ReferenceField,
   FunctionField,
-  useListContext,
 } from "react-admin";
-import { Typography, Box, Paper } from "@mui/material";
 import { postFilters } from "../filters/list";
-import { sampleType } from ".";
 import { SampleTypeChip } from "../components/SampleTypeChips";
 
 const ListComponentActions = () => {
@@ -33,26 +28,14 @@ const ListComponentActions = () => {
   );
 };
 
-const ExperimentalSamplesTable = () => {
-  const { data, isLoading } = useListContext();
-
-  const experimentalSamples =
-    data?.filter(
-      (sample) => sample.type === "bulk" || sample.type === "filter",
-    ) || [];
-
-  if (isLoading) return null;
-
+export const ListComponent = () => {
   return (
-    <Paper sx={{ p: 2, mb: 3 }}>
-      <Typography variant="h6" gutterBottom>
-        Experimental Samples ({experimentalSamples.length})
-      </Typography>
-      <Datagrid
-        data={experimentalSamples}
-        rowClick="show"
-        bulkActionButtons={false}
-      >
+    <List
+      actions={<ListComponentActions />}
+      storeKey={false}
+      filters={postFilters}
+    >
+      <Datagrid rowClick="show" bulkActionButtons={false}>
         <TextField source="name" label="Sample ID" />
         <FunctionField
           source="type"
@@ -72,55 +55,6 @@ const ExperimentalSamplesTable = () => {
         />
         <DateField source="last_updated" label="Last Updated" showTime />
       </Datagrid>
-    </Paper>
-  );
-};
-
-const ControlSamplesTable = () => {
-  const { data, isLoading } = useListContext();
-
-  const controlSamples =
-    data?.filter((sample) => sample.type === "blank") || [];
-
-  if (isLoading) return null;
-
-  return (
-    <Paper sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom>
-        Control Samples ({controlSamples.length})
-      </Typography>
-      <Datagrid data={controlSamples} rowClick="show" bulkActionButtons={false}>
-        <TextField source="name" label="Sample ID" />
-        <FunctionField
-          source="type"
-          label="Type"
-          render={(record) => (
-            <SampleTypeChip sampleType={record.type} />
-          )}
-        />
-        <FunctionField
-          label="Treatments"
-          render={(record) =>
-            record.treatments ? record.treatments.length : 0
-          }
-        />
-        <DateField source="last_updated" label="Last Updated" showTime />
-      </Datagrid>
-    </Paper>
-  );
-};
-
-export const ListComponent = () => {
-  return (
-    <List
-      actions={<ListComponentActions />}
-      storeKey={false}
-      filters={postFilters}
-    >
-      <Box>
-        <ExperimentalSamplesTable />
-        <ControlSamplesTable />
-      </Box>
     </List>
   );
 };

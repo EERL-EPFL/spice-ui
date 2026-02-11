@@ -1,9 +1,11 @@
 services:
   traefik:
-    image: traefik:v2.9.6
+    image: traefik:v3.6
     command:
       - "--api.insecure=true"
       - "--providers.docker=true"
+    environment:
+      - DOCKER_API_VERSION=1.44
     ports:
       - "88:80"
       - "8088:8080"

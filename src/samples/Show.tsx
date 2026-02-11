@@ -295,7 +295,7 @@ const SampleInfo = () => {
   // Convert coordinates for map (for bulk and filter samples)
   const lat = typeof record.latitude === 'string' ? parseFloat(record.latitude) : record.latitude;
   const lng = typeof record.longitude === 'string' ? parseFloat(record.longitude) : record.longitude;
-  const hasValidCoordinates = (record.type === "bulk" || record.type === "filter") && lat && lng && !isNaN(lat) && !isNaN(lng);
+  const hasValidCoordinates = (record.type === "bulk" || record.type === "filter" || record.type === "filter_blank") && lat && lng && !isNaN(lat) && !isNaN(lng);
 
   return (
     <Card sx={{ mb: 3 }}>
@@ -320,6 +320,13 @@ const SampleInfo = () => {
               {/* Collection date - only for bulk and filter */}
               {record.type === "bulk" && record.start_time && (
                 <Labeled label="Collection Date">
+                  <DateField source="start_time" showTime />
+                </Labeled>
+              )}
+
+              {/* Time - for filter_blank (instant, not period) */}
+              {record.type === "filter_blank" && record.start_time && (
+                <Labeled label="Time">
                   <DateField source="start_time" showTime />
                 </Labeled>
               )}
@@ -358,8 +365,8 @@ const SampleInfo = () => {
                 </Labeled>
               )}
 
-              {/* Suspension volume - only for bulk and filter */}
-              {(record.type === "bulk" || record.type === "filter") && record.suspension_volume_litres && (
+              {/* Suspension volume - for bulk, filter, and filter_blank */}
+              {(record.type === "bulk" || record.type === "filter" || record.type === "filter_blank") && record.suspension_volume_litres && (
                 <Labeled label="Suspension Volume (L)">
                   <NumberField source="suspension_volume_litres" />
                 </Labeled>
@@ -394,12 +401,14 @@ const SampleInfo = () => {
                       <NumberField source="total_volume" />
                     </Labeled>
                   )}
-                  {record.filter_substrate && (
-                    <Labeled label="Filter Substrate">
-                      <TextField source="filter_substrate" />
-                    </Labeled>
-                  )}
                 </>
+              )}
+
+              {/* Filter substrate - for filter and filter_blank */}
+              {(record.type === "filter" || record.type === "filter_blank") && record.filter_substrate && (
+                <Labeled label="Filter Substrate">
+                  <TextField source="filter_substrate" />
+                </Labeled>
               )}
 
     

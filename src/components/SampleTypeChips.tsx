@@ -7,6 +7,7 @@ const sampleTypeColors = {
   bulk: "#4caf50",             // Green
   filter: "#ff9800",           // Orange  
   blank: "#9c27b0",  // Purple
+  filter_blank: "#e91e63",     // Pink
   pure_water: "#2196f3",       // Blue (in case this type exists)
 } as const;
 

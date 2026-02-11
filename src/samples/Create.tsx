@@ -34,6 +34,7 @@ const CreateComponent = () => {
             { id: "blank", name: "Blank" },
             { id: "bulk", name: "Bulk" },
             { id: "filter", name: "Filter" },
+            { id: "filter_blank", name: "Filter Blank" },
           ]}
           validate={required()}
           defaultValue="bulk"
@@ -45,8 +46,8 @@ const CreateComponent = () => {
             <>
               {/* Location - hidden for blank */}
               {formData.type !== "blank" && (
-                <ReferenceInput 
-                  source="location_id" 
+                <ReferenceInput
+                  source="location_id"
                   reference="locations"
                   defaultValue={prefilledLocationId}
                 >
@@ -112,7 +113,7 @@ const CreateComponent = () => {
                       </>
                     )}
                   </Box>
-                  
+
                   <Box sx={{ display: 'flex', gap: 2 }}>
                     <DateTimeInput
                       source="start_time"
@@ -144,8 +145,29 @@ const CreateComponent = () => {
                 </>
               )}
 
-              {/* Type-specific additional fields */}
-              {formData.type === "filter" && (
+              {/* Filter blank fields */}
+              {formData.type === "filter_blank" && (
+                <>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <NumberInput
+                      source="suspension_volume_litres"
+                      label="Suspension Volume (L)"
+                      helperText="Volume of liquid used to prepare the sample suspension"
+                      sx={{ flex: 1 }}
+                    />
+                  </Box>
+                  <DateTimeInput
+                    source="start_time"
+                    label="Time"
+                    helperText="When the filter blank was prepared"
+                    parse={(value) => value ? new Date(value).toISOString() : null}
+                    fullWidth
+                  />
+                </>
+              )}
+
+              {/* Filter substrate - for filter and filter_blank */}
+              {(formData.type === "filter" || formData.type === "filter_blank") && (
                 <TextInput
                   source="filter_substrate"
                   label="Filter Substrate"
@@ -154,7 +176,7 @@ const CreateComponent = () => {
                 />
               )}
 
-              {(formData.type === "bulk" || formData.type === "filter") && (
+              {(formData.type === "bulk" || formData.type === "filter" || formData.type === "filter_blank") && (
                 <>
                   <Divider sx={{ my: 2 }} />
                   <Typography variant="h6" gutterBottom>
