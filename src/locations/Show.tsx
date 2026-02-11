@@ -20,8 +20,8 @@ import {
   Labeled,
   useDataProvider,
 } from "react-admin";
-import { Box, Typography, Card, CardContent, Chip, Button, TablePagination } from "@mui/material";
-import { Add as AddIcon } from "@mui/icons-material";
+import { Box, Typography, Card, CardContent, Chip, Button, TablePagination, TextField as MuiTextField, InputAdornment, TableSortLabel } from "@mui/material";
+import { Add as AddIcon, Search as SearchIcon } from "@mui/icons-material";
 import { treatmentName } from "../treatments";
 import { LocationConvexHullMap } from "../components/LocationConvexHullMap";
 import { TreatmentChips } from "../components/TreatmentChips";
@@ -127,6 +127,8 @@ const SamplesTabContent = ({ onCountChange }: { onCountChange?: (count: number) 
   const dataProvider = useDataProvider();
   const [samples, setSamples] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(10);
   const [totalSamples, setTotalSamples] = React.useState(0);
@@ -168,15 +170,32 @@ const SamplesTabContent = ({ onCountChange }: { onCountChange?: (count: number) 
     setPage(0);
   };
 
-  // Calculate paginated samples
-  const paginatedSamples = samples.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  // Filter, sort, and paginate samples
+  const filteredSamples = searchQuery
+    ? samples.filter((s: any) => s.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : samples;
+  const sortedSamples = [...filteredSamples].sort((a: any, b: any) => {
+    const cmp = (a.name ?? '').localeCompare(b.name ?? '');
+    return sortDirection === 'asc' ? cmp : -cmp;
+  });
+  const paginatedSamples = sortedSamples.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   if (loading) return <div>Loading samples...</div>;
 
   return (
     <Box>
-      {/* Header with create button */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+      {/* Header with search and create button */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 2, alignItems: 'center' }}>
+        <MuiTextField
+          size="small"
+          placeholder="Search samples..."
+          value={searchQuery}
+          onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+          }}
+          sx={{ width: 250 }}
+        />
         <Button
           variant="contained"
           startIcon={<AddIcon />}
@@ -189,7 +208,7 @@ const SamplesTabContent = ({ onCountChange }: { onCountChange?: (count: number) 
 
       {/* Samples data grid - manual table since we're using custom data */}
       <Box sx={{ mt: 2 }}>
-        {!Array.isArray(samples) || samples.length === 0 ? (
+        {filteredSamples.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
             No samples found for this location
           </Typography>
@@ -199,7 +218,15 @@ const SamplesTabContent = ({ onCountChange }: { onCountChange?: (count: number) 
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
-                    <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Name</th>
+                    <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>
+                      <TableSortLabel
+                        active
+                        direction={sortDirection}
+                        onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                      >
+                        Name
+                      </TableSortLabel>
+                    </th>
                     <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Type</th>
                     <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Treatments</th>
                   </tr>
@@ -234,7 +261,7 @@ const SamplesTabContent = ({ onCountChange }: { onCountChange?: (count: number) 
             {/* Pagination controls */}
             <TablePagination
               component="div"
-              count={totalSamples}
+              count={filteredSamples.length}
               page={page}
               onPageChange={handleChangePage}
               rowsPerPage={rowsPerPage}
@@ -258,6 +285,8 @@ const ExperimentsTabContent = ({ onCountChange }: { onCountChange?: (count: numb
   const dataProvider = useDataProvider();
   const [experiments, setExperiments] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('desc');
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(10);
   const [totalExperiments, setTotalExperiments] = React.useState(0);
@@ -294,14 +323,33 @@ const ExperimentsTabContent = ({ onCountChange }: { onCountChange?: (count: numb
     setPage(0);
   };
 
-  // Calculate paginated experiments
-  const paginatedExperiments = experiments.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  // Filter, sort, and paginate experiments
+  const filteredExperiments = searchQuery
+    ? experiments.filter((e: any) => e.name?.toLowerCase().includes(searchQuery.toLowerCase()))
+    : experiments;
+  const sortedExperiments = [...filteredExperiments].sort((a: any, b: any) => {
+    const cmp = (a.name ?? '').localeCompare(b.name ?? '');
+    return sortDirection === 'asc' ? cmp : -cmp;
+  });
+  const paginatedExperiments = sortedExperiments.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   if (loading) return <div>Loading experiments...</div>;
 
   return (
     <Box>
-      {!Array.isArray(experiments) || experiments.length === 0 ? (
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <MuiTextField
+          size="small"
+          placeholder="Search experiments..."
+          value={searchQuery}
+          onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+          InputProps={{
+            startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>,
+          }}
+          sx={{ width: 250 }}
+        />
+      </Box>
+      {filteredExperiments.length === 0 ? (
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
           No experiments found for this location
         </Typography>
@@ -312,7 +360,15 @@ const ExperimentsTabContent = ({ onCountChange }: { onCountChange?: (count: numb
               <thead>
                 <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
                   <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Date</th>
-                  <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Name</th>
+                  <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>
+                    <TableSortLabel
+                      active
+                      direction={sortDirection}
+                      onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    >
+                      Name
+                    </TableSortLabel>
+                  </th>
                   <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Remarks</th>
                 </tr>
               </thead>
@@ -343,7 +399,7 @@ const ExperimentsTabContent = ({ onCountChange }: { onCountChange?: (count: numb
           {/* Pagination controls */}
           <TablePagination
             component="div"
-            count={totalExperiments}
+            count={filteredExperiments.length}
             page={page}
             onPageChange={handleChangePage}
             rowsPerPage={rowsPerPage}
