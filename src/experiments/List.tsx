@@ -30,6 +30,7 @@ export const ListComponent = () => {
       actions={<ListComponentActions />}
       storeKey={false}
       filters={<ExperimentFilterForm />}
+      sort={{ field: 'performed_at', order: 'DESC' }}
     >
       <Datagrid rowClick="show">
         <DateField source="performed_at" label="Performed at" showTime />

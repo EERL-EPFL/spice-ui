@@ -47,9 +47,6 @@ const EditComponent = () => {
       <SimpleForm>
         <TextInput disabled label="Id" source="id" />
         <TextInput source="name" validate={[required()]} />
-        <ReferenceInput source="sample_id" reference="samples">
-          <SelectInput optionText="name" />
-        </ReferenceInput>
         <TextInput source="username" />
         <DateTimeInput
           source="performed_at"

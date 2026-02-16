@@ -20,6 +20,9 @@ import {
   useList,
   Pagination,
   Labeled,
+  useDataProvider,
+  useRedirect,
+  useCreatePath,
 } from "react-admin";
 import {
   Card,
@@ -34,6 +37,7 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
+  TablePagination,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { treatmentName } from "../treatments";
@@ -469,11 +473,103 @@ const SampleInfo = () => {
   );
 };
 
+const SampleExperiments = () => {
+  const record = useRecordContext();
+  const redirect = useRedirect();
+  const createPath = useCreatePath();
+  const dataProvider = useDataProvider();
+  const [experiments, setExperiments] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+
+  React.useEffect(() => {
+    if (record?.id) {
+      dataProvider.getSampleExperiments('samples', { sampleId: record.id })
+        .then((response: any) => {
+          const arr = Array.isArray(response.data) ? response.data : [];
+          setExperiments(arr);
+          setLoading(false);
+        })
+        .catch(() => {
+          setExperiments([]);
+          setLoading(false);
+        });
+    }
+  }, [record?.id, dataProvider]);
+
+  if (loading) return <Typography>Loading experiments...</Typography>;
+  if (experiments.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        No experiments found for this sample
+      </Typography>
+    );
+  }
+
+  const paginatedExperiments = experiments.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+
+  return (
+    <Box>
+      <Box sx={{ overflow: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
+              <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Date</th>
+              <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>Name</th>
+              <th style={{ textAlign: 'left', padding: '12px 8px', fontWeight: 600 }}>User</th>
+            </tr>
+          </thead>
+          <tbody>
+            {paginatedExperiments.map((experiment: any) => (
+              <tr
+                key={experiment.id}
+                style={{
+                  borderBottom: '1px solid #f0f0f0',
+                  cursor: 'pointer',
+                }}
+                onClick={() => {
+                  const path = createPath({ resource: "experiments", id: experiment.id, type: "show" });
+                  redirect(path);
+                }}
+              >
+                <td style={{ padding: '12px 8px' }}>
+                  {experiment.performed_at ? new Date(experiment.performed_at).toLocaleString() : '-'}
+                </td>
+                <td style={{ padding: '12px 8px' }}>{experiment.name}</td>
+                <td style={{ padding: '12px 8px' }}>{experiment.username || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Box>
+      {experiments.length > rowsPerPage && (
+        <TablePagination
+          component="div"
+          count={experiments.length}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[5, 10, 25]}
+        />
+      )}
+    </Box>
+  );
+};
+
 export const ShowComponent = () => {
   return (
     <Show actions={<ShowActions />}>
       <SimpleShowLayout>
         <SampleInfo />
+        <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
+          Experiments
+        </Typography>
+        <SampleExperiments />
         <Typography variant="h6" sx={{ mt: 3, mb: 2 }}>
           Treatments
         </Typography>

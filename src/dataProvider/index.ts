@@ -297,6 +297,11 @@ const dataProvider = (
     const url = `${apiUrl}/${resource}/${locationId}/experiments`;
     return httpClient(url).then(({ json }) => ({ data: json }));
   },
+  getSampleExperiments: async (resource, params) => {
+    const { sampleId } = params;
+    const url = `${apiUrl}/${resource}/${sampleId}/experiments`;
+    return httpClient(url).then(({ json }) => ({ data: json }));
+  },
   downloadAsset: async (assetId: string) => {
     const url = `${apiUrl}/assets/${assetId}/download`;
     const response = await httpClient(url, { method: "GET" });

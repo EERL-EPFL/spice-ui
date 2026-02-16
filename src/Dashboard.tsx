@@ -53,16 +53,6 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ p: 1.5, maxHeight: '100vh', overflow: 'hidden' }}>
-      {/* Header */}
-      <Box sx={{ mb: 1.5, textAlign: "center" }}>
-        <Typography variant="h5" gutterBottom color="primary">
-          SPICE Dashboard
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Submicron Particle Ice Nucleation Analysis
-        </Typography>
-      </Box>
-
       {/* Main Content Grid */}
       <Grid container spacing={1.5} sx={{ height: 'calc(100vh - 150px)' }}>
         {/* Left Column: Three Cards Stacked */}
