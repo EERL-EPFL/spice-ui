@@ -1008,6 +1008,15 @@ const ExperimentDetailsHeader = () => {
             </Typography>
           </Box>
         </Box>
+
+        {record?.remarks && (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary">
+              Remarks
+            </Typography>
+            <Typography variant="body2">{record.remarks}</Typography>
+          </Box>
+        )}
       </CardContent>
     </Card>
   );
